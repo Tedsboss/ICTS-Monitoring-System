@@ -1,0 +1,1 @@
+<p class="text-danger text-xs pt-1" hidden id="{{ convertErrorIdElement($elem_id) }}"></p>

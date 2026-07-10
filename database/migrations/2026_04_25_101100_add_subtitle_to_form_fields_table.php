@@ -1,0 +1,40 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        if (!Schema::hasTable('form_fields')) {
+            return;
+        }
+
+        Schema::table('form_fields', function (Blueprint $table) {
+            if (!Schema::hasColumn('form_fields', 'subtitle')) {
+                $table->text('subtitle')->nullable()->after('label');
+            }
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        if (!Schema::hasTable('form_fields')) {
+            return;
+        }
+
+        Schema::table('form_fields', function (Blueprint $table) {
+            if (Schema::hasColumn('form_fields', 'subtitle')) {
+                $table->dropColumn('subtitle');
+            }
+        });
+    }
+};

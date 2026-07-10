@@ -1,0 +1,39 @@
+/* .updated-ph::placeholder {
+  color: #9c27b0;
+  font-weight: 500;
+  font-size: 15px;
+}
+
+.updated-ph::-moz-input-placeholder {
+  color: #9c27b0;
+  font-weight: 500;
+  font-size: 15px;
+}
+
+.updated-ph::-ms-input-placeholder {
+  color: #9c27b0;
+  font-weight: 500;
+  font-size: 15px;
+}
+
+.updated-ph::-webkit-input-placeholder {
+  color: #9c27b0;
+  font-weight: 500;
+  font-size: 15px;
+} */
+
+.updated-ph-center::placeholder {
+  text-align: center;
+}
+
+.updated-ph-center::-moz-input-placeholder {
+  text-align: center;
+}
+
+.updated-ph-center::-ms-input-placeholder {
+  text-align: center;
+}
+
+.updated-ph-center::-webkit-input-placeholder {
+  text-align: center;
+}
