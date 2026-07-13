@@ -25,7 +25,7 @@
     <i class="fa fa-times p-3 cursor-pointer text-secondary opacity-5 position-absolute end-0 top-0 d-none d-xl-none" aria-hidden="true" id="iconSidenav"></i>
     <a class="navbar-brand m-0" href="{{ route('home') }}">
       <img src="{{ $logo ?? '/assets/img/neda/logo.png'}}" class="navbar-brand-img h-100" alt="main_logo">
-      <span class="ms-3 font-weight-bold">DEPDev - UPLIFT Portal</span>
+      <span class="ms-3 font-weight-bold">D.I.R.E.K. Application</span>
     </a>
   </div>
   <hr class="horizontal dark mt-0 mb-0">
@@ -90,17 +90,14 @@
         </a>
       </li>
 
-
-      @can('viewAny', App\Models\FormSubmission::class)
         <li class="nav-item">
           <a class="nav-link {{ $isFormSubmissionRoute ? 'active' : '' }}" href="{{ route('submissions.index') }}">
             <div class="icon icon-shape icon-sm text-center d-flex align-items-center justify-content-center pt-1">
               <i class="fa fa-book text-primary opacity-10" style="font-size: large; font-weight: 500 "></i>
             </div>
-            <span class="nav-link-text ms-1">Headline Indicator Submissions</span>
+            <span class="nav-link-text ms-1">Performance Commitment</span>
           </a>
         </li>
-      @endcan
 
       @can('viewAny', App\Models\UpliftSubmission::class)
         <li class="nav-item">

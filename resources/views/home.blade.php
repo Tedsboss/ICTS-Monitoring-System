@@ -18,14 +18,11 @@
           <div class="card-body p-5">
             <div class="row align-items-center">
               <div class="col-lg-7">
-                <span class="badge bg-white text-info mb-3">Unified Package for Livelihoods, Industry, Food, and Transport</span>
+                <span class="badge bg-white text-info mb-3">Director's Integrated Reporting and Executive Kiosk</span>
                 <h5 class="text-uppercase text-muted mb-2">Welcome to</h5>
-                <h1 class="text-info text-gradient mb-3">DEPDev - UPLIFT Portal</h1>
+                <h1 class="text-info text-gradient mb-3">D.I.R.E.K. Application</h1>
                 <p class="lead mb-3">
-                  UPLIFT is a government project designed to consolidate weekly updates and provide a clearer view of initiatives related to livelihoods, industry, food, and transport.
-                </p>
-                <p class="mb-0">
-                  This portal gives stakeholders a single place to track progress, review updates, and keep reporting aligned across participating offices and programs.
+                  Project DIREK is a one-stop digital platform designed for DEPDev Directors, providing a consolidated view of administrative, financial, operational, and performance information in a single dashboard. It serves as an executive command center that enables faster decision-making, improves access to critical information, and streamlines the monitoring of programs, projects, resources, and organizational performance.
                 </p>
               </div>
               <div class="col-lg-5 mt-4 mt-lg-0">

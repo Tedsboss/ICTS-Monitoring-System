@@ -42,13 +42,14 @@
               <div class="col-sm-auto col-8 my-auto">
                 <div class="h-100">
                   <h5 class="mb-1 font-weight-bolder"> {{ auth()->user()->firstname ?? '' }} {{ auth()->user()->lastname ?? '' }}</h5>
-                  <p class="mb-0 font-weight-bold text-sm">{{ auth()->user()->position_name()  }}</p>
+                  <p class="mb-0 font-weight-bold text-sm">{{ auth()->user()->position_name() }}</p>
+                  <p class="mb-0 font-weight-bold text-sm">{{ auth()->user()->staff_name() }}</p>
                 </div>
               </div>
               <div class="col-sm-auto ms-sm-auto mt-sm-0 mt-3 d-flex">
                 {{-- @can('enableMyEmailNotification', App\Models\User::class)
                   <div class="form-group">
-                    <p class="form-text text-muted text-xs ms-1">Recieve email notification1?</p>
+                    <p class="form-text text-muted text-xs ms-1">Receive email notification?</p>
                     <div class="form-check form-switch ms-2  justify-content-end">
                       <input class="form-check-input" type="checkbox" name="emailnotif" value="1" @if(auth()->user()->emailnotif == 'Y') checked @endif>
                     </div>

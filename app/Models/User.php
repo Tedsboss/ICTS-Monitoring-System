@@ -41,7 +41,6 @@ class User extends Authenticatable
     'twofactorexpiredat',
     'position_id',
     'division_id',
-    'staff_id',
   ];
 
   /**
@@ -137,6 +136,14 @@ class User extends Authenticatable
   {
     if ($this->position()->first() != null) {
       return $this->position()->first()->name;
+    }
+    return null;
+  }
+
+  public function staff_name()
+  {
+    if ($this->staff()->first() != null) {
+      return $this->staff()->first()->name;
     }
     return null;
   }

@@ -6,7 +6,7 @@
 @section('content')
   <nav class="navbar navbar-main navbar-expand-lg  px-0 mx-4 shadow-none border-radius-xl z-index-sticky " id="navbarBlur" data-scroll="false">
     <div class="container-fluid py-1 px-3">
-      @include('layouts.navbars.auth.topnav', ['title' => 'Requests'])
+      @include('layouts.navbars.auth.topnav', ['title' => 'Office Performance Commitment'])
       @include('layouts.navbars.auth.topnav-withdatetime')
     </div>
   </nav>
@@ -17,7 +17,7 @@
         <div class="card">
           <div class="card-header d-flex justify-content-between">
             <div class="d-flex align-items-center">
-              <h5 class="mb-0">Submissions</h5>
+              <h5 class="mb-0">Rating Period</h5>
             </div>
             @can('create', App\Models\FormSubmission::class)
             @if($form != null)
