@@ -8,6 +8,7 @@ use App\Http\Controllers\Auth\ChangePassword;
 use App\Http\Controllers\AgencyController;
 use App\Http\Controllers\ApiClientController;
 use App\Http\Controllers\DivisionController;
+use App\Http\Controllers\FinancialPlanController;
 use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\HolidayController;
 use App\Http\Controllers\HomeController;
@@ -22,6 +23,9 @@ use App\Http\Controllers\SystemLogController;
 use App\Http\Middleware\AppAzure;
 use App\Http\Controllers\InquiryController;
 use App\Http\Controllers\ParameterController;
+use App\Http\Controllers\ProcurementController;
+use App\Http\Controllers\SaebController;
+use App\Http\Controllers\SaebSummaryController;
 use App\Http\Controllers\StaffController;
 use App\Http\Controllers\TwoFactorController;
 use App\Http\Controllers\UpliftFormBuilderController;
@@ -34,7 +38,7 @@ use App\Http\Controllers\UpliftSubmissionController;
 */
 
 Route::get('/', function () {
-  return redirect('/login');
+    return redirect()->route('saebs.index');
 });
 
 Route::get('/login', [LoginController::class, 'show'])
@@ -119,6 +123,9 @@ Route::group(['middleware' => 'check.restricted.ips'], function () {
       Route::group(['middleware' => 'first.login'], function () {
         Route::get('home', [HomeController::class, 'index'])
           ->name('home');
+
+        Route::get('saeb-summary', [SaebSummaryController::class, 'index'])
+          ->name('saeb.index');
 
         /*
         |--------------------------------------------------------------------------
@@ -387,4 +394,28 @@ Route::delete('administrator/forms/{form}/fields/{form_field}', [FormController:
     Route::post('logout', [LoginController::class, 'logout'])
       ->name('logout');
   });
+
+Route::middleware(['auth'])->prefix('administrator')->group(function () {
+
+    Route::get('saebs/data', [SaebController::class, 'data'])->name('saebs.data');
+    Route::resource('saebs', SaebController::class);
+
+    Route::get('procurements/data', [ProcurementController::class, 'data'])->name('procurements.data');
+    Route::resource('procurements', ProcurementController::class);
+
+    Route::get('financial-plans/all', [FinancialPlanController::class, 'plans'])->name('financial-plans.plans');
+    Route::get('financial-plans', [FinancialPlanController::class, 'index'])->name('financial-plans.index');
+    Route::get('financial-plans/data', [FinancialPlanController::class, 'data'])->name('financial-plans.data');
+    Route::get('financial-plans/builder', [FinancialPlanController::class, 'builder'])->name('financial-plans.builder');
+    Route::post(
+        'financial-plans/save',
+        [FinancialPlanController::class, 'save']
+    )->name('financial-plans.save');
+    Route::delete('financial-plans/destroy-plan', [FinancialPlanController::class, 'destroyPlan'])
+        ->name('financial-plans.destroy-plan');
+
+    Route::delete('financial-plans/{financial_plan}', [FinancialPlanController::class, 'destroy'])
+        ->name('financial-plans.destroy');
+
+});
 });
