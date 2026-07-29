@@ -269,7 +269,7 @@ abstract class Renderer
             return 'warning';
         }
 
-        return 'success';
+        return 'succes';
     }
 
     private function runtimeString(): string

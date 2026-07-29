@@ -71,7 +71,7 @@ out:
     $myClass->doFetching();
 
 If we run this, our test will error out with a nasty
-``PHP Fatal error:  Uncaught Error: Undefined class constant 'SUCCESS' in ..``.
+``PHP Fatal error:  Uncaught Error: Undefined class constant 'succes' in ..``.
 
 Here's how a ``namedMock()`` can help us in a situation like this.
 
@@ -173,11 +173,11 @@ It can be mocked with:
 
     \Mockery::getConfiguration()->setConstantsMap([
         'Fetcher' => [
-            'SUCCESS' => 'success',
+            'succes' => 'succes',
             'FAILURE' => 'fail',
         ]
     ]);
 
     $mock = \Mockery::mock('Fetcher');
-    var_dump($mock::SUCCESS); // (string) 'success'
+    var_dump($mock::SUCCESS); // (string) 'succes'
     var_dump($mock::FAILURE); // (string) 'fail'

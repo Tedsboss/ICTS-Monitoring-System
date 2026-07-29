@@ -24,6 +24,6 @@ final class Success extends Known
 
     public function asString(): string
     {
-        return 'success';
+        return 'succes';
     }
 }

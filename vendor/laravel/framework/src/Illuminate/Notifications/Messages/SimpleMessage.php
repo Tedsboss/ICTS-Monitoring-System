@@ -77,7 +77,7 @@ class SimpleMessage
      */
     public function success()
     {
-        $this->level = 'success';
+        $this->level = 'succes';
 
         return $this;
     }
