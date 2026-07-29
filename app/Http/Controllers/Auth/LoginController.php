@@ -51,7 +51,7 @@ class LoginController extends Controller
         'class_theme' => auth()->user()->enabledark == 'Y' ? 'dark' : '',
       ]]);
 
-      return redirect()->intended('/');
+      return redirect()->intended(route('home'));
     } else {
       $this->incrementLoginAttempts($request);
     }

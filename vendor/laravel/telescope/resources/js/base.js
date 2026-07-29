@@ -79,7 +79,7 @@ export default {
          * Show a success message.
          */
         alertSuccess(message, autoClose) {
-            this.$root.alert.type = 'success';
+            this.$root.alert.type = 'succes';
             this.$root.alert.autoClose = autoClose;
             this.$root.alert.message = message;
         },

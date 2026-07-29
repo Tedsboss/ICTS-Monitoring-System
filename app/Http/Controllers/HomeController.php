@@ -11,9 +11,10 @@ use Illuminate\Support\Facades\DB;
 
 class HomeController extends Controller
 {
-  public function index()
-  {
-    $homeannouncement = Parameter::findorFail(2);
-    return view("home", compact('homeannouncement'));
-  }
+    public function index()
+    {
+        $homeannouncement = Parameter::findOrFail(2);
+
+        return view('home', compact('homeannouncement'));
+    }
 }

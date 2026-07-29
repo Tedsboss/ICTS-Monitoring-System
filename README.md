@@ -158,7 +158,7 @@ The `App/Http/Controllers/Auth/ResetPassword.php` takes care of sending an email
 
         if ($user) {
             $this->notify(new RecoverPassword($user->id));
-            return back()->with('succes', 'An email was send to your email address');
+            return back()->with('success', 'An email was send to your email address');
         }
     }
 ```
@@ -219,7 +219,7 @@ The `App/Http/Controllers/UserController.php ` takes care of data validation and
     {
         $user = User::find($id);
         $user->delete();
-        return redirect()->route('user-management')->with('succes', 'The user was deleted');
+        return redirect()->route('user-management')->with('success', 'The user was deleted');
     }
 ```
 Once the user pressed **Send** at the end of the form the new user is added to the table.
@@ -254,7 +254,7 @@ The `App/Http/Controllers/RoleController.php ` takes care of data validation and
 
         $role->update($attributes);
 
-        return redirect()->route('role-management')->with('succes', 'role succesfully updated');
+        return redirect()->route('role-management')->with('success', 'role succesfully updated');
     }
 ```
 
@@ -278,7 +278,7 @@ The `App/Http/Controllers/CategoryController.php ` takes care of data validation
 
         $category->update($attributes);
 
-        return redirect()->route('category-management')->with('succes', 'Category succesfully updated');
+        return redirect()->route('category-management')->with('success', 'Category succesfully updated');
     }
 ```
 
@@ -336,7 +336,7 @@ The `App/Http/Controllers/ItemController.php` takes care of data validation when
             ]);
         }
 
-        return redirect()->route('item-management')->with('succes', 'Item succesfully saved');
+        return redirect()->route('item-management')->with('success', 'Item succesfully saved');
     }
 ```
 

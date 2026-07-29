@@ -131,7 +131,7 @@ EOT;
     }
 
     /**
-     * @psalm-return array<string, 'success'|'defect'>
+     * @psalm-return array<string, 'succes'|'defect'>
      */
     private function reduce(TestResultCollection $tests): array
     {
@@ -141,7 +141,7 @@ EOT;
             $prettifiedMethodName = $test->test()->testDox()->prettifiedMethodName();
 
             if (!isset($result[$prettifiedMethodName])) {
-                $result[$prettifiedMethodName] = $test->status()->isSuccess() ? 'success' : 'defect';
+                $result[$prettifiedMethodName] = $test->status()->isSuccess() ? 'succes' : 'defect';
 
                 continue;
             }

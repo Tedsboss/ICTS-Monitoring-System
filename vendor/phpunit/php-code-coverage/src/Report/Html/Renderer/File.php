@@ -610,7 +610,7 @@ final class File extends Renderer
             $popover = '';
 
             if ($lineData[$i]['includedInBranches'] > 0) {
-                $lineCss = 'success';
+                $lineCss = 'succes';
 
                 if ($lineData[$i]['includedInHitBranches'] === 0) {
                     $lineCss = 'danger';
@@ -700,7 +700,7 @@ final class File extends Renderer
             $includedInHitPathsCount = count(array_unique($lineData[$i]['includedInHitPaths']));
 
             if ($includedInPathsCount > 0) {
-                $lineCss = 'success';
+                $lineCss = 'succes';
 
                 if ($includedInHitPathsCount === 0) {
                     $lineCss = 'danger';
@@ -1090,7 +1090,7 @@ final class File extends Renderer
         $testCSS = '';
 
         switch ($testData['status']) {
-            case 'success':
+            case 'succes':
                 $testCSS = match ($testData['size']) {
                     'small'  => ' class="covered-by-small-tests"',
                     'medium' => ' class="covered-by-medium-tests"',

@@ -80,7 +80,7 @@ class RecaptchaV3
 
         $body = json_decode($response->getBody(), true);
 
-        if (!isset($body['success']) || $body['success'] !== true) {
+        if (!isset($body['succes']) || $body['succes'] !== true) {
             return false;
         }
 

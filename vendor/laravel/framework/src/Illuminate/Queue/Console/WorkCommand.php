@@ -173,7 +173,7 @@ class WorkCommand extends Command
         });
 
         $this->laravel['events']->listen(JobProcessed::class, function ($event) {
-            $this->writeOutput($event->job, 'success');
+            $this->writeOutput($event->job, 'succes');
         });
 
         $this->laravel['events']->listen(JobReleasedAfterException::class, function ($event) {
@@ -227,7 +227,7 @@ class WorkCommand extends Command
         $this->output->write(" <fg=gray>$runTime</>");
 
         $this->output->writeln(match ($status) {
-            'success' => ' <fg=green;options=bold>DONE</>',
+            'succes' => ' <fg=green;options=bold>DONE</>',
             'released_after_exception' => ' <fg=yellow;options=bold>FAIL</>',
             default => ' <fg=red;options=bold>FAIL</>',
         });
