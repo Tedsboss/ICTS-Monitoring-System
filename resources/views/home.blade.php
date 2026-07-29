@@ -25,23 +25,23 @@
                   Project DIREK is a one-stop digital platform designed for DEPDev Directors, providing a consolidated view of administrative, financial, operational, and performance information in a single dashboard. It serves as an executive command center that enables faster decision-making, improves access to critical information, and streamlines the monitoring of programs, projects, resources, and organizational performance.
                 </p>
               </div>
-              <div class="col-lg-5 mt-4 mt-lg-0">
+            <div class="col-lg-5 mt-4 mt-lg-0">
                 <div class="card shadow-sm mb-3">
                   <div class="card-body py-3">
-                    <h6 class="text-info mb-1">Weekly Updates</h6>
-                    <p class="text-sm mb-0">Capture regular status updates in one place so reporting stays timely, organized, and easy to review.</p>
+                    <h6 class="text-info mb-1">Consolidated View</h6>
+                    <p class="text-sm mb-0">Bring administrative, financial, operational, and performance information together in a single dashboard.</p>
                   </div>
                 </div>
                 <div class="card shadow-sm mb-3">
                   <div class="card-body py-3">
-                    <h6 class="text-info mb-1">Program Coordination</h6>
-                    <p class="text-sm mb-0">Support alignment across offices handling livelihoods, industry, food, and transport initiatives.</p>
+                    <h6 class="text-info mb-1">Faster Decision-Making</h6>
+                    <p class="text-sm mb-0">Give Directors quicker access to the critical information they need, right when they need it.</p>
                   </div>
                 </div>
                 <div class="card shadow-sm">
                   <div class="card-body py-3">
-                    <h6 class="text-info mb-1">Progress Visibility</h6>
-                    <p class="text-sm mb-0">Give decision-makers and implementers a clearer view of accomplishments, issues, and next steps.</p>
+                    <h6 class="text-info mb-1">Streamlined Monitoring</h6>
+                    <p class="text-sm mb-0">Track programs, projects, resources, and organizational performance from one command center.</p>
                   </div>
                 </div>
               </div>
@@ -52,28 +52,27 @@
     </div>
 
     <div class="row mt-4">
-      <div class="col-lg-6 mb-4">
-        <div class="card h-100 shadow-sm">
-          <div class="card-body">
-            <h5 class="mb-3">What UPLIFT Covers</h5>
-            <p class="mb-0">
-              UPLIFT brings together updates and monitoring information for government workstreams related to livelihoods, industry, food, and transport.
-            </p>
-          </div>
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100 shadow-sm">
+            <div class="card-body">
+                <h5 class="mb-3">What D.I.R.E.K. Covers</h5>
+                <p class="mb-0">
+                DIREK consolidates administrative, financial, operational, and performance information for DEPDev Directors into a single dashboard — covering programs, projects, resources, and organizational performance in one place.
+                </p>
+            </div>
+            </div>
         </div>
-      </div>
-      <div class="col-lg-6 mb-4">
-        <div class="card h-100 shadow-sm">
-          <div class="card-body">
-            <h5 class="mb-3">What This Portal Supports</h5>
-            <p class="mb-0">
-              The platform supports consistent reporting and monitoring of weekly updates without scattering information across separate channels.
-            </p>
-          </div>
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100 shadow-sm">
+            <div class="card-body">
+                <h5 class="mb-3">What This Portal Supports</h5>
+                <p class="mb-0">
+                As an executive command center, this portal supports faster decision-making, improved access to critical information, and streamlined monitoring across all directorate activities.
+                </p>
+            </div>
+            </div>
         </div>
-      </div>
-      </div>
-    </div>
+        </div>
 
     @if ($homeannouncement->start_date <= \Carbon\Carbon::now() && $homeannouncement->end_date >= \Carbon\Carbon::now())
       @include('components.home-announcement')
