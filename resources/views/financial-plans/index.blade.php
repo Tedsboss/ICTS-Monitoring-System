@@ -80,6 +80,9 @@
                 #fpTable .align-top {
                     vertical-align: top;
                 }
+                #fpTable thead th {
+                    color: #055160;
+                }
             </style>
 
             <div class="table-responsive">
@@ -100,7 +103,7 @@
                         @endfor
                         <col style="width:120px;"> {{-- TOTAL --}}
                     </colgroup>
-                    <thead class="text-center" style="background:#FFFF00;">
+                    <thead class="text-center" style="background:#eaf6fb;">
                         <tr>
                             <th rowspan="2" class="wrap-cell">DEPDev Program of Expenditure Classification (a)</th>
                             <th rowspan="2" class="prexc-cell">PREXC Code (b)</th>
@@ -117,7 +120,7 @@
                         </tr>
                         <tr>
                             @foreach($months as $label)
-                                <th style="background:#FFFF00;">{{ $label }}</th>
+                                <th style="background:#eaf6fb;">{{ $label }}</th>
                             @endforeach
                         </tr>
                     </thead>

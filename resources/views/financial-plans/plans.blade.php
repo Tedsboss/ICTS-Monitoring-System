@@ -32,7 +32,7 @@
                 <div class="col-auto">
                     <label class="form-label mb-1">Name of Office/Staff</label>
                     <input type="text" id="newOfficeName" class="form-control form-control-sm" style="width:340px;"
-                           list="officeSuggestions" placeholder="Type an existing office, or a brand-new one">
+                        list="officeSuggestions" placeholder="Type an existing office, or a brand-new one">
                     <datalist id="officeSuggestions">
                         @foreach($offices as $office)
                             <option value="{{ $office }}">
@@ -40,8 +40,10 @@
                     </datalist>
                 </div>
                 <div class="col-auto">
-                    <button type="button" id="btnStartPlan" class="btn btn-sm btn-success px-3">
-                        <i class="fa fa-arrow-right me-1"></i> Start / Open in Builder
+                    <label class="form-label mb-1 invisible">Action</label>
+                    <button type="button" id="btnStartPlan" class="btn btn-sm btn-success d-flex align-items-center justify-content-center"
+                            style="width:31px; height:31px;" data-bs-toggle="tooltip" title="Start / Open in Builder">
+                        <i class="fa fa-arrow-right"></i>
                     </button>
                 </div>
             </div>
