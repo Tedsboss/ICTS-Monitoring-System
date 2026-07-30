@@ -21,6 +21,7 @@ class Procurement extends Model
      *
      * @var array<int, string>
      */
+
     protected $fillable = [
         'funding_source',
         'procurement_title',
@@ -31,8 +32,13 @@ class Procurement extends Model
         'procurement_status',
         'payment_status',
         'retention_status',
+        'financial_plan_item_id', 
     ];
 
+    public function financialPlanItem(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(FinancialPlan::class, 'financial_plan_item_id');
+    }
     /**
      * The attributes that should be cast.
      *

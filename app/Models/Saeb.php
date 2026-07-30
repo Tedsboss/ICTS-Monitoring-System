@@ -21,6 +21,7 @@ class Saeb extends Model
      *
      * @var array<int, string>
      */
+
     protected $fillable = [
         'as_of_date',
         'funding_source',
@@ -30,6 +31,7 @@ class Saeb extends Model
         'obligated',
         'aa',
         'balances',
+        'financial_plan_item_id',
     ];
 
     /**
@@ -58,9 +60,10 @@ class Saeb extends Model
     }
 
     // Saeb.php / Procurement.php
-    public function financialPlanItem()
+
+    public function financialPlanItem(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
-        return $this->belongsTo(FinancialPlanItem::class);
+        return $this->belongsTo(FinancialPlan::class, 'financial_plan_item_id');
     }
 
 }

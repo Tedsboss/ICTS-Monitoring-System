@@ -111,7 +111,7 @@
                     <th class="border-bottom-0">Funding Source</th>
                     <th class="text-end border-bottom-0">Allotment</th>
                     <th class="text-end border-bottom-0">Obligated</th>
-                    <th class="text-end border-bottom-0">AA</th>
+                    <th class="text-end border-bottom-0">Allocation Allotment</th>
                     <th class="text-end border-bottom-0">Balances</th>
                     <th class="text-end border-bottom-0">% Obl.</th>
                   </tr>
