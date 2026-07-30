@@ -186,36 +186,37 @@ Route::group(['middleware' => 'check.restricted.ips'], function () {
         Route::resource('administrator/agencies', AgencyController::class, [
           'except' => ['show', 'create', 'store', 'edit', 'destroy'],
         ]);
-/*
-|--------------------------------------------------------------------------
-| Administrator Forms
-|--------------------------------------------------------------------------
-*/
 
-Route::get('administrator/forms/agencies/search', [FormController::class, 'searchAgencies'])
-  ->name('forms.agencies.search');
+        /*
+        |--------------------------------------------------------------------------
+        | Administrator Forms
+        |--------------------------------------------------------------------------
+        */
 
-Route::resource('administrator/forms', FormController::class, [
-  'except' => ['show', 'create', 'destroy'],
-]);
+        Route::get('administrator/forms/agencies/search', [FormController::class, 'searchAgencies'])
+          ->name('forms.agencies.search');
 
-Route::get('administrator/forms/{form}/preview', [FormController::class, 'preview'])
-  ->name('forms.preview');
+        Route::resource('administrator/forms', FormController::class, [
+          'except' => ['show', 'create', 'destroy'],
+        ]);
 
-Route::post('administrator/forms/{form}/duplicate', [FormController::class, 'duplicate'])
-  ->name('forms.duplicate');
+        Route::get('administrator/forms/{form}/preview', [FormController::class, 'preview'])
+          ->name('forms.preview');
 
-Route::post('administrator/forms/{form}/fields', [FormController::class, 'storeField'])
-  ->name('forms.fields.store');
+        Route::post('administrator/forms/{form}/duplicate', [FormController::class, 'duplicate'])
+          ->name('forms.duplicate');
 
-Route::put('administrator/forms/{form}/fields', [FormController::class, 'updateFields'])
-  ->name('forms.fields.update-all');
+        Route::post('administrator/forms/{form}/fields', [FormController::class, 'storeField'])
+          ->name('forms.fields.store');
 
-Route::put('administrator/forms/{form}/fields/{form_field}', [FormController::class, 'updateField'])
-  ->name('forms.fields.update');
+        Route::put('administrator/forms/{form}/fields', [FormController::class, 'updateFields'])
+          ->name('forms.fields.update-all');
 
-Route::delete('administrator/forms/{form}/fields/{form_field}', [FormController::class, 'destroyField'])
-  ->name('forms.fields.destroy');
+        Route::put('administrator/forms/{form}/fields/{form_field}', [FormController::class, 'updateField'])
+          ->name('forms.fields.update');
+
+        Route::delete('administrator/forms/{form}/fields/{form_field}', [FormController::class, 'destroyField'])
+          ->name('forms.fields.destroy');
 
         /*
         |--------------------------------------------------------------------------
@@ -388,34 +389,34 @@ Route::delete('administrator/forms/{form}/fields/{form_field}', [FormController:
 
         Route::post('administrator/inquiries/updatestatus', [InquiryController::class, 'updatestatus'])
           ->name('inquiries.updatestatus');
+
+        Route::prefix('administrator')->group(function () {
+
+            Route::get('saebs/data', [SaebController::class, 'data'])->name('saebs.data');
+            Route::resource('saebs', SaebController::class);
+
+            Route::get('procurements/data', [ProcurementController::class, 'data'])->name('procurements.data');
+            Route::resource('procurements', ProcurementController::class);
+
+            Route::get('financial-plans/all', [FinancialPlanController::class, 'plans'])->name('financial-plans.plans');
+            Route::get('financial-plans', [FinancialPlanController::class, 'index'])->name('financial-plans.index');
+            Route::get('financial-plans/data', [FinancialPlanController::class, 'data'])->name('financial-plans.data');
+            Route::get('financial-plans/builder', [FinancialPlanController::class, 'builder'])->name('financial-plans.builder');
+            Route::post('financial-plans/save', [FinancialPlanController::class, 'save'])->name('financial-plans.save');
+            Route::delete('financial-plans/destroy-plan', [FinancialPlanController::class, 'destroyPlan'])
+                ->name('financial-plans.destroy-plan');
+            Route::delete('financial-plans/{financial_plan}', [FinancialPlanController::class, 'destroy'])
+                ->name('financial-plans.destroy');
+            Route::get('/financial-plans/export-pdf', [FinancialPlanController::class, 'exportPdf'])
+                ->name('financial-plans.export-pdf');
+
+            Route::get('/financial-plans/signatories', [FinancialPlanController::class, 'signatories'])->name('financial-plans.signatories');
+            Route::post('/financial-plans/signatories', [FinancialPlanController::class, 'saveSignatories'])->name('financial-plans.signatories.save');
+        });
       });
     });
 
     Route::post('logout', [LoginController::class, 'logout'])
       ->name('logout');
   });
-
-Route::middleware(['auth'])->prefix('administrator')->group(function () {
-
-    Route::get('saebs/data', [SaebController::class, 'data'])->name('saebs.data');
-    Route::resource('saebs', SaebController::class);
-
-    Route::get('procurements/data', [ProcurementController::class, 'data'])->name('procurements.data');
-    Route::resource('procurements', ProcurementController::class);
-
-    Route::get('financial-plans/all', [FinancialPlanController::class, 'plans'])->name('financial-plans.plans');
-    Route::get('financial-plans', [FinancialPlanController::class, 'index'])->name('financial-plans.index');
-    Route::get('financial-plans/data', [FinancialPlanController::class, 'data'])->name('financial-plans.data');
-    Route::get('financial-plans/builder', [FinancialPlanController::class, 'builder'])->name('financial-plans.builder');
-    Route::post(
-        'financial-plans/save',
-        [FinancialPlanController::class, 'save']
-    )->name('financial-plans.save');
-    Route::delete('financial-plans/destroy-plan', [FinancialPlanController::class, 'destroyPlan'])
-        ->name('financial-plans.destroy-plan');
-
-    Route::delete('financial-plans/{financial_plan}', [FinancialPlanController::class, 'destroy'])
-        ->name('financial-plans.destroy');
-
-});
 });

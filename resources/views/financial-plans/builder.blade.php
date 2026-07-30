@@ -69,6 +69,35 @@
             </div>
         </div>
 
+        {{-- Signatories for this WFP's printed form (Prepared/Reviewed/
+             Recommended/Approved by). Saved per (fiscal_year, office_name)
+             alongside the plan itself, and pre-filled from whatever was
+             last saved for this office/FY. --}}
+        <div class="card-body p-3 pb-0 border-bottom">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label mb-1 small text-muted">Prepared by</label>
+                    <input type="text" id="sigPreparedBy" class="form-control form-control-sm mb-1" placeholder="Name">
+                    <input type="text" id="sigPreparedByPosition" class="form-control form-control-sm" placeholder="Position/Designation">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label mb-1 small text-muted">Reviewed by</label>
+                    <input type="text" id="sigReviewedBy" class="form-control form-control-sm mb-1" placeholder="Name">
+                    <input type="text" id="sigReviewedByPosition" class="form-control form-control-sm" placeholder="Position/Designation">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label mb-1 small text-muted">Recommended by</label>
+                    <input type="text" id="sigRecommendedBy" class="form-control form-control-sm mb-1" placeholder="Name">
+                    <input type="text" id="sigRecommendedByPosition" class="form-control form-control-sm" placeholder="Position/Designation">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label mb-1 small text-muted">Approved by</label>
+                    <input type="text" id="sigApprovedBy" class="form-control form-control-sm mb-1" placeholder="Name">
+                    <input type="text" id="sigApprovedByPosition" class="form-control form-control-sm" placeholder="Position/Designation">
+                </div>
+            </div>
+        </div>
+
         <div class="card-body p-3">
             <div class="table-responsive">
                 <table class="table table-bordered table-sm align-middle" style="font-size:0.75rem;" id="builderTable">
@@ -228,6 +257,58 @@ $(document).ready(function () {
         bindRowTypeChange();
     }
 
+    // Pre-fills the four signatory inputs from whatever was last saved for
+    // this fiscal_year/office_name. Independent of the row data load below
+    // — a WFP with no rows yet can still have signatories saved, and vice
+    // versa — so this always resolves to '' rather than erroring when
+    // nothing has been saved yet (see FinancialPlanController::signatories()).
+    function loadSignatories() {
+        const fiscalYear = $('#fiscalYear').val();
+        const officeName = $('#officeName').val();
+
+        $.getJSON(
+            '{{ route("financial-plans.signatories") }}',
+            { fiscal_year: fiscalYear, office_name: officeName },
+            function (sig) {
+                $('#sigPreparedBy').val(sig.prepared_by || '');
+                $('#sigPreparedByPosition').val(sig.prepared_by_position || '');
+                $('#sigReviewedBy').val(sig.reviewed_by || '');
+                $('#sigReviewedByPosition').val(sig.reviewed_by_position || '');
+                $('#sigRecommendedBy').val(sig.recommended_by || '');
+                $('#sigRecommendedByPosition').val(sig.recommended_by_position || '');
+                $('#sigApprovedBy').val(sig.approved_by || '');
+                $('#sigApprovedByPosition').val(sig.approved_by_position || '');
+            }
+        );
+    }
+
+    // Fire-and-await: saves the four signatory names for the current
+    // fiscal_year/office_name. Called from savePlan() right before the
+    // redirect so both the plan rows and the signatories land together
+    // under one "Save Entire Plan" click, without needing a second button.
+    function saveSignatories() {
+        return $.ajax({
+            url: '{{ route("financial-plans.signatories.save") }}',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                fiscal_year: $('#fiscalYear').val(),
+                office_name: $('#officeName').val(),
+                prepared_by: $('#sigPreparedBy').val(),
+                prepared_by_position: $('#sigPreparedByPosition').val(),
+                reviewed_by: $('#sigReviewedBy').val(),
+                reviewed_by_position: $('#sigReviewedByPosition').val(),
+                recommended_by: $('#sigRecommendedBy').val(),
+                recommended_by_position: $('#sigRecommendedByPosition').val(),
+                approved_by: $('#sigApprovedBy').val(),
+                approved_by_position: $('#sigApprovedByPosition').val(),
+            }),
+            headers: {
+                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+            }
+        });
+    }
+
     function loadPlan(isManualReload = false) {
         if (isManualReload && hasUnsavedChanges) {
             const proceed = confirm(
@@ -246,6 +327,8 @@ $(document).ready(function () {
 
         const fiscalYear = $('#fiscalYear').val();
         const officeName = $('#officeName').val();
+
+        loadSignatories();
 
         activeLoadRequest = $.getJSON(
             '{{ route("financial-plans.data") }}',
@@ -327,7 +410,12 @@ $(document).ready(function () {
             success: function (response) {
                 if (response.success) {
                     hasUnsavedChanges = false;
-                    window.location.href = response.redirect;
+                    // Signatories are a secondary, best-effort save — a
+                    // failure here shouldn't block the user from leaving
+                    // with their (already-saved) plan rows intact.
+                    saveSignatories().always(function () {
+                        window.location.href = response.redirect;
+                    });
                 } else {
                     alert(response.message || 'Failed to save.');
                     $('#btnSavePlan, #btnSavePlan2')
@@ -353,6 +441,10 @@ $(document).ready(function () {
     });
 
     $('#builderBody').on('input change', '.field-input, .month-input', function () {
+        hasUnsavedChanges = true;
+    });
+
+    $('#sigPreparedBy, #sigPreparedByPosition, #sigReviewedBy, #sigReviewedByPosition, #sigRecommendedBy, #sigRecommendedByPosition, #sigApprovedBy, #sigApprovedByPosition').on('input', function () {
         hasUnsavedChanges = true;
     });
 

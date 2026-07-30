@@ -24,6 +24,9 @@
                 <a href="javascript:void(0)" id="btnEditPlan" class="btn btn-sm btn-primary px-3">
                     <i class="fa fa-pencil me-1"></i> Edit This Plan
                 </a>
+                <a href="javascript:void(0)" id="btnDownloadPdf" class="btn btn-sm btn-outline-success px-3">
+                    <i class="fa fa-file-pdf-o me-1"></i> Download PDF
+                </a>
             </div>
             <div class="d-flex align-items-center gap-2">
                 <label class="form-label mb-0 me-1">Fiscal Year</label>
@@ -317,6 +320,56 @@ $(document).ready(function ()
         const fiscalYear = $('#filterFiscalYear').val();
         const officeName = $('#filterOffice').val();
         window.location.href = `{{ route('financial-plans.builder') }}?fiscal_year=${fiscalYear}&office_name=${encodeURIComponent(officeName)}`;
+    });
+
+    // Download PDF: fetch as a blob and trigger the save via a throwaway
+    // <a download> link instead of `window.location.href`. Navigating the
+    // page (the old approach) starts a real page-navigation event; since
+    // the server responds with Content-Disposition: attachment, the browser
+    // cancels that navigation to hand the file to the download manager
+    // instead — but any app-wide "show loader on navigate / hide on page
+    // load" logic in layouts.app never sees a completed page load to hide
+    // itself, and the UI is left looking stuck. Fetch+blob never navigates
+    // at all, so that can't happen, and the button's own state always
+    // resets via .finally() regardless of success or failure.
+    $('#btnDownloadPdf').on('click', function () {
+        const $btn = $(this);
+        const fiscalYear = $('#filterFiscalYear').val();
+        const officeName = $('#filterOffice').val();
+        const url = `{{ route('financial-plans.export-pdf') }}?fiscal_year=${fiscalYear}&office_name=${encodeURIComponent(officeName)}`;
+
+        const originalHtml = $btn.html();
+        $btn.addClass('disabled').html('<i class="fa fa-spinner fa-spin me-1"></i> Preparing PDF…');
+
+        fetch(url, { credentials: 'same-origin' })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Server returned ${response.status}`);
+                }
+
+                const disposition = response.headers.get('Content-Disposition') || '';
+                const match = disposition.match(/filename="?([^"]+)"?/);
+                const filename = match ? match[1] : `FY${fiscalYear}_Financial_Plan.pdf`;
+
+                return response.blob().then(blob => ({ blob, filename }));
+            })
+            .then(({ blob, filename }) => {
+                const blobUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = blobUrl;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(blobUrl);
+            })
+            .catch(function (err) {
+                console.error('PDF export failed:', err);
+                alert('Failed to generate the PDF. Please try again.');
+            })
+            .finally(function () {
+                $btn.removeClass('disabled').html(originalHtml);
+            });
     });
 
     $('#btnLoad').on('click', loadTable);

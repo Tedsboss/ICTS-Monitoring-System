@@ -82,4 +82,24 @@ class FinancialPlan extends Model
             ->pluck('amount', 'month')
             ->toArray();
     }
+
+    public function saebEntries(): HasMany
+    {
+        return $this->hasMany(Saeb::class, 'financial_plan_item_id');
+    }
+
+    public function procurements(): HasMany
+    {
+        return $this->hasMany(Procurement::class, 'financial_plan_item_id');
+    }
+
+    public function getSaebBalanceAttribute(): float
+    {
+        return (float) $this->saebEntries->sum('balances');
+    }
+
+    public function getIsProcuredAttribute(): bool
+    {
+        return $this->procurements->contains('procurement_status', 'OK');
+    }
 }

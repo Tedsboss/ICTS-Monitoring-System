@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\FinancialPlan;
+use App\Models\FinancialPlanSignatory;
 use App\Models\FinancialPlanTarget;
 use App\Traits\GenerateLogs;
 use Illuminate\Http\JsonResponse;
@@ -11,7 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
-
+use Barryvdh\DomPDF\Facade\Pdf;
 class FinancialPlanController extends Controller
 {
     use GenerateLogs;
@@ -196,13 +197,8 @@ class FinancialPlanController extends Controller
             $query->where('office_name', $officeName);
         }
 
-        // Order by classification first so every row that belongs to the
-        // same program stays grouped together as one intact block, no
-        // matter what order it was originally entered/saved in. PREXC code
-        // is the secondary tiebreaker (it's the finer-grained sub-code
-        // within a classification), and sort_order preserves the row's
-        // original relative position within its own group.
         $rows = $query
+            ->with(['saebEntries', 'procurements'])
             ->orderBy('program_classification')
             ->orderBy('prexc_code')
             ->orderBy('sort_order')
@@ -215,23 +211,82 @@ class FinancialPlanController extends Controller
             'prexc_code'              => $p->prexc_code,
             'staff_unit_project'      => $p->staff_unit_project,
             'specific_activity'       => $p->specific_activity,
-            'procurement_status'      => $p->procurement_status,
+            'procurement_status'      => $p->is_procured ? 'OK' : $p->procurement_status,
             'expense_item'            => $p->expense_item,
             'assigned_personnel'      => $p->assigned_personnel,
             'mooe'                    => (float) $p->mooe,
             'capital_outlay'          => (float) $p->capital_outlay,
             'months'                  => $p->monthly_amounts,
             'total'                   => $p->total_target,
+            'saeb_balance'            => $p->saeb_balance,
         ]));
     }
 
-    // ── SAVE (bulk upsert for one office/FY)
+    public function signatories(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', FinancialPlan::class);
 
-    /**
-     * Save the ENTIRE FY plan for one office in a single submission.
-     * Creates new rows, updates existing ones, and deletes rows removed
-     * in the grid — each mutation is mirrored into the audit trail.
-     */
+        $fiscalYear = (int) $request->input('fiscal_year', now()->year);
+        $officeName = $request->string('office_name')->toString();
+
+        $signatory = FinancialPlanSignatory::where('fiscal_year', $fiscalYear)
+            ->where('office_name', $officeName)
+            ->first();
+
+        return response()->json([
+            'prepared_by'              => $signatory->prepared_by ?? '',
+            'prepared_by_position'     => $signatory->prepared_by_position ?? '',
+            'reviewed_by'              => $signatory->reviewed_by ?? '',
+            'reviewed_by_position'     => $signatory->reviewed_by_position ?? '',
+            'recommended_by'           => $signatory->recommended_by ?? '',
+            'recommended_by_position'  => $signatory->recommended_by_position ?? '',
+            'approved_by'              => $signatory->approved_by ?? '',
+            'approved_by_position'     => $signatory->approved_by_position ?? '',
+        ]);
+    }
+
+    public function saveSignatories(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', FinancialPlan::class);
+
+        $validated = $request->validate([
+            'fiscal_year'              => ['required', 'integer', 'min:2000', 'max:2100'],
+            'office_name'              => ['required', 'string', 'max:150'],
+            'prepared_by'              => ['nullable', 'string', 'max:150'],
+            'prepared_by_position'     => ['nullable', 'string', 'max:150'],
+            'reviewed_by'              => ['nullable', 'string', 'max:150'],
+            'reviewed_by_position'     => ['nullable', 'string', 'max:150'],
+            'recommended_by'           => ['nullable', 'string', 'max:150'],
+            'recommended_by_position'  => ['nullable', 'string', 'max:150'],
+            'approved_by'              => ['nullable', 'string', 'max:150'],
+            'approved_by_position'     => ['nullable', 'string', 'max:150'],
+        ]);
+
+        $signatory = FinancialPlanSignatory::updateOrCreate(
+            [
+                'fiscal_year' => $validated['fiscal_year'],
+                'office_name' => $validated['office_name'],
+            ],
+            [
+                'prepared_by'             => $validated['prepared_by'] ?? null,
+                'prepared_by_position'    => $validated['prepared_by_position'] ?? null,
+                'reviewed_by'             => $validated['reviewed_by'] ?? null,
+                'reviewed_by_position'    => $validated['reviewed_by_position'] ?? null,
+                'recommended_by'          => $validated['recommended_by'] ?? null,
+                'recommended_by_position' => $validated['recommended_by_position'] ?? null,
+                'approved_by'             => $validated['approved_by'] ?? null,
+                'approved_by_position'    => $validated['approved_by_position'] ?? null,
+            ]
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Signatories saved.',
+            'data'    => $signatory,
+        ]);
+    }
+
+
     public function save(Request $request): JsonResponse
     {
         $this->authorize('viewAny', FinancialPlan::class);
@@ -351,8 +406,6 @@ class FinancialPlanController extends Controller
 
             DB::commit();
 
-            // NOTE: key is "success" (not "succes") — matches the front-end
-            // check in builder.blade.php's savePlan() handler.
             return response()->json([
                 'success'  => true,
                 'message'  => 'Successfully saved data.',
@@ -452,5 +505,153 @@ class FinancialPlanController extends Controller
 
             return redirect()->back()->with('success', 'Something went wrong deleting that plan.');
         }
+    }
+
+    public function exportPdf(Request $request)
+    {
+        $this->authorize('viewAny', FinancialPlan::class);
+
+        $fiscalYear = (int) $request->input('fiscal_year', now()->year);
+        $officeName = $request->string('office_name')->toString();
+
+        $query = FinancialPlan::query()
+            ->with(['targets', 'saebEntries', 'procurements'])
+            ->where('fiscal_year', $fiscalYear);
+
+        if ($officeName) {
+            $query->where('office_name', $officeName);
+        }
+
+        $rows = $query
+            ->orderBy('program_classification')
+            ->orderBy('prexc_code')
+            ->orderBy('sort_order')
+            ->get()
+            ->map(fn (FinancialPlan $p) => [
+                'row_type'               => $p->row_type,
+                'program_classification' => $p->program_classification,
+                'prexc_code'             => $p->prexc_code,
+                'staff_unit_project'     => $p->staff_unit_project,
+                'specific_activity'      => $p->specific_activity,
+                'procurement_status'     => $p->is_procured ? 'OK' : $p->procurement_status,
+                'expense_item'           => $p->expense_item,
+                'assigned_personnel'     => $p->assigned_personnel,
+                'mooe'                   => (float) $p->mooe,
+                'capital_outlay'         => (float) $p->capital_outlay,
+                'months'                 => $p->monthly_amounts,
+                'total'                  => $p->total_target,
+                'saeb_balance'           => $p->saeb_balance,
+            ]);
+
+        $blocks      = $this->buildPdfBlocks($rows);
+        $grandTotals = $this->buildPdfGrandTotals($rows);
+
+
+        $signatory = FinancialPlanSignatory::where('fiscal_year', $fiscalYear)
+            ->where('office_name', $officeName)
+            ->first();
+
+        $pdf = Pdf::loadView('financial-plans.pdf', [
+            'fiscalYear'  => $fiscalYear,
+            'officeName'  => $officeName,
+            'months'      => self::MONTHS,
+            'blocks'      => $blocks,
+            'grandTotals' => $grandTotals,
+            'signatory'   => $signatory,
+            'generatedAt' => now(),
+        ])->setPaper('folio', 'landscape');
+
+        $filename = "FY{$fiscalYear}_Financial_Plan_" . \Illuminate\Support\Str::slug($officeName ?: 'All') . '.pdf';
+
+        return $pdf->download($filename)->withHeaders([
+            'Content-Type'        => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ]);
+    }
+
+    private function buildPdfBlocks($rows): array
+    {
+        $blocks = [];
+        $run = null;
+
+        foreach ($rows as $r) {
+            if ($r['row_type'] === 'header') {
+                if ($run) {
+                    $blocks[] = $run;
+                    $run = null;
+                }
+                $blocks[] = ['type' => 'header', 'row' => $r];
+                continue;
+            }
+
+            $key = trim($r['program_classification'] ?? '') . '::' . trim($r['prexc_code'] ?? '');
+
+            if (! $run || $run['key'] !== $key) {
+                if ($run) {
+                    $blocks[] = $run;
+                }
+                $run = ['type' => 'group', 'key' => $key, 'rows' => []];
+            }
+
+            $run['rows'][] = $r;
+        }
+
+        if ($run) {
+            $blocks[] = $run;
+        }
+
+        foreach ($blocks as &$block) {
+            if ($block['type'] !== 'group') {
+                continue;
+            }
+
+            $totals = [
+                'mooe'           => 0,
+                'capital_outlay' => 0,
+                'total'          => 0,
+                'months'         => array_fill(1, 12, 0),
+            ];
+
+            foreach ($block['rows'] as $r) {
+                $totals['mooe'] += $r['mooe'];
+                $totals['capital_outlay'] += $r['capital_outlay'];
+                $totals['total'] += $r['total'];
+
+                for ($m = 1; $m <= 12; $m++) {
+                    $totals['months'][$m] += (float) ($r['months'][$m] ?? 0);
+                }
+            }
+
+            $block['totals'] = $totals;
+        }
+        unset($block);
+
+        return $blocks;
+    }
+
+    private function buildPdfGrandTotals($rows): array
+    {
+        $grand = [
+            'mooe'           => 0,
+            'capital_outlay' => 0,
+            'total'          => 0,
+            'months'         => array_fill(1, 12, 0),
+        ];
+
+        foreach ($rows as $r) {
+            if ($r['row_type'] !== 'item') {
+                continue;
+            }
+
+            $grand['mooe'] += $r['mooe'];
+            $grand['capital_outlay'] += $r['capital_outlay'];
+            $grand['total'] += $r['total'];
+
+            for ($m = 1; $m <= 12; $m++) {
+                $grand['months'][$m] += (float) ($r['months'][$m] ?? 0);
+            }
+        }
+
+        return $grand;
     }
 }

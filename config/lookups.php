@@ -3,6 +3,12 @@
 
 return [
 
+    'funding_programs' => [
+        'ICTS',
+        'MITHI',
+        'DINP',
+    ],
+
     'saeb_funding_sources' => [
         'ICTS Internal Allotment',
         'MITHI Continuing',
@@ -12,10 +18,10 @@ return [
     ],
 
     'procurement_funding_sources' => [
-        'MITHI 2026',
-        'DINP 2026',
-        'DINP 2025',
         'MITHI 2025',
+        'MITHI 2026',
+        'DINP 2025',
+        'DINP 2026',
     ],
 
 ];
