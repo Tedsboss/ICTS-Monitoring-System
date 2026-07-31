@@ -44,15 +44,13 @@
                     <input type="text" id="officeName" class="form-control form-control-sm" style="width:340px;"
                            value="{{ $officeName }}" placeholder="e.g. Information and Communications Technology Staff (ICTS)">
                 </div>
-                <div class="col-auto">
-                    <a href="javascript:void(0)" id="btnLoadPlan" class="btn btn-sm btn-outline-primary">
-                        <i class="fa fa-folder-open me-1"></i> Load Plan
-                    </a>
-                </div>
                 <div class="col-auto ms-auto d-flex align-items-center gap-2">
                     <span id="builderLoadingNote" class="text-muted small">
                         <i class="fa fa-spinner fa-spin me-1"></i> Loading plan…
                     </span>
+                    <a href="javascript:void(0)" id="btnLoadPlan" class="btn btn-sm btn-outline-primary">
+                        <i class="fa fa-folder-open me-1"></i> Load Plan
+                    </a>
                     <button type="button" id="btnAddHeader" class="btn btn-sm btn-outline-secondary" disabled>
                         <i class="fa fa-plus me-1"></i> Section Header
                     </button>
@@ -106,7 +104,7 @@
                             <th style="min-width:200px;">Program Classification (a)</th>
                             <th style="min-width:100px;">PREXC Code (b)</th>
                             <th style="min-width:110px;">Staff/Unit (c)</th>
-                            <th style="min-width:180px;">Specific Activity (d)</th>
+                            <th style="min-width:240px;">Specific Activity (d)</th>
                             <th style="min-width:90px;">Procurement Status (e)</th>
                             <th style="min-width:110px;">Expense Item</th>
                             <th style="min-width:100px;">Assigned Personnel</th>
@@ -154,17 +152,21 @@ $(document).ready(function () {
     let hasUnsavedChanges = false;
     let activeLoadRequest = null;
 
+    function esc(v) {
+        return String(v ?? '').replace(/"/g, '&quot;');
+    }
+
+    function autoGrow(el) {
+        el.style.height = 'auto';
+        el.style.height = el.scrollHeight + 'px';
+    }
+
     function setBuilderControlsEnabled(enabled) {
         $('#btnAddHeader, #btnAddHeader2, #btnAddSubHeader, #btnAddSubHeader2, #btnAddItem, #btnAddItem2, #btnSavePlan, #btnSavePlan2')
             .prop('disabled', !enabled);
         $('#builderLoadingNote').toggle(!enabled);
     }
 
-    // row_type is one of: 'header' (top-level section, e.g. "A. Programs"),
-    // 'subheader' (nested section, e.g. "II. Support to Operations"), or
-    // 'item' (a budget line). Only 'item' rows carry PREXC codes, financial
-    // figures, and monthly targets — header/subheader rows are pure banners,
-    // so every field except program_classification stays disabled on them.
     function fieldRow(r = {}) {
         rowCounter++;
         const rowId = r.id ?? '';
@@ -198,7 +200,12 @@ $(document).ready(function () {
                 </td>
                 <td><input type="text" class="form-control form-control-sm field-input" data-field="prexc_code" value="${r.prexc_code ?? ''}" ${isItem ? '' : 'disabled'}></td>
                 <td><input type="text" class="form-control form-control-sm field-input" data-field="staff_unit_project" value="${r.staff_unit_project ?? ''}" ${isItem ? '' : 'disabled'}></td>
-                <td><input type="text" class="form-control form-control-sm field-input" data-field="specific_activity" value="${r.specific_activity ?? ''}" ${isItem ? '' : 'disabled'}></td>
+                <td>
+                    <textarea class="form-control form-control-sm field-input specific-activity-input"
+                              data-field="specific_activity" rows="1"
+                              style="resize:vertical; overflow:hidden; min-height:31px; white-space:pre-wrap;"
+                              ${isItem ? '' : 'disabled'}>${esc(r.specific_activity ?? '')}</textarea>
+                </td>
                 <td>
                     <select class="form-select form-select-sm field-input" data-field="procurement_status" ${isItem ? '' : 'disabled'}>
                         <option value="">--</option>
@@ -230,8 +237,10 @@ $(document).ready(function () {
         }
 
         prefill.row_type = type;
-        $body.append(fieldRow(prefill));
+        const $newRow = $(fieldRow(prefill));
+        $body.append($newRow);
         bindRowTypeChange();
+        growSpecificActivityCells($newRow);
         hasUnsavedChanges = true;
     }
 
@@ -251,17 +260,19 @@ $(document).ready(function () {
         });
     }
 
+    function growSpecificActivityCells($scope) {
+        $scope.find('.specific-activity-input').each(function () {
+            autoGrow(this);
+        });
+    }
+
     function renderRows(rows) {
         const $body = $('#builderBody').empty();
         rows.forEach(r => $body.append(fieldRow(r)));
         bindRowTypeChange();
+        growSpecificActivityCells($body);
     }
 
-    // Pre-fills the four signatory inputs from whatever was last saved for
-    // this fiscal_year/office_name. Independent of the row data load below
-    // — a WFP with no rows yet can still have signatories saved, and vice
-    // versa — so this always resolves to '' rather than erroring when
-    // nothing has been saved yet (see FinancialPlanController::signatories()).
     function loadSignatories() {
         const fiscalYear = $('#fiscalYear').val();
         const officeName = $('#officeName').val();
@@ -282,10 +293,6 @@ $(document).ready(function () {
         );
     }
 
-    // Fire-and-await: saves the four signatory names for the current
-    // fiscal_year/office_name. Called from savePlan() right before the
-    // redirect so both the plan rows and the signatories land together
-    // under one "Save Entire Plan" click, without needing a second button.
     function saveSignatories() {
         return $.ajax({
             url: '{{ route("financial-plans.signatories.save") }}',
@@ -410,9 +417,6 @@ $(document).ready(function () {
             success: function (response) {
                 if (response.success) {
                     hasUnsavedChanges = false;
-                    // Signatories are a secondary, best-effort save — a
-                    // failure here shouldn't block the user from leaving
-                    // with their (already-saved) plan rows intact.
                     saveSignatories().always(function () {
                         window.location.href = response.redirect;
                     });
@@ -442,6 +446,10 @@ $(document).ready(function () {
 
     $('#builderBody').on('input change', '.field-input, .month-input', function () {
         hasUnsavedChanges = true;
+
+        if ($(this).hasClass('specific-activity-input')) {
+            autoGrow(this);
+        }
     });
 
     $('#sigPreparedBy, #sigPreparedByPosition, #sigReviewedBy, #sigReviewedByPosition, #sigRecommendedBy, #sigRecommendedByPosition, #sigApprovedBy, #sigApprovedByPosition').on('input', function () {

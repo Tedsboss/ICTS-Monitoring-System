@@ -217,16 +217,6 @@
         </tbody>
     </table>
 
-    <div class="instructions">
-        <div>Instructions:</div>
-        <div>(a) This column contains the Programs/Activities/Projects/(PAP) Structures of the DEPDev Budget following the Program of Expenditure Classification (PREXC).</div>
-        <div>(b) Refer to the Internal Allocation provided and program the activities as applicable. For columns A and B, refer to the PREXC in the provided internal allocation and program the activities as applicable</div>
-        <div>(c) Under this column, please indicate the staff/units concerned for the activity to be undertaken.</div>
-        <div>(d) Under this column, the Staffs/Units should provide a short description of the activity to be undertaken.</div>
-        <div>(e) Under this column, Staffs/Units should identify expense item needed for the activity to be undertaken</div>
-        <div>(f) Under this column, Staffs/Units should identify the cost/amount needed to pursue the activity per expense item.</div>
-    </div>
-
     <table class="signatures">
         <tr>
             <td style="width:25%;">
