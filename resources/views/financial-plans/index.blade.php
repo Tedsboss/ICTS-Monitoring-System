@@ -27,6 +27,13 @@
                 <a href="javascript:void(0)" id="btnDownloadPdf" class="btn btn-sm btn-outline-success px-3">
                     <i class="fa fa-file-pdf-o me-1"></i> Download PDF
                 </a>
+                <button type="button" id="btnFinalize" class="btn btn-sm btn-outline-dark px-3">
+                    <i class="fa fa-lock me-1"></i> Finalize Plan
+                </button>
+                <button type="button" id="btnReopen" class="btn btn-sm btn-outline-warning px-3 d-none">
+                    <i class="fa fa-unlock me-1"></i> Reopen for Editing
+                </button>
+                <span id="planStatusBadge" class="badge bg-secondary">Draft</span>
             </div>
             <div class="d-flex align-items-center gap-2">
                 <label class="form-label mb-0 me-1">Fiscal Year</label>
@@ -60,6 +67,49 @@
                 <div style="font-size:0.85rem;">
                     Name of Office/Staff: <span class="fw-bold text-decoration-underline">{{ $officeName }}</span>
                 </div>
+            </div>
+
+            {{-- Allocation vs Programmed summary --}}
+            <div class="table-responsive mb-4">
+                <table class="table table-bordered table-sm mb-0" style="max-width:640px; font-size:0.85rem;">
+                    <thead class="text-center" style="background:#eaf6fb; color:#055160;">
+                        <tr>
+                            <th style="width:120px;"></th>
+                            <th class="text-end">Allocation</th>
+                            <th class="text-end">Programmed</th>
+                            <th class="text-end">Balance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="fw-semibold">MOOE (MITHI)</td>
+                            <td class="text-end" id="sumMooeAlloc">0.00</td>
+                            <td class="text-end" id="sumMooeProg">0.00</td>
+                            <td class="text-end fw-semibold" id="sumMooeBalance">0.00</td>
+                        </tr>
+                        <tr>
+                            <td class="fw-semibold">Capital Outlay (MITHI)</td>
+                            <td class="text-end" id="sumCoAlloc">0.00</td>
+                            <td class="text-end" id="sumCoProg">0.00</td>
+                            <td class="text-end fw-semibold" id="sumCoBalance">0.00</td>
+                        </tr>
+                        <tr>
+                            <td class="fw-semibold">
+                                NINP
+                                <div class="text-muted" style="font-size:0.65rem; font-weight:normal;"></div>
+                            </td>
+                            <td class="text-end" id="sumNinpAlloc">0.00</td>
+                            <td class="text-end" id="sumNinpProg">0.00</td>
+                            <td class="text-end fw-semibold" id="sumNinpBalance">0.00</td>
+                        </tr>
+                        <tr class="fw-bold" style="background:#f1f3f5;">
+                            <td>TOTAL</td>
+                            <td class="text-end" id="sumTotalAlloc">0.00</td>
+                            <td class="text-end" id="sumTotalProg">0.00</td>
+                            <td class="text-end" id="sumTotalBalance">0.00</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
 
             <style>
@@ -151,231 +201,332 @@
 @push('js')
 <script>
 $(document).ready(function ()
-{
-    function money(v) {
-        const n = Number(v ?? 0);
-        return (Number.isFinite(n) ? n : 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    }
+    {
+        // NINP = NEDA Information Network Project. Its budget ceiling is
+        // tracked separately, scoped to this single PREXC code, and only
+        // nets against MOOE (not Capital Outlay).
+        const NINP_PREXC_CODE = '200000200001000';
 
-    function statusBadge(status) {
-        return status === 'OK'
-            ? '<span class="badge" style="background:#2dce89;">OK</span>'
-            : '<span class="text-muted">—</span>';
-    }
-
-    // rowspan > 0  -> this row is the FIRST row of its classification/PREXC
-    //                 group, so it renders (and merges) those two cells.
-    // rowspan === 0 -> a later row in the same group; classification/PREXC
-    //                 cells are skipped entirely (covered by the rowspan
-    //                 cell rendered on the group's first row).
-    function renderItemRow(r, rowspan) {
-        let monthCells = '';
-        for (let m = 1; m <= 12; m++) {
-            monthCells += `<td class="text-end">${money(r.months[m] || 0)}</td>`;
+        function money(v) {
+            const n = Number(v ?? 0);
+            return (Number.isFinite(n) ? n : 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
 
-        const classCells = rowspan > 0
-            ? `<td class="wrap-cell align-top" rowspan="${rowspan}">${r.program_classification ?? '—'}</td>
-               <td class="text-center prexc-cell align-top" rowspan="${rowspan}">${r.prexc_code ?? '—'}</td>`
-            : '';
-
-        return `
-            <tr>
-                ${classCells}
-                <td class="text-center wrap-cell">${r.staff_unit_project ?? '—'}</td>
-                <td class="wrap-cell">${r.specific_activity ?? '—'}</td>
-                <td class="text-center">${statusBadge(r.procurement_status)}</td>
-                <td class="text-end">${money(r.saeb_balance ?? 0)}</td>
-                <td class="text-center wrap-cell">${r.expense_item ?? '—'}</td>
-                <td class="text-center wrap-cell">${r.assigned_personnel ?? '—'}</td>
-                <td class="text-end">${money(r.mooe)}</td>
-                <td class="text-end">${money(r.capital_outlay)}</td>
-                ${monthCells}
-                <td class="text-end fw-semibold">${money(r.total)}</td>
-            </tr>
-        `;
-    }
-
-    function renderHeaderRow(r) {
-        // 2 (classification + PREXC) + 8 (staff..capital_outlay, incl. SAEB
-        // balance) + 12 (months) + 1 (TOTAL) = 23 columns, matching the
-        // <colgroup> (Action column removed).
-        return `
-            <tr class="fw-semibold" style="background:#eef1f5;">
-                <td class="wrap-cell">${r.program_classification ?? '—'}</td>
-                <td class="text-center prexc-cell">${r.prexc_code ?? ''}</td>
-                <td colspan="8"></td>
-                ${Array(12).fill('<td></td>').join('')}
-                <td></td>
-            </tr>
-        `;
-    }
-
-    function renderSubtotalRow(totals) {
-        let monthCells = '';
-        for (let m = 1; m <= 12; m++) {
-            monthCells += `<td class="text-end">${money(totals.months[m])}</td>`;
+        function statusBadge(status) {
+            return status === 'OK'
+                ? '<span class="badge" style="background:#2dce89;">OK</span>'
+                : '<span class="text-muted">—</span>';
         }
-        return `
-            <tr class="fw-bold" style="background:#f1f3f5;">
-                <td colspan="8" class="text-end">TOTAL</td>
-                <td class="text-end">${money(totals.mooe)}</td>
-                <td class="text-end">${money(totals.capital_outlay)}</td>
-                ${monthCells}
-                <td class="text-end">${money(totals.total)}</td>
-            </tr>
-        `;
-    }
 
-    function emptyTotals() {
-        const t = { mooe: 0, capital_outlay: 0, total: 0, months: {} };
-        for (let m = 1; m <= 12; m++) t.months[m] = 0;
-        return t;
-    }
 
-    function addToTotals(totals, r) {
-        totals.mooe += Number(r.mooe) || 0;
-        totals.capital_outlay += Number(r.capital_outlay) || 0;
-        totals.total += Number(r.total) || 0;
-        for (let m = 1; m <= 12; m++) totals.months[m] += (Number(r.months[m]) || 0);
-    }
-
-    // Splits the row list into display "blocks":
-    //  - a header block for each row_type === 'header' row (section dividers
-    //    like "A. Programs" / classification banners), rendered as-is
-    //  - a group block for each run of *consecutive* item rows that share
-    //    the same (program_classification, prexc_code) pair — this is the
-    //    unit that gets merged via rowspan and closed with a TOTAL row
-    function buildBlocks(rows) {
-        const blocks = [];
-        let run = null;
-
-        rows.forEach(r => {
-            if (r.row_type === 'header') {
-                if (run) { blocks.push(run); run = null; }
-                blocks.push({ type: 'header', row: r });
-                return;
+        function renderItemRow(r, rowspan) {
+            let monthCells = '';
+            for (let m = 1; m <= 12; m++) {
+                monthCells += `<td class="text-end">${money(r.months[m] || 0)}</td>`;
             }
 
-            const key = (r.program_classification || '').trim() + '::' + (r.prexc_code || '').trim();
+            const effMooe = r.effective_mooe ?? r.mooe;
+            const effCo   = r.effective_capital_outlay ?? r.capital_outlay;
 
-            if (!run || run.key !== key) {
-                if (run) blocks.push(run);
-                run = { type: 'group', key, rows: [] };
+            const classCells = rowspan > 0
+                ? `<td class="wrap-cell align-top" rowspan="${rowspan}">${r.program_classification ?? '—'}</td>
+                <td class="text-center prexc-cell align-top" rowspan="${rowspan}">${r.prexc_code ?? '—'}</td>`
+                : '';
+
+            return `
+                <tr>
+                    ${classCells}
+                    <td class="text-center wrap-cell">${r.staff_unit_project ?? '—'}</td>
+                    <td class="wrap-cell">${r.specific_activity ?? '—'}</td>
+                    <td class="text-center">${statusBadge(r.procurement_status)}</td>
+                    <td class="text-end">${money(r.saeb_balance ?? 0)}</td>
+                    <td class="text-center wrap-cell">${r.expense_item ?? '—'}</td>
+                    <td class="text-center wrap-cell">${r.assigned_personnel ?? '—'}</td>
+                    <td class="text-end">${money(effMooe)}</td>
+                    <td class="text-end">${money(effCo)}</td>
+                    ${monthCells}
+                    <td class="text-end fw-semibold">${money(r.total)}</td>
+                </tr>
+            `;
+        }
+
+        function renderHeaderRow(r) {
+
+            return `
+                <tr class="fw-semibold" style="background:#eef1f5;">
+                    <td class="wrap-cell">${r.program_classification ?? '—'}</td>
+                    <td class="text-center prexc-cell">${r.prexc_code ?? ''}</td>
+                    <td colspan="8"></td>
+                    ${Array(12).fill('<td></td>').join('')}
+                    <td></td>
+                </tr>
+            `;
+        }
+
+        function renderSubtotalRow(totals) {
+            let monthCells = '';
+            for (let m = 1; m <= 12; m++) {
+                monthCells += `<td class="text-end">${money(totals.months[m])}</td>`;
             }
+            return `
+                <tr class="fw-bold" style="background:#f1f3f5;">
+                    <td colspan="8" class="text-end">TOTAL</td>
+                    <td class="text-end">${money(totals.mooe)}</td>
+                    <td class="text-end">${money(totals.capital_outlay)}</td>
+                    ${monthCells}
+                    <td class="text-end">${money(totals.total)}</td>
+                </tr>
+            `;
+        }
 
-            run.rows.push(r);
-        });
+        function emptyTotals() {
+            const t = { mooe: 0, capital_outlay: 0, total: 0, months: {} };
+            for (let m = 1; m <= 12; m++) t.months[m] = 0;
+            return t;
+        }
 
-        if (run) blocks.push(run);
+        function addToTotals(totals, r) {
+            totals.mooe += Number(r.effective_mooe ?? r.mooe) || 0;
+            totals.capital_outlay += Number(r.effective_capital_outlay ?? r.capital_outlay) || 0;
+            totals.total += Number(r.total) || 0;
+            for (let m = 1; m <= 12; m++) totals.months[m] += (Number(r.months[m]) || 0);
+        }
 
-        return blocks;
-    }
+        function buildBlocks(rows) {
+            const blocks = [];
+            let run = null;
 
-    function renderBlocks(blocks, $body) {
-        blocks.forEach(block => {
-            if (block.type === 'header') {
-                $body.append(renderHeaderRow(block.row));
-                return;
-            }
-
-            const totals = emptyTotals();
-
-            block.rows.forEach((r, idx) => {
-                $body.append(renderItemRow(r, idx === 0 ? block.rows.length : 0));
-                addToTotals(totals, r);
-            });
-
-            $body.append(renderSubtotalRow(totals));
-        });
-    }
-
-    function loadTable() {
-        const fiscalYear = $('#filterFiscalYear').val();
-        const officeName = $('#filterOffice').val();
-
-        $.getJSON('{{ route("financial-plans.data") }}', { fiscal_year: fiscalYear, office_name: officeName }, function (rows) {
-            const $body = $('#fpBody').empty();
-
-            renderBlocks(buildBlocks(rows), $body);
-
-            const grand = { mooe: 0, co: 0, months: Array(13).fill(0), grand: 0 };
             rows.forEach(r => {
-                if (r.row_type === 'item') {
-                    grand.mooe += Number(r.mooe) || 0;
-                    grand.co += Number(r.capital_outlay) || 0;
-                    grand.grand += Number(r.total) || 0;
-                    for (let m = 1; m <= 12; m++) grand.months[m] += (Number(r.months[m]) || 0);
+                if (r.row_type === 'header') {
+                    if (run) { blocks.push(run); run = null; }
+                    blocks.push({ type: 'header', row: r });
+                    return;
                 }
+
+                const key = (r.program_classification || '').trim() + '::' + (r.prexc_code || '').trim();
+
+                if (!run || run.key !== key) {
+                    if (run) blocks.push(run);
+                    run = { type: 'group', key, rows: [] };
+                }
+
+                run.rows.push(r);
             });
 
-            $('#totMooe').text(money(grand.mooe));
-            $('#totCo').text(money(grand.co));
-            for (let m = 1; m <= 12; m++) $(`#totM${m}`).text(money(grand.months[m]));
-            $('#totGrand').text(money(grand.grand));
+            if (run) blocks.push(run);
+
+            return blocks;
+        }
+
+        function renderBlocks(blocks, $body) {
+            blocks.forEach(block => {
+                if (block.type === 'header') {
+                    $body.append(renderHeaderRow(block.row));
+                    return;
+                }
+
+                const totals = emptyTotals();
+
+                block.rows.forEach((r, idx) => {
+                    $body.append(renderItemRow(r, idx === 0 ? block.rows.length : 0));
+                    addToTotals(totals, r);
+                });
+
+                $body.append(renderSubtotalRow(totals));
+            });
+        }
+
+        // Allocation figures come from the totals endpoint (loadAllocationSummary);
+        // Programmed figures come from the plan's rows (loadTable). They resolve
+        // independently and re-render the NINP row whenever either finishes.
+        let ninpAllocation = 0;
+        let ninpProgrammed = 0;
+
+        function renderNinpSummary() {
+            const ninpBalance = ninpAllocation - ninpProgrammed;
+            $('#sumNinpAlloc').text(money(ninpAllocation));
+            $('#sumNinpProg').text(money(ninpProgrammed));
+            $('#sumNinpBalance').text(money(ninpBalance)).toggleClass('text-danger', ninpBalance < 0);
+        }
+
+        function loadTable() {
+            const fiscalYear = $('#filterFiscalYear').val();
+            const officeName = $('#filterOffice').val();
+
+            $.getJSON('{{ route("financial-plans.data") }}', { fiscal_year: fiscalYear, office_name: officeName }, function (rows) {
+                const $body = $('#fpBody').empty();
+
+                renderBlocks(buildBlocks(rows), $body);
+
+                const grand = { mooe: 0, co: 0, months: Array(13).fill(0), grand: 0 };
+                ninpProgrammed = 0;
+
+                rows.forEach(r => {
+                    if (r.row_type === 'item') {
+                        grand.mooe += Number(r.effective_mooe ?? r.mooe) || 0;
+                        grand.co += Number(r.effective_capital_outlay ?? r.capital_outlay) || 0;
+                        grand.grand += Number(r.total) || 0;
+                        for (let m = 1; m <= 12; m++) grand.months[m] += (Number(r.months[m]) || 0);
+
+                        if ((r.prexc_code || '').trim() === NINP_PREXC_CODE) {
+                            ninpProgrammed += Number(r.effective_mooe ?? r.mooe) || 0;
+                        }
+                    }
+                });
+
+                $('#totMooe').text(money(grand.mooe));
+                $('#totCo').text(money(grand.co));
+                for (let m = 1; m <= 12; m++) $(`#totM${m}`).text(money(grand.months[m]));
+                $('#totGrand').text(money(grand.grand));
+
+                renderNinpSummary();
+            });
+        }
+
+        $('#btnEditPlan').on('click', function () {
+            if ($(this).hasClass('disabled')) return;
+            const fiscalYear = $('#filterFiscalYear').val();
+            const officeName = $('#filterOffice').val();
+            window.location.href = `{{ route('financial-plans.builder') }}?fiscal_year=${fiscalYear}&office_name=${encodeURIComponent(officeName)}`;
+        });
+
+        $('#btnDownloadPdf').on('click', function () {
+            const $btn = $(this);
+            const fiscalYear = $('#filterFiscalYear').val();
+            const officeName = $('#filterOffice').val();
+            const url = `{{ route('financial-plans.export-pdf') }}?fiscal_year=${fiscalYear}&office_name=${encodeURIComponent(officeName)}`;
+
+            const originalHtml = $btn.html();
+            $btn.addClass('disabled').html('<i class="fa fa-spinner fa-spin me-1"></i> Preparing PDF…');
+
+            fetch(url, { credentials: 'same-origin' })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Server returned ${response.status}`);
+                    }
+
+                    const disposition = response.headers.get('Content-Disposition') || '';
+                    const match = disposition.match(/filename="?([^"]+)"?/);
+                    const filename = match ? match[1] : `FY${fiscalYear}_Financial_Plan.pdf`;
+
+                    return response.blob().then(blob => ({ blob, filename }));
+                })
+                .then(({ blob, filename }) => {
+                    const blobUrl = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = blobUrl;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    window.URL.revokeObjectURL(blobUrl);
+                })
+                .catch(function (err) {
+                    console.error('PDF export failed:', err);
+                    alert('Failed to generate the PDF. Please try again.');
+                })
+                .finally(function () {
+                    $btn.removeClass('disabled').html(originalHtml);
+                });
+        });
+
+        $('#btnLoad').on('click', function () {
+            loadTable();
+            loadAllocationSummary();
+            loadPlanStatus();
+        });
+        loadTable();
+        loadAllocationSummary();
+        loadPlanStatus();
+        $('[data-bs-toggle="tooltip"]').tooltip();
+
+        function loadAllocationSummary() {
+            const fiscalYear = $('#filterFiscalYear').val();
+            const officeName = $('#filterOffice').val();
+
+            $.getJSON('{{ route("financial-plans.totals") }}', { fiscal_year: fiscalYear, office_name: officeName }, function (res) {
+                $('#sumMooeAlloc').text(money(res.mooe_allocation));
+                $('#sumMooeProg').text(money(res.mooe_sum));
+                $('#sumMooeBalance').text(money(res.mooe_balance)).toggleClass('text-danger', res.mooe_balance < 0);
+
+                $('#sumCoAlloc').text(money(res.capital_outlay_allocation));
+                $('#sumCoProg').text(money(res.capital_outlay_sum));
+                $('#sumCoBalance').text(money(res.capital_outlay_balance)).toggleClass('text-danger', res.capital_outlay_balance < 0);
+
+                // Requires the backend totals endpoint to return this field.
+                ninpAllocation = Number(res.ninp_allocation) || 0;
+                renderNinpSummary();
+
+                const totalAlloc   = res.mooe_allocation + res.capital_outlay_allocation + ninpAllocation;
+                const totalProg    = res.mooe_sum + res.capital_outlay_sum + ninpProgrammed;
+                const totalBalance = res.mooe_balance + res.capital_outlay_balance + (ninpAllocation - ninpProgrammed);
+
+                $('#sumTotalAlloc').text(money(totalAlloc));
+                $('#sumTotalProg').text(money(totalProg));
+                $('#sumTotalBalance').text(money(totalBalance)).toggleClass('text-danger', totalBalance < 0);
+            });
+        }
+
+        function loadPlanStatus() {
+        const fiscalYear = $('#filterFiscalYear').val();
+        const officeName = $('#filterOffice').val();
+
+        $.getJSON('{{ route("financial-plans.status") }}', { fiscal_year: fiscalYear, office_name: officeName }, function (res) {
+            const isFinalized = res.finalized === 'yes';
+
+            $('#planStatusBadge')
+                .text(isFinalized ? 'Finalized' : 'Draft')
+                .toggleClass('bg-secondary', !isFinalized)
+                .toggleClass('bg-success', isFinalized);
+
+            $('#btnFinalize').toggleClass('d-none', isFinalized);
+            $('#btnReopen').toggleClass('d-none', !isFinalized);
+            $('#btnEditPlan').toggleClass('disabled', isFinalized);
+
+            if (isFinalized && res.submitted_by) {
+                $('#planStatusBadge').attr(
+                    'title',
+                    `Finalized by ${res.submitted_by} on ${res.submitted_at ?? ''}`
+                );
+            }
         });
     }
 
-    $('#btnEditPlan').on('click', function () {
-        const fiscalYear = $('#filterFiscalYear').val();
-        const officeName = $('#filterOffice').val();
-        window.location.href = `{{ route('financial-plans.builder') }}?fiscal_year=${fiscalYear}&office_name=${encodeURIComponent(officeName)}`;
+    $('#btnFinalize').on('click', function () {
+        if (!confirm('Finalize this plan? It will be locked from further edits until reopened.')) return;
+
+        $.ajax({
+            url: '{{ route("financial-plans.finalize") }}',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                fiscal_year: $('#filterFiscalYear').val(),
+                office_name: $('#filterOffice').val(),
+            }),
+            headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+            success: function () { loadPlanStatus(); },
+            error: function (xhr) { alert(xhr.responseJSON?.message || 'Failed to finalize.'); }
+        });
     });
 
-    // Download PDF: fetch as a blob and trigger the save via a throwaway
-    // <a download> link instead of `window.location.href`. Navigating the
-    // page (the old approach) starts a real page-navigation event; since
-    // the server responds with Content-Disposition: attachment, the browser
-    // cancels that navigation to hand the file to the download manager
-    // instead — but any app-wide "show loader on navigate / hide on page
-    // load" logic in layouts.app never sees a completed page load to hide
-    // itself, and the UI is left looking stuck. Fetch+blob never navigates
-    // at all, so that can't happen, and the button's own state always
-    // resets via .finally() regardless of success or failure.
-    $('#btnDownloadPdf').on('click', function () {
-        const $btn = $(this);
-        const fiscalYear = $('#filterFiscalYear').val();
-        const officeName = $('#filterOffice').val();
-        const url = `{{ route('financial-plans.export-pdf') }}?fiscal_year=${fiscalYear}&office_name=${encodeURIComponent(officeName)}`;
+    $('#btnReopen').on('click', function () {
+        if (!confirm('Reopen this plan for editing?')) return;
 
-        const originalHtml = $btn.html();
-        $btn.addClass('disabled').html('<i class="fa fa-spinner fa-spin me-1"></i> Preparing PDF…');
-
-        fetch(url, { credentials: 'same-origin' })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`Server returned ${response.status}`);
-                }
-
-                const disposition = response.headers.get('Content-Disposition') || '';
-                const match = disposition.match(/filename="?([^"]+)"?/);
-                const filename = match ? match[1] : `FY${fiscalYear}_Financial_Plan.pdf`;
-
-                return response.blob().then(blob => ({ blob, filename }));
-            })
-            .then(({ blob, filename }) => {
-                const blobUrl = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = blobUrl;
-                a.download = filename;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                window.URL.revokeObjectURL(blobUrl);
-            })
-            .catch(function (err) {
-                console.error('PDF export failed:', err);
-                alert('Failed to generate the PDF. Please try again.');
-            })
-            .finally(function () {
-                $btn.removeClass('disabled').html(originalHtml);
-            });
+        $.ajax({
+            url: '{{ route("financial-plans.reopen") }}',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                fiscal_year: $('#filterFiscalYear').val(),
+                office_name: $('#filterOffice').val(),
+            }),
+            headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+            success: function () { loadPlanStatus(); },
+            error: function (xhr) { alert(xhr.responseJSON?.message || 'Failed to reopen.'); }
+        });
     });
 
-    $('#btnLoad').on('click', loadTable);
-    loadTable();
-    $('[data-bs-toggle="tooltip"]').tooltip();
-
-});
+    });
+    
 </script>
 @endpush

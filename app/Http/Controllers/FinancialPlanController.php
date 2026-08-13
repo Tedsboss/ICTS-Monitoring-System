@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\FinancialPlan;
+use App\Models\FinancialPlanAllocation;
 use App\Models\FinancialPlanSignatory;
+use App\Models\FinancialPlanSubmission;
 use App\Models\FinancialPlanTarget;
 use App\Traits\GenerateLogs;
 use Illuminate\Http\JsonResponse;
@@ -13,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 use Barryvdh\DomPDF\Facade\Pdf;
+
 class FinancialPlanController extends Controller
 {
     use GenerateLogs;
@@ -24,8 +27,11 @@ class FinancialPlanController extends Controller
         7 => 'J', 8 => 'A', 9 => 'S', 10 => 'O', 11 => 'N', 12 => 'D',
     ];
 
-    // Fields eligible for per-column change tracking when an existing
-    // row is updated (mirrors NPMC's fieldMap-driven auditLog calls).
+    // NINP = NEDA Information Network Project. Its allocation ceiling is
+    // tracked separately (financial_plan_allocations.ninp_allocation) and
+    // only nets against MOOE for rows filed under this single PREXC code.
+    private const NINP_PREXC_CODE = '200000200001000';
+    private const MOOE_CO_PREXC_CODE = '100000100001000';
     private const TRACKED_FIELDS = [
         'program_classification',
         'prexc_code',
@@ -36,20 +42,32 @@ class FinancialPlanController extends Controller
         'assigned_personnel',
         'mooe',
         'capital_outlay',
+        'contract_amount',
     ];
 
     // ── HELPERS
+    private function effectiveAmounts(float $mooe, float $capitalOutlay, $contractAmount): array
+    {
+        if ($contractAmount === null || $contractAmount === '') {
+            return [$mooe, $capitalOutlay];
+        }
 
-    /**
-     * Empty-string numeric inputs (a cleared MOOE / Capital Outlay / month
-     * cell) must become null before validation — Laravel's `nullable` rule
-     * does not treat "" as null, and letting "" flow through into the
-     * (float) casts further down is the main source of NaN in the UI.
-     */
+        $contractAmount = (float) $contractAmount;
+        $total = $mooe + $capitalOutlay;
+
+        if ($total <= 0) {
+            return [0.0, 0.0];
+        }
+
+        return [
+            $contractAmount * ($mooe / $total),
+            $contractAmount * ($capitalOutlay / $total),
+        ];
+    }
     private function normalizeRows(array $rows): array
     {
         return collect($rows)->map(function ($row) {
-            foreach (['mooe', 'capital_outlay'] as $field) {
+            foreach (['mooe', 'capital_outlay', 'contract_amount'] as $field) {
                 if (array_key_exists($field, $row) && $row[$field] === '') {
                     $row[$field] = null;
                 }
@@ -69,12 +87,6 @@ class FinancialPlanController extends Controller
 
     // ── AUDIT LOG
 
-    /**
-     * GenerateLogs::addSystemLogs() signature is POSITIONAL, not named,
-     * and only accepts: activity, userId, userName, ip, table, id, createdAt.
-     * There is no separate old/new value column, so the change details are
-     * folded directly into the activity string instead.
-     */
     private function auditLog($planId, string $field, $old, $new, string $activity): void
     {
         $oldDisplay = $old === null || $old === '' ? '—' : $old;
@@ -114,25 +126,37 @@ class FinancialPlanController extends Controller
 
     // ── PLANS LIST (browse every WFP that's been filed, across all FYs/offices)
 
-    /**
-     * Landing page for the Financial Plan module. Shows every distinct
-     * (fiscal_year, office_name) combination that has at least one row on
-     * file, so the user isn't dropped straight into editing whatever plan
-     * happens to match "current year + first office alphabetically."
-     * Also the jumping-off point for filing a brand-new WFP.
-     */
     public function plans(Request $request): View
     {
         $this->authorize('viewAny', FinancialPlan::class);
 
-        $plans = FinancialPlan::query()
-            ->select('fiscal_year', 'office_name')
-            ->selectRaw('COUNT(*) as row_count')
-            ->selectRaw("SUM(CASE WHEN row_type = 'item' THEN mooe + capital_outlay ELSE 0 END) as total_budget")
-            ->groupBy('fiscal_year', 'office_name')
-            ->orderByDesc('fiscal_year')
-            ->orderBy('office_name')
-            ->get();
+        $rows = FinancialPlan::query()
+            ->where('row_type', 'item')
+            ->get(['fiscal_year', 'office_name', 'mooe', 'capital_outlay', 'contract_amount']);
+
+        $plans = $rows
+            ->groupBy(fn ($r) => $r->fiscal_year . '|' . $r->office_name)
+            ->map(function ($group) {
+                $budgetSum = $group->sum(function ($r) {
+                    [$effMooe, $effCo] = $this->effectiveAmounts(
+                        (float) $r->mooe,
+                        (float) $r->capital_outlay,
+                        $r->contract_amount
+                    );
+                    return $effMooe + $effCo;
+                });
+
+                return (object) [
+                    'fiscal_year' => $group->first()->fiscal_year,
+                    'office_name' => $group->first()->office_name,
+                    'row_count'   => $group->count(),
+                    'budget_sum'  => $budgetSum,
+                ];
+            })
+            ->values()
+            ->sortBy('office_name')
+            ->sortByDesc('fiscal_year')
+            ->values();
 
         $offices = FinancialPlan::query()->distinct()->orderBy('office_name')->pluck('office_name');
 
@@ -180,7 +204,6 @@ class FinancialPlanController extends Controller
     }
 
     // ── DATA JSON
-    // (feeds both the read-only display table and the builder grid preload)
 
     public function data(Request $request): JsonResponse
     {
@@ -198,28 +221,38 @@ class FinancialPlanController extends Controller
         }
 
         $rows = $query
-            ->with(['saebEntries', 'procurements'])
-            ->orderBy('program_classification')
-            ->orderBy('prexc_code')
             ->orderBy('sort_order')
             ->get();
 
-        return response()->json($rows->map(fn (FinancialPlan $p) => [
-            'id'                      => $p->id,
-            'row_type'                => $p->row_type,
-            'program_classification'  => $p->program_classification,
-            'prexc_code'              => $p->prexc_code,
-            'staff_unit_project'      => $p->staff_unit_project,
-            'specific_activity'       => $p->specific_activity,
-            'procurement_status'      => $p->is_procured ? 'OK' : $p->procurement_status,
-            'expense_item'            => $p->expense_item,
-            'assigned_personnel'      => $p->assigned_personnel,
-            'mooe'                    => (float) $p->mooe,
-            'capital_outlay'          => (float) $p->capital_outlay,
-            'months'                  => $p->monthly_amounts,
-            'total'                   => $p->total_target,
-            'saeb_balance'            => $p->saeb_balance,
-        ]));
+        return response()->json($rows->map(function (FinancialPlan $p) {
+            [$effMooe, $effCapitalOutlay] = $this->effectiveAmounts(
+                (float) $p->mooe,
+                (float) $p->capital_outlay,
+                $p->contract_amount
+            );
+
+            return [
+                'id'                      => $p->id,
+                'row_type'                => $p->row_type,
+                'program_classification'  => $p->program_classification,
+                'prexc_code'              => $p->prexc_code,
+                'staff_unit_project'      => $p->staff_unit_project,
+                'specific_activity'       => $p->specific_activity,
+                'procurement_status'      => $p->is_procured ? 'OK' : $p->procurement_status,
+                'expense_item'            => $p->expense_item,
+                'assigned_personnel'      => $p->assigned_personnel,
+                // Raw as-entered figures — the builder needs these to repopulate its input boxes.
+                'mooe'                     => (float) $p->mooe,
+                'capital_outlay'           => (float) $p->capital_outlay,
+                'contract_amount'          => $p->contract_amount !== null ? (float) $p->contract_amount : null,
+                // Contract-amount-netted figures — what should actually be *displayed*.
+                'effective_mooe'           => $effMooe,
+                'effective_capital_outlay' => $effCapitalOutlay,
+                'months'                  => $p->monthly_amounts,
+                'total'                   => $p->total_target,
+                'saeb_balance'            => $p->saeb_balance,
+            ];
+        }));
     }
 
     public function signatories(Request $request): JsonResponse
@@ -296,14 +329,12 @@ class FinancialPlanController extends Controller
         ]);
 
         $validated = $request->validate([
-            'fiscal_year'                   => ['required', 'integer', 'min:2000', 'max:2100'],
-            'office_name'                   => ['required', 'string', 'max:150'],
+            'fiscal_year' => ['required', 'integer', 'min:2000', 'max:2100'],
+            'office_name' => ['required', 'string', 'max:150'],
 
-            'rows'                          => ['nullable', 'array'],
-
-            'rows.*.id'                     => ['nullable'],
-            'rows.*.row_type'               => ['required', 'in:header,subheader,item'],
-
+            'rows'                          => ['present', 'array'],
+            'rows.*.id'                     => ['nullable', 'integer'],
+            'rows.*.row_type'               => ['required', 'string', 'in:header,subheader,item'],
             'rows.*.program_classification' => ['nullable', 'string', 'max:500'],
             'rows.*.prexc_code'             => ['nullable', 'string', 'max:50'],
             'rows.*.staff_unit_project'     => ['nullable', 'string', 'max:150'],
@@ -311,10 +342,9 @@ class FinancialPlanController extends Controller
             'rows.*.procurement_status'     => ['nullable', 'string', 'max:150'],
             'rows.*.expense_item'           => ['nullable', 'string', 'max:150'],
             'rows.*.assigned_personnel'     => ['nullable', 'string', 'max:150'],
-
             'rows.*.mooe'                   => ['nullable', 'numeric'],
             'rows.*.capital_outlay'         => ['nullable', 'numeric'],
-
+            'rows.*.contract_amount'        => ['nullable', 'numeric'],
             'rows.*.months'                 => ['nullable', 'array'],
             'rows.*.months.*'               => ['nullable', 'numeric'],
         ]);
@@ -322,6 +352,18 @@ class FinancialPlanController extends Controller
         $year   = $validated['fiscal_year'];
         $office = $validated['office_name'];
         $rows   = $validated['rows'] ?? [];
+
+        // ── LOCK CHECK — now that $year/$office actually exist
+        $existingSubmission = FinancialPlanSubmission::where('fiscal_year', $year)
+            ->where('office_name', $office)
+            ->first();
+
+        if ($existingSubmission?->isLocked()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This plan is finalized. Reopen it first if you need to make changes.',
+            ], 403);
+        }
 
         DB::beginTransaction();
 
@@ -348,8 +390,9 @@ class FinancialPlanController extends Controller
                 $plan  ??= new FinancialPlan();
 
                 $incoming = [
-                    'fiscal_year'            => $year,
-                    'office_name'            => $office,
+                    'fiscal_year' => $year,
+                    'office_name' => $office,
+                    'division_id' => auth()->user()->division_id,
                     'row_type'               => $row['row_type'],
                     'program_classification' => $row['program_classification'] ?? null,
                     'prexc_code'             => $row['prexc_code'] ?? null,
@@ -360,6 +403,9 @@ class FinancialPlanController extends Controller
                     'assigned_personnel'     => $row['assigned_personnel'] ?? null,
                     'mooe'                   => (float) ($row['mooe'] ?? 0),
                     'capital_outlay'         => (float) ($row['capital_outlay'] ?? 0),
+                    'contract_amount'        => array_key_exists('contract_amount', $row) && $row['contract_amount'] !== null
+                        ? (float) $row['contract_amount']
+                        : null,
                     'sort_order'             => $sortOrder,
                 ];
 
@@ -523,25 +569,37 @@ class FinancialPlanController extends Controller
         }
 
         $rows = $query
-            ->orderBy('program_classification')
-            ->orderBy('prexc_code')
+            ->with(['saebEntries', 'procurements'])
             ->orderBy('sort_order')
             ->get()
-            ->map(fn (FinancialPlan $p) => [
-                'row_type'               => $p->row_type,
-                'program_classification' => $p->program_classification,
-                'prexc_code'             => $p->prexc_code,
-                'staff_unit_project'     => $p->staff_unit_project,
-                'specific_activity'      => $p->specific_activity,
-                'procurement_status'     => $p->is_procured ? 'OK' : $p->procurement_status,
-                'expense_item'           => $p->expense_item,
-                'assigned_personnel'     => $p->assigned_personnel,
-                'mooe'                   => (float) $p->mooe,
-                'capital_outlay'         => (float) $p->capital_outlay,
-                'months'                 => $p->monthly_amounts,
-                'total'                  => $p->total_target,
-                'saeb_balance'           => $p->saeb_balance,
-            ]);
+            ->map(function (FinancialPlan $p) {
+                [$effMooe, $effCapitalOutlay] = $this->effectiveAmounts(
+                    (float) $p->mooe,
+                    (float) $p->capital_outlay,
+                    $p->contract_amount
+                );
+
+                return [
+                    'row_type'               => $p->row_type,
+                    'program_classification' => $p->program_classification,
+                    'prexc_code'             => $p->prexc_code,
+                    'staff_unit_project'     => $p->staff_unit_project,
+                    'specific_activity'      => $p->specific_activity,
+                    'procurement_status'     => $p->is_procured ? 'OK' : $p->procurement_status,
+                    'expense_item'           => $p->expense_item,
+                    'assigned_personnel'     => $p->assigned_personnel,
+                    // Raw as-entered figures (kept in case anything downstream needs them).
+                    'mooe'                    => (float) $p->mooe,
+                    'capital_outlay'          => (float) $p->capital_outlay,
+                    'contract_amount'         => $p->contract_amount !== null ? (float) $p->contract_amount : null,
+                    // Contract-amount-netted figures — what the PDF should actually print.
+                    'effective_mooe'           => $effMooe,
+                    'effective_capital_outlay' => $effCapitalOutlay,
+                    'months'                  => $p->monthly_amounts,
+                    'total'                   => $p->total_target,
+                    'saeb_balance'            => $p->saeb_balance,
+                ];
+            });
 
         $blocks      = $this->buildPdfBlocks($rows);
         $grandTotals = $this->buildPdfGrandTotals($rows);
@@ -613,8 +671,14 @@ class FinancialPlanController extends Controller
             ];
 
             foreach ($block['rows'] as $r) {
-                $totals['mooe'] += $r['mooe'];
-                $totals['capital_outlay'] += $r['capital_outlay'];
+                [$effMooe, $effCo] = $this->effectiveAmounts(
+                    (float) $r['mooe'],
+                    (float) $r['capital_outlay'],
+                    $r['contract_amount'] ?? null
+                );
+
+                $totals['mooe'] += $effMooe;
+                $totals['capital_outlay'] += $effCo;
                 $totals['total'] += $r['total'];
 
                 for ($m = 1; $m <= 12; $m++) {
@@ -643,8 +707,14 @@ class FinancialPlanController extends Controller
                 continue;
             }
 
-            $grand['mooe'] += $r['mooe'];
-            $grand['capital_outlay'] += $r['capital_outlay'];
+            [$effMooe, $effCo] = $this->effectiveAmounts(
+                (float) $r['mooe'],
+                (float) $r['capital_outlay'],
+                $r['contract_amount'] ?? null
+            );
+
+            $grand['mooe'] += $effMooe;
+            $grand['capital_outlay'] += $effCo;
             $grand['total'] += $r['total'];
 
             for ($m = 1; $m <= 12; $m++) {
@@ -653,5 +723,270 @@ class FinancialPlanController extends Controller
         }
 
         return $grand;
+    }
+
+    // ── MOOE / CO / NINP ALLOCATION (ceilings) + BALANCE
+
+    public function allocation(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', FinancialPlan::class);
+
+        $fiscalYear = (int) $request->input('fiscal_year', now()->year);
+        $officeName = $request->string('office_name')->toString();
+
+        $allocation = FinancialPlanAllocation::where('fiscal_year', $fiscalYear)
+            ->where('office_name', $officeName)
+            ->first();
+
+        return response()->json([
+            'mooe_allocation'           => (float) ($allocation->mooe_allocation ?? 0),
+            'capital_outlay_allocation' => (float) ($allocation->capital_outlay_allocation ?? 0),
+            'ninp_allocation'           => (float) ($allocation->ninp_allocation ?? 0),
+        ]);
+    }
+
+    public function saveAllocation(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', FinancialPlan::class);
+
+        $validated = $request->validate([
+            'fiscal_year'                => ['required', 'integer', 'min:2000', 'max:2100'],
+            'office_name'                => ['required', 'string', 'max:150'],
+            'mooe_allocation'            => ['nullable', 'numeric', 'min:0'],
+            'capital_outlay_allocation'  => ['nullable', 'numeric', 'min:0'],
+            'ninp_allocation'            => ['nullable', 'numeric', 'min:0'],
+        ]);
+
+        $allocation = FinancialPlanAllocation::updateOrCreate(
+            [
+                'fiscal_year' => $validated['fiscal_year'],
+                'office_name' => $validated['office_name'],
+            ],
+            [
+                'mooe_allocation'           => $validated['mooe_allocation'] ?? 0,
+                'capital_outlay_allocation' => $validated['capital_outlay_allocation'] ?? 0,
+                'ninp_allocation'           => $validated['ninp_allocation'] ?? 0,
+            ]
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Allocation saved.',
+            'data'    => $allocation,
+        ]);
+    }
+
+    /**
+     * Programmed MOOE/CO (sum of item rows) vs allocation ceiling, with
+     * the remaining balance — mirrors the red-boxed block in the source
+     * spreadsheet (Total Allocation - Sum of Column = Remaining Balance).
+     *
+     * NINP is tracked the same way but scoped to a single PREXC code
+     * (self::NINP_PREXC_CODE) and nets against MOOE only, not Capital Outlay.
+     */
+    public function totals(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', FinancialPlan::class);
+
+        $fiscalYear = (int) $request->input('fiscal_year', now()->year);
+        $officeName = $request->string('office_name')->toString();
+
+        $items = FinancialPlan::where('fiscal_year', $fiscalYear)
+            ->where('office_name', $officeName)
+            ->where('row_type', 'item')
+            ->get(['mooe', 'capital_outlay', 'contract_amount', 'prexc_code']);
+
+        $mooeSum = 0.0;
+        $coSum   = 0.0;
+        $ninpSum = 0.0;
+
+        foreach ($items as $row) {
+            [$effMooe, $effCo] = $this->effectiveAmounts(
+                (float) $row->mooe,
+                (float) $row->capital_outlay,
+                $row->contract_amount
+            );
+
+            if ($row->prexc_code === self::MOOE_CO_PREXC_CODE) {
+                $mooeSum += $effMooe;
+                $coSum   += $effCo;
+            }
+
+            if ($row->prexc_code === self::NINP_PREXC_CODE) {
+                $ninpSum += $effMooe;
+            }
+        }
+
+        $allocation = FinancialPlanAllocation::where('fiscal_year', $fiscalYear)
+            ->where('office_name', $officeName)
+            ->first();
+
+        $mooeAllocation = (float) ($allocation->mooe_allocation ?? 0);
+        $coAllocation   = (float) ($allocation->capital_outlay_allocation ?? 0);
+        $ninpAllocation = (float) ($allocation->ninp_allocation ?? 0);
+
+        return response()->json([
+            'mooe_allocation'           => $mooeAllocation,
+            'capital_outlay_allocation' => $coAllocation,
+            'ninp_allocation'           => $ninpAllocation,
+            'mooe_sum'                  => $mooeSum,
+            'capital_outlay_sum'        => $coSum,
+            'ninp_sum'                  => $ninpSum,
+            'mooe_balance'              => $mooeAllocation - $mooeSum,
+            'capital_outlay_balance'    => $coAllocation - $coSum,
+            'ninp_balance'              => $ninpAllocation - $ninpSum,
+        ]);
+    }
+
+    // FinancialPlanController — new methods
+
+    public function submitForApproval(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'fiscal_year' => ['required', 'integer'],
+            'office_name' => ['required', 'string', 'max:150'],
+        ]);
+
+        $submission = FinancialPlanSubmission::updateOrCreate(
+            ['fiscal_year' => $validated['fiscal_year'], 'office_name' => $validated['office_name']],
+            [
+                'status'       => 'submitted',
+                'submitted_by' => auth()->id(),
+                'submitted_at' => now(),
+            ]
+        );
+
+        $this->auditLog(0, 'plan', 'draft', 'submitted', "Plan submitted for review: FY {$validated['fiscal_year']}, {$validated['office_name']}");
+
+        return response()->json(['success' => true, 'data' => $submission]);
+    }
+
+    public function approve(Request $request): JsonResponse
+    {
+        $this->authorize('approve', FinancialPlan::class); // needs a dedicated Gate/Policy ability
+
+        $validated = $request->validate([
+            'fiscal_year' => ['required', 'integer'],
+            'office_name' => ['required', 'string', 'max:150'],
+        ]);
+
+        $submission = FinancialPlanSubmission::where($validated)->firstOrFail();
+        $submission->update([
+            'status'      => 'approved',
+            'approved_by' => auth()->id(),
+            'approved_at' => now(),
+        ]);
+
+        return response()->json(['success' => true, 'data' => $submission]);
+    }
+
+    public function returnForRevision(Request $request): JsonResponse
+    {
+        $this->authorize('approve', FinancialPlan::class);
+
+        $validated = $request->validate([
+            'fiscal_year'     => ['required', 'integer'],
+            'office_name'     => ['required', 'string', 'max:150'],
+            'return_remarks'  => ['required', 'string'],
+        ]);
+
+        $submission = FinancialPlanSubmission::where($validated)->firstOrFail();
+        $submission->update([
+            'status'          => 'returned',
+            'return_remarks'  => $validated['return_remarks'],
+        ]);
+
+        return response()->json(['success' => true, 'data' => $submission]);
+    }
+
+    // ── FINALIZE / REOPEN (single-actor lock, no multi-step approval)
+     public function finalize(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', FinancialPlan::class);
+
+        $validated = $request->validate([
+            'fiscal_year' => ['required', 'integer'],
+            'office_name' => ['required', 'string', 'max:150'],
+        ]);
+
+        $submission = FinancialPlanSubmission::updateOrCreate(
+            ['fiscal_year' => $validated['fiscal_year'], 'office_name' => $validated['office_name']],
+            [
+                'finalized'    => 'yes',
+                'submitted_by' => auth()->id(),
+                'submitted_at' => now(),
+            ]
+        );
+
+        $plan = FinancialPlan::where('fiscal_year', $validated['fiscal_year'])
+            ->where('office_name', $validated['office_name'])
+            ->first();
+
+        $this->auditLog(
+            $plan->id ?? 0,
+            'plan',
+            'draft',
+            'finalized',
+            "Plan finalized: FY {$validated['fiscal_year']}, {$validated['office_name']}"
+        );
+
+        return response()->json(['success' => true, 'data' => $submission]);
+    }
+
+    public function reopen(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', FinancialPlan::class);
+
+        $validated = $request->validate([
+            'fiscal_year' => ['required', 'integer'],
+            'office_name' => ['required', 'string', 'max:150'],
+        ]);
+
+        $submission = FinancialPlanSubmission::where('fiscal_year', $validated['fiscal_year'])
+            ->where('office_name', $validated['office_name'])
+            ->first();
+
+        if (! $submission) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No finalized plan found for that fiscal year/office.',
+            ], 404);
+        }
+
+        $submission->update(['finalized' => 'no']);
+
+        $plan = FinancialPlan::where('fiscal_year', $validated['fiscal_year'])
+            ->where('office_name', $validated['office_name'])
+            ->first();
+
+        $this->auditLog(
+            $plan->id ?? 0,
+            'plan',
+            'finalized',
+            'draft',
+            "Plan reopened for editing: FY {$validated['fiscal_year']}, {$validated['office_name']}"
+        );
+
+        return response()->json(['success' => true, 'data' => $submission]);
+    }
+
+    // ── STATUS (used by index/builder to show badge + gate the Edit button)
+
+    public function status(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'fiscal_year' => ['required', 'integer'],
+            'office_name' => ['required', 'string', 'max:150'],
+        ]);
+
+        $submission = FinancialPlanSubmission::where('fiscal_year', $validated['fiscal_year'])
+            ->where('office_name', $validated['office_name'])
+            ->first();
+
+        return response()->json([
+            'finalized'    => $submission->finalized ?? 'no',
+            'submitted_by' => $submission?->submittedBy?->name,
+            'submitted_at' => $submission?->submitted_at,
+        ]);
     }
 }

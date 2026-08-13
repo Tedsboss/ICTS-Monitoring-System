@@ -412,6 +412,15 @@ Route::group(['middleware' => 'check.restricted.ips'], function () {
 
             Route::get('/financial-plans/signatories', [FinancialPlanController::class, 'signatories'])->name('financial-plans.signatories');
             Route::post('/financial-plans/signatories', [FinancialPlanController::class, 'saveSignatories'])->name('financial-plans.signatories.save');
+
+            Route::get('financial-plans/allocation', [FinancialPlanController::class, 'allocation'])->name('financial-plans.allocation');
+            Route::post('financial-plans/allocation', [FinancialPlanController::class, 'saveAllocation'])->name('financial-plans.allocation.save');
+            Route::get('financial-plans/totals', [FinancialPlanController::class, 'totals'])->name('financial-plans.totals');
+
+            Route::post('financial-plans/finalize', [FinancialPlanController::class, 'finalize'])->name('financial-plans.finalize');
+            Route::post('financial-plans/reopen', [FinancialPlanController::class, 'reopen'])->name('financial-plans.reopen');
+            Route::get('financial-plans/status', [FinancialPlanController::class, 'status'])->name('financial-plans.status');
+
         });
       });
     });

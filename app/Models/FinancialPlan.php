@@ -18,7 +18,7 @@ class FinancialPlan extends Model
 
         'fiscal_year',
         'office_name',
-
+        'division_id',
         'row_type',
 
         'program_classification',
@@ -31,15 +31,16 @@ class FinancialPlan extends Model
 
         'mooe',
         'capital_outlay',
-
+        'contract_amount',
         'sort_order',
     ];
 
     protected $casts = [
-        'mooe'           => 'decimal:2',
-        'capital_outlay' => 'decimal:2',
-        'fiscal_year'    => 'integer',
-        'sort_order'     => 'integer',
+        'mooe'             => 'decimal:2',
+        'capital_outlay'   => 'decimal:2',
+        'contract_amount'  => 'decimal:2',
+        'fiscal_year'      => 'integer',
+        'sort_order'       => 'integer',
     ];
 
     public function parent(): BelongsTo
@@ -101,5 +102,10 @@ class FinancialPlan extends Model
     public function getIsProcuredAttribute(): bool
     {
         return $this->procurements->contains('procurement_status', 'OK');
+    }
+
+    public function division(): BelongsTo
+    {
+        return $this->belongsTo(Division::class);
     }
 }

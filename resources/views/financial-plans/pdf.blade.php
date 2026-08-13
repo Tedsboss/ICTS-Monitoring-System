@@ -66,17 +66,7 @@
     <div class="office">Name of Office/Staff: <span>{{ $officeName ?: 'All Offices' }}</span></div>
 
     @php
-        /**
-         * Grand totals sum across every row in the plan, so their digit
-         * count is unbounded — a fixed column width can't guarantee they
-         * fit. Instead of clipping/overflowing, the rendered font size
-         * steps down once the formatted string passes a character
-         * threshold, so an 8-, 9-, or 10-digit peso amount still lands
-         * inside its cell, just smaller. Thresholds were picked against
-         * the widened amount columns (46-50pt): a 6-digit value
-         * ("999,999.99", 10 chars) needs no shrink; each step down buys
-         * roughly 2-3 more digits of headroom.
-         */
+
         $fmt = function ($v) {
             $v = (float) $v;
             if ($v == 0) return '-';
@@ -172,8 +162,8 @@
                         ">{{ $r['procurement_status'] ?? '' }}</td>
                         <td class="text-center {{ $isLong($r['expense_item'] ?? '') ? 'long-text' : '' }}">{{ $r['expense_item'] ?? '—' }}</td>
                         <td class="text-center">{{ $r['assigned_personnel'] ?? '—' }}</td>
-                        <td class="text-end">{!! $fmt($r['mooe']) !!}</td>
-                        <td class="text-end">{!! $fmt($r['capital_outlay']) !!}</td>
+                        <td class="text-end">{!! $fmt($r['effective_mooe']) !!}</td>
+                        <td class="text-end">{!! $fmt($r['effective_capital_outlay']) !!}</td>
                         @for($m = 1; $m <= 12; $m++)
                             @php $mv = (float) ($r['months'][$m] ?? 0); @endphp
                             <td class="text-end {{ $mv != 0 ? 'amt-hit' : '' }}">{!! $fmt($mv) !!}</td>

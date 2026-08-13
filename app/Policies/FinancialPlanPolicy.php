@@ -1,5 +1,4 @@
 <?php
-// app/Policies/FinancialPlanPolicy.php
 
 namespace App\Policies;
 
@@ -10,31 +9,28 @@ class FinancialPlanPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->isSuperAdmin() || $user->role->permissions->contains('module_id', $this->moduleId());
+        return true;
     }
 
-    public function view(User $user, FinancialPlan $financialPlan): bool
+    public function view(User $user, FinancialPlan $plan): bool
     {
-        return $this->viewAny($user);
+        return $this->ownsDivision($user, $plan);
     }
 
-    public function create(User $user): bool
+    public function update(User $user, FinancialPlan $plan): bool
     {
-        return $this->viewAny($user);
+        return $this->ownsDivision($user, $plan);
     }
 
-    public function update(User $user, FinancialPlan $financialPlan): bool
+    private function ownsDivision(User $user, FinancialPlan $plan): bool
     {
-        return $this->viewAny($user);
-    }
+        // Super Admin / System Admin get cross-division visibility for
+        // oversight — everyone else is locked to their own division.
+        if (in_array($user->role_id, [1, 29], true)) {
+            return true;
+        }
 
-    public function delete(User $user, FinancialPlan $financialPlan): bool
-    {
-        return $this->viewAny($user);
-    }
-
-    private function moduleId(): ?int
-    {
-        return \App\Models\Module::where('name', 'financial_plans')->value('id');
+        return $plan->division_id !== null
+            && $user->division_id === $plan->division_id;
     }
 }

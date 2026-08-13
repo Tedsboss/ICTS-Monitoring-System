@@ -78,7 +78,7 @@
                                 <td class="fw-semibold">{{ $plan->fiscal_year }}</td>
                                 <td>{{ $plan->office_name }}</td>
                                 <td class="text-end">{{ $plan->row_count }}</td>
-                                <td class="text-end">{{ number_format($plan->total_budget, 2) }}</td>
+                                <td class="text-end">{{ number_format($plan->budget_sum, 2) }}</td>
                                 <td class="text-end">
                                     <a href="{{ route('financial-plans.index', ['fiscal_year' => $plan->fiscal_year, 'office_name' => $plan->office_name]) }}"
                                        class="btn btn-sm btn-outline-secondary" data-bs-toggle="tooltip" title="View">
@@ -88,7 +88,7 @@
                                        class="btn btn-sm btn-outline-primary" data-bs-toggle="tooltip" title="Edit">
                                         <i class="fa fa-pencil"></i>
                                     </a>
-                                    <form action="{{ route('financial-plans.destroy-plan') }}" method="POST" class="d-inline"
+                                    {{-- <form action="{{ route('financial-plans.destroy-plan') }}" method="POST" class="d-inline"
                                           onsubmit="return confirm('Delete the entire FY {{ $plan->fiscal_year }} plan for {{ $plan->office_name }}? This removes all {{ $plan->row_count }} row(s) and cannot be undone.');">
                                         @csrf
                                         @method('DELETE')
@@ -97,7 +97,7 @@
                                         <button type="submit" class="btn btn-sm btn-outline-danger" data-bs-toggle="tooltip" title="Delete">
                                             <i class="fa fa-trash"></i>
                                         </button>
-                                    </form>
+                                    </form> --}}
                                 </td>
                             </tr>
                         @empty
@@ -126,7 +126,7 @@ $(document).ready(function () {
 
         if (!fiscalYear) {
             alert('Fiscal Year is required.');
-            return;
+            return; 
         }
         if (!officeName) {
             alert('Name of Office/Staff is required.');

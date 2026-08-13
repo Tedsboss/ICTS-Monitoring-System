@@ -95,12 +95,56 @@
                 </div>
             </div>
         </div>
-
+        <br>
+        <div class="card shadow-sm border-0 mb-3" style="max-width:780px;">
+            <div class="card-body p-3">
+                <p class="text-muted small mb-2">MOOE / CO / NINP Allocation vs Programmed</p>
+                <div class="row g-2 mb-2">
+                    <div class="col-4">
+                        <label class="form-label small mb-1">MOOE Allocation</label>
+                        <input type="number" id="mooeAllocation" class="form-control form-control-sm">
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label small mb-1">CO Allocation</label>
+                        <input type="number" id="coAllocation" class="form-control form-control-sm">
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label small mb-1">NINP Allocation</label>
+                        <input type="number" id="ninpAllocation" class="form-control form-control-sm">
+                    </div>
+                </div>
+                <button id="btnSaveAllocation" class="btn btn-sm btn-outline-primary mb-3">
+                    <i class="fa fa-save me-1"></i>Save Allocation
+                </button>
+                <div class="row g-2">
+                    <div class="col-4">
+                        <div class="bg-light rounded p-2">
+                            <div class="text-muted small">MOOE Balance (MITHI)</div>
+                            <div class="fw-bold" id="mooeBalanceOut">0.00</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="bg-light rounded p-2">
+                            <div class="text-muted small">CO Balance (MITHI)</div>
+                            <div class="fw-bold" id="coBalanceOut">0.00</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="bg-light rounded p-2">
+                            <div class="text-muted small">NINP Balance</div>
+                            <div class="fw-bold" id="ninpBalanceOut">0.00</div>
+                        </div>
+                        <div class="text-muted" style="font-size:0.68rem;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
         <div class="card-body p-3">
             <div class="table-responsive">
                 <table class="table table-bordered table-sm align-middle" style="font-size:0.75rem;" id="builderTable">
                     <thead class="text-center" style="background:#FFFF00;">
                         <tr>
+                            <th style="width:28px;"></th>
                             <th style="min-width:200px;">Program Classification (a)</th>
                             <th style="min-width:100px;">PREXC Code (b)</th>
                             <th style="min-width:110px;">Staff/Unit (c)</th>
@@ -110,6 +154,7 @@
                             <th style="min-width:100px;">Assigned Personnel</th>
                             <th style="min-width:100px;">MOOE</th>
                             <th style="min-width:100px;">Capital Outlay</th>
+                            <th style="min-width:110px;">Contract Amount</th>
                             @foreach($months as $label)
                                 <th style="min-width:80px; background:#FFFF00;">{{ $label }}</th>
                             @endforeach
@@ -147,6 +192,9 @@ $(document).ready(function () {
 
     const MONTHS = @json($months);
     let rowCounter = 0;
+
+    const NINP_PREXC_CODE = '200000200001000';
+    const MOOE_CO_PREXC_CODE = '100000100001000';
 
     let initialLoadDone = false;
     let hasUnsavedChanges = false;
@@ -188,9 +236,12 @@ $(document).ready(function () {
         }
 
         return `
-            <tr data-row-id="${rowId}" data-row-type="${type}" class="${rowClass}">
-                <td>
-                    <select class="form-select form-select-sm row-type-select">
+                <tr data-row-id="${rowId}" data-row-type="${type}" class="${rowClass}">
+                    <td class="text-center drag-handle" style="cursor:grab; width:28px;">
+                        <i class="fa fa-grip-vertical text-muted"></i>
+                    </td>
+                    <td>
+                        <select class="form-select form-select-sm row-type-select">
                         <option value="item" ${isItem ? 'selected' : ''}>Line</option>
                         <option value="subheader" ${type === 'subheader' ? 'selected' : ''}>Sub Header</option>
                         <option value="header" ${type === 'header' ? 'selected' : ''}>Header</option>
@@ -216,32 +267,13 @@ $(document).ready(function () {
                 <td><input type="text" class="form-control form-control-sm field-input" data-field="assigned_personnel" value="${r.assigned_personnel ?? ''}" ${isItem ? '' : 'disabled'}></td>
                 <td><input type="number" step="0.01" class="form-control form-control-sm field-input" data-field="mooe" value="${r.mooe ?? 0}" ${isItem ? '' : 'disabled'}></td>
                 <td><input type="number" step="0.01" class="form-control form-control-sm field-input" data-field="capital_outlay" value="${r.capital_outlay ?? 0}" ${isItem ? '' : 'disabled'}></td>
+                <td><input type="number" step="0.01" class="form-control form-control-sm field-input" data-field="contract_amount" value="${r.contract_amount ?? ''}" placeholder="—" ${isItem ? '' : 'disabled'}></td>
                 ${monthCells}
                 <td class="text-center">
                     <a href="javascript:void(0)" class="text-danger btn-delete-row"><i class="fa fa-trash"></i></a>
                 </td>
             </tr>
         `;
-    }
-
-    function addRow(type) {
-        const $body = $('#builderBody');
-        const $rows = $body.find('tr');
-        let prefill = {};
-
-        // Auto-carry PREXC / classification from the row above for new item rows
-        if (type === 'item' && $rows.length > 0) {
-            const $last = $rows.last();
-            prefill.prexc_code = $last.find('[data-field="prexc_code"]').val() || '';
-            prefill.program_classification = $last.find('[data-field="program_classification"]').val() || '';
-        }
-
-        prefill.row_type = type;
-        const $newRow = $(fieldRow(prefill));
-        $body.append($newRow);
-        bindRowTypeChange();
-        growSpecificActivityCells($newRow);
-        hasUnsavedChanges = true;
     }
 
     function bindRowTypeChange() {
@@ -257,6 +289,8 @@ $(document).ready(function () {
 
             $tr.find('[data-field]:not([data-field="program_classification"]), .month-input')
                 .prop('disabled', !isItem);
+
+            recalcLiveBalance();
         });
     }
 
@@ -271,6 +305,58 @@ $(document).ready(function () {
         rows.forEach(r => $body.append(fieldRow(r)));
         bindRowTypeChange();
         growSpecificActivityCells($body);
+    }
+
+    function enableRowDragging() {
+        let dragSrcRow = null;
+
+        // Only the grip handle starts a drag — typing in inputs shouldn't.
+        $('#builderBody').on('mousedown', '.drag-handle', function () {
+            $(this).closest('tr').attr('draggable', true);
+        });
+
+        $('#builderBody').on('dragstart', 'tr', function (e) {
+            dragSrcRow = this;
+            e.originalEvent.dataTransfer.effectAllowed = 'move';
+            e.originalEvent.dataTransfer.setData('text/plain', '');
+            $(this).addClass('dragging');
+        });
+
+        $('#builderBody').on('dragend', 'tr', function () {
+            $(this).removeClass('dragging').attr('draggable', false);
+            $('#builderBody tr').removeClass('drag-over');
+        });
+
+        $('#builderBody').on('dragover', 'tr', function (e) {
+            e.preventDefault();
+            e.originalEvent.dataTransfer.dropEffect = 'move';
+            if (this !== dragSrcRow) {
+                $(this).addClass('drag-over');
+            }
+        });
+
+        $('#builderBody').on('dragleave', 'tr', function () {
+            $(this).removeClass('drag-over');
+        });
+
+        $('#builderBody').on('drop', 'tr', function (e) {
+            e.preventDefault();
+            $(this).removeClass('drag-over');
+            if (!dragSrcRow || dragSrcRow === this) return;
+
+            const $target = $(this);
+            const srcIndex = $(dragSrcRow).index();
+            const targetIndex = $target.index();
+
+            if (srcIndex < targetIndex) {
+                $target.after(dragSrcRow);
+            } else {
+                $target.before(dragSrcRow);
+            }
+
+            hasUnsavedChanges = true;
+            recalcLiveBalance();
+        });
     }
 
     function loadSignatories() {
@@ -316,6 +402,99 @@ $(document).ready(function () {
         });
     }
 
+    function fmtNum(n) {
+        return Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function loadAllocationAndBalance() {
+            const fiscalYear = $('#fiscalYear').val();
+            const officeName = $('#officeName').val();
+
+            $.getJSON(
+                '{{ route("financial-plans.totals") }}',
+                { fiscal_year: fiscalYear, office_name: officeName },
+                function (res) {
+                    $('#mooeAllocation').val(res.mooe_allocation);
+                    $('#coAllocation').val(res.capital_outlay_allocation);
+                    // ninp_allocation requires a matching column/field on the
+                    // backend totals endpoint — falls back to blank if absent.
+                    $('#ninpAllocation').val(res.ninp_allocation ?? '');
+                    recalcLiveBalance();
+                }
+            );
+        }
+
+    function saveAllocation() {
+        return $.ajax({
+            url: '{{ route("financial-plans.allocation.save") }}',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                fiscal_year: $('#fiscalYear').val(),
+                office_name: $('#officeName').val(),
+                mooe_allocation: $('#mooeAllocation').val(),
+                capital_outlay_allocation: $('#coAllocation').val(),
+                // Requires the backend save endpoint to accept/persist this field.
+                ninp_allocation: $('#ninpAllocation').val(),
+            }),
+            headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' }
+        }).done(function () {
+            loadAllocationAndBalance();
+        });
+    }
+
+    function getLiveTotals() {
+        let mooeSum = 0, coSum = 0, ninpMooeSum = 0;
+        $('#builderBody tr').each(function () {
+            const $tr = $(this);
+            if ($tr.find('.row-type-select').val() !== 'item') return;
+
+            const mooe = parseFloat($tr.find('[data-field="mooe"]').val()) || 0;
+            const co   = parseFloat($tr.find('[data-field="capital_outlay"]').val()) || 0;
+            const contractRaw = $tr.find('[data-field="contract_amount"]').val();
+            const contractAmount = contractRaw === '' ? null : parseFloat(contractRaw);
+            const prexc = ($tr.find('[data-field="prexc_code"]').val() || '').trim();
+
+            const [effMooe, effCo] = effectiveAmounts(mooe, co, contractAmount);
+
+            if (prexc === MOOE_CO_PREXC_CODE) {
+                mooeSum += effMooe;
+                coSum   += effCo;
+            }
+            if (prexc === NINP_PREXC_CODE) {
+                ninpMooeSum += effMooe;
+            }
+        });
+        return { mooeSum, coSum, ninpMooeSum };
+    }
+
+    function effectiveAmounts(mooe, co, contractAmount) 
+    {
+        if (contractAmount === null || isNaN(contractAmount)) {
+            return [mooe, co];
+        }
+        const total = mooe + co;
+        if (total <= 0) return [0, 0];
+        return [contractAmount * (mooe / total), contractAmount * (co / total)];
+    }
+
+    function recalcLiveBalance() {
+        const { mooeSum, coSum, ninpMooeSum } = getLiveTotals();
+        const mooeAlloc = parseFloat($('#mooeAllocation').val()) || 0;
+        const coAlloc   = parseFloat($('#coAllocation').val()) || 0;
+        const ninpAlloc = parseFloat($('#ninpAllocation').val()) || 0;
+
+        const mooeBalance = mooeAlloc - mooeSum;
+        const coBalance   = coAlloc - coSum;
+        const ninpBalance = ninpAlloc - ninpMooeSum;
+
+        $('#mooeBalanceOut').text(fmtNum(mooeBalance)).toggleClass('text-danger', mooeBalance < 0);
+        $('#coBalanceOut').text(fmtNum(coBalance)).toggleClass('text-danger', coBalance < 0);
+        $('#ninpBalanceOut').text(fmtNum(ninpBalance)).toggleClass('text-danger', ninpBalance < 0);
+
+        return { mooeBalance, coBalance, ninpBalance };
+    }
+
     function loadPlan(isManualReload = false) {
         if (isManualReload && hasUnsavedChanges) {
             const proceed = confirm(
@@ -338,20 +517,22 @@ $(document).ready(function () {
         loadSignatories();
 
         activeLoadRequest = $.getJSON(
-            '{{ route("financial-plans.data") }}',
-            { fiscal_year: fiscalYear, office_name: officeName },
-            function (rows) {
-                renderRows(rows);
-                if (rows.length === 0) {
-                    addRow('header');
-                    addRow('item');
-                }
-                hasUnsavedChanges = false;
-            }
-        ).always(function () {
-            initialLoadDone = true;
-            setBuilderControlsEnabled(true);
-        });
+                    '{{ route("financial-plans.data") }}',
+                    { fiscal_year: fiscalYear, office_name: officeName },
+                    function (rows) {
+                        renderRows(rows);
+                        if (rows.length === 0) {
+                            addRow('header');
+                            addRow('item');
+                        }
+                        hasUnsavedChanges = false;
+                        recalcLiveBalance();
+                    }
+                ).always(function () {
+                    initialLoadDone = true;
+                    setBuilderControlsEnabled(true);
+                    loadAllocationAndBalance();
+                });
     }
 
     function collectPayload() {
@@ -400,6 +581,20 @@ $(document).ready(function () {
             return;
         }
 
+        const { mooeBalance, coBalance, ninpBalance } = recalcLiveBalance();
+
+        if (mooeBalance < 0 || coBalance < 0 || ninpBalance < 0) {
+            let msg = 'This plan exceeds the allocation ceiling:\n';
+            if (mooeBalance < 0) msg += `MOOE over by ${fmtNum(Math.abs(mooeBalance))}\n`;
+            if (coBalance < 0)   msg += `Capital Outlay over by ${fmtNum(Math.abs(coBalance))}\n`;
+            if (ninpBalance < 0) msg += `NINP over by ${fmtNum(Math.abs(ninpBalance))}\n`;
+            msg += '\nSave anyway?';
+
+            if (!confirm(msg)) {
+                return;
+            }
+        }
+
         $('#btnSavePlan, #btnSavePlan2')
             .prop('disabled', true)
             .text('Saving...');
@@ -417,6 +612,7 @@ $(document).ready(function () {
             success: function (response) {
                 if (response.success) {
                     hasUnsavedChanges = false;
+                    loadAllocationAndBalance();
                     saveSignatories().always(function () {
                         window.location.href = response.redirect;
                     });
@@ -439,17 +635,29 @@ $(document).ready(function () {
 
     }
 
+    $('#builderBody').on('input change', '.field-input, .month-input', function () {
+            hasUnsavedChanges = true;
+
+            if ($(this).hasClass('specific-activity-input')) {
+                autoGrow(this);
+            }
+
+            if (
+                $(this).data('field') === 'mooe' ||
+                $(this).data('field') === 'capital_outlay' ||
+                $(this).data('field') === 'contract_amount' ||
+                $(this).data('field') === 'prexc_code'
+            ) {
+                recalcLiveBalance();
+            }
+    });
+
+    $('#mooeAllocation, #coAllocation, #ninpAllocation').on('input', recalcLiveBalance);
+
     $('#builderBody').on('click', '.btn-delete-row', function () {
         $(this).closest('tr').remove();
         hasUnsavedChanges = true;
-    });
-
-    $('#builderBody').on('input change', '.field-input, .month-input', function () {
-        hasUnsavedChanges = true;
-
-        if ($(this).hasClass('specific-activity-input')) {
-            autoGrow(this);
-        }
+        recalcLiveBalance();
     });
 
     $('#sigPreparedBy, #sigPreparedByPosition, #sigReviewedBy, #sigReviewedByPosition, #sigRecommendedBy, #sigRecommendedByPosition, #sigApprovedBy, #sigApprovedByPosition').on('input', function () {
@@ -461,13 +669,35 @@ $(document).ready(function () {
     $('#btnAddItem, #btnAddItem2').on('click', () => addRow('item'));
     $('#btnSavePlan, #btnSavePlan2').on('click', savePlan);
     $('#btnLoadPlan').on('click', () => loadPlan(true));
+    $('#btnSaveAllocation').on('click', saveAllocation);
+    enableRowDragging();
 
     window.addEventListener('beforeunload', function (e) {
-        if (hasUnsavedChanges) {
-            e.preventDefault();
-            e.returnValue = '';
+            if (hasUnsavedChanges) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        });
+
+    function addRow(type) {
+            const $body = $('#builderBody');
+            const $rows = $body.find('tr');
+            let prefill = {};
+
+            if (type === 'item' && $rows.length > 0) {
+                const $last = $rows.last();
+                prefill.prexc_code = $last.find('[data-field="prexc_code"]').val() || '';
+                prefill.program_classification = $last.find('[data-field="program_classification"]').val() || '';
+            }
+
+            prefill.row_type = type;
+            const $newRow = $(fieldRow(prefill));
+            $body.append($newRow);
+            bindRowTypeChange();
+            growSpecificActivityCells($newRow);
+            hasUnsavedChanges = true;
+            recalcLiveBalance();
         }
-    });
 
     loadPlan(false);
 });
@@ -478,5 +708,15 @@ $(document).ready(function () {
     /* Sub Header rows nest visually under their parent Header row. */
     #builderTable .builder-subheader td:first-child {
         padding-left: 24px;
+    }
+
+    #builderBody tr.dragging {
+        opacity: 0.4;
+    }
+    #builderBody tr.drag-over {
+        box-shadow: inset 0 2px 0 0 #2dce89;
+    }
+    .drag-handle:active {
+        cursor: grabbing;
     }
 </style>
