@@ -134,9 +134,13 @@ class FinancialPlanController extends Controller
             ->where('row_type', 'item')
             ->get(['fiscal_year', 'office_name', 'mooe', 'capital_outlay', 'contract_amount']);
 
+        $submissions = FinancialPlanSubmission::query()
+            ->get(['fiscal_year', 'office_name', 'finalized'])
+            ->keyBy(fn ($s) => $s->fiscal_year . '|' . $s->office_name);
+
         $plans = $rows
             ->groupBy(fn ($r) => $r->fiscal_year . '|' . $r->office_name)
-            ->map(function ($group) {
+            ->map(function ($group, $key) use ($submissions) {
                 $budgetSum = $group->sum(function ($r) {
                     [$effMooe, $effCo] = $this->effectiveAmounts(
                         (float) $r->mooe,
@@ -151,6 +155,7 @@ class FinancialPlanController extends Controller
                     'office_name' => $group->first()->office_name,
                     'row_count'   => $group->count(),
                     'budget_sum'  => $budgetSum,
+                    'finalized'   => $submissions->get($key)->finalized ?? 'no',
                 ];
             })
             ->values()
@@ -158,11 +163,15 @@ class FinancialPlanController extends Controller
             ->sortByDesc('fiscal_year')
             ->values();
 
-        $offices = FinancialPlan::query()->distinct()->orderBy('office_name')->pluck('office_name');
+        // Derived from $plans itself (not a separate query), so the filter
+        // dropdowns can never offer a combination that yields zero table rows.
+        $offices     = $plans->pluck('office_name')->unique()->sort()->values();
+        $fiscalYears = $plans->pluck('fiscal_year')->unique()->sortDesc()->values();
 
         return view('financial-plans.plans', [
-            'plans'   => $plans,
-            'offices' => $offices,
+            'plans'       => $plans,
+            'offices'     => $offices,
+            'fiscalYears' => $fiscalYears,
         ]);
     }
 
