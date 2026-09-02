@@ -738,17 +738,23 @@ let referenceButtons = document.querySelector('[data-class]');
 window.addEventListener("resize", navbarColorOnResize);
 
 function navbarColorOnResize() {
-  if (sidenav) {
-    if (window.innerWidth > 1200) {
-      if (referenceButtons.classList.contains('active') && referenceButtons.getAttribute('data-class') === 'bg-default') {
-        sidenav.classList.remove('bg-white');
-      } else {
-        sidenav.classList.add('bg-white');
-      }
+  if (!sidenav) {
+    return;
+  }
+
+  if (window.innerWidth > 1200) {
+    if (
+      referenceButtons &&
+      referenceButtons.classList.contains('active') &&
+      referenceButtons.getAttribute('data-class') === 'bg-default'
+    ) {
+      sidenav.classList.remove('bg-white');
     } else {
       sidenav.classList.add('bg-white');
-      sidenav.classList.remove('bg-default');
     }
+  } else {
+    sidenav.classList.add('bg-white');
+    sidenav.classList.remove('bg-default');
   }
 }
 
