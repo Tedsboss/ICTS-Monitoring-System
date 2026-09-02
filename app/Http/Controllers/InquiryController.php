@@ -6,7 +6,6 @@ use App\Http\Requests\InquiryReplyRequest;
 use App\Http\Requests\InquiryRequest;
 use App\Models\Inquiry;
 use App\Models\Parameter;
-use App\Models\Question;
 use App\Models\RestrictedIp;
 use App\Notifications\ReplyInquiryNotification;
 use App\Traits\GenerateLogs;
@@ -14,7 +13,6 @@ use DateTime;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Notification;
 use Mews\Purifier\Facades\Purifier;
 use Yajra\DataTables\DataTables;
@@ -36,11 +34,11 @@ class InquiryController extends Controller
    */
   public function create()
   {
-    $icc_telephone = Parameter::where('id', 27)->first()->value;
-    $icc_email = Parameter::where('id', 28)->first()->value;
-    $icc_open = DateTime::createFromFormat('H:i', Parameter::where('id', 23)->first()->value)->format('g:i A');
-    $icc_close = DateTime::createFromFormat('H:i', Parameter::where('id', 24)->first()->value)->format('g:i A');
-    $icc_address = Parameter::where('id', 29)->first()->value;
+    $icc_telephone = Parameter::whereKey(27)->value('value') ?? '';
+    $icc_email = Parameter::whereKey(28)->value('value') ?? '';
+    $icc_open = $this->formatOfficeTime(Parameter::whereKey(23)->value('value'));
+    $icc_close = $this->formatOfficeTime(Parameter::whereKey(24)->value('value'));
+    $icc_address = Parameter::whereKey(29)->value('value') ?? '';
 
     return view('inquiries.create', compact('icc_telephone', 'icc_email', 'icc_open', 'icc_close', 'icc_address'));
   }
@@ -55,7 +53,13 @@ class InquiryController extends Controller
       $user = auth()->user();
       $inquiry->firstname = $user->firstname;
       $inquiry->lastname = $user->lastname;
-      $inquiry->staff = $user->staff->name . ' (' . $user->division->abbreviation . ')';
+      $staffName = optional($user->staff)->name;
+      $divisionAbbreviation = optional($user->division)->abbreviation;
+
+      $inquiry->staff = trim(
+        ($staffName ?? '') .
+        ($divisionAbbreviation ? ' (' . $divisionAbbreviation . ')' : '')
+      );
       $inquiry->email = $user->email;
       $inquiry->user_id = $user->id;
     } else {
@@ -66,15 +70,15 @@ class InquiryController extends Controller
     }
 
     /**
-     * The convertBase64ImagesToURLs function will create a copy of the image in the application's public folder. 
+     * The convertBase64ImagesToURLs function will create a copy of the image in the application's public folder.
      * This is necessary when sending an HTML message via email, especially to email clients like Gmail that do not support base64-encoded images.
-     * 
+     *
      * PROS:
      * 1. Ensures that images will display properly in email clients like Gmail, Outlook
      * 2. Reduced Email Size
      * 3. Cleaner and more readable email HTML
      * 4. Email clients or browsers may cache the images, reducing the load time
-     * 
+     *
      * CONS:
      * 1. Public folder may accumulate a large number of images, potentially consuming server storage space
      * 2. If the image is deleted or the URL changes, the email will display a broken image.
@@ -92,7 +96,16 @@ class InquiryController extends Controller
       $route_link = 'auth.contactus.create';
       $add_remarks = '';
     }
-    $this->addSystemLogs("Created user inquiry: " . $inquiry->email . $add_remarks, auth()->id(), auth()->user()->email, request()->getClientIp(true), 'inquiries', $inquiry->id);
+    $logEmail = auth()->check() ? auth()->user()->email : $inquiry->email;
+
+    $this->addSystemLogs(
+      "Created user inquiry: " . $inquiry->email . $add_remarks,
+      auth()->id(),
+      $logEmail,
+      request()->getClientIp(true),
+      'inquiries',
+      $inquiry->id
+    );
     return redirect()->route($route_link)->with('succes', 'Your message has been sent!. Someone from our support team will contact you shortly.');
   }
 
@@ -131,7 +144,6 @@ class InquiryController extends Controller
   public function getinquiries(Request $request)
   {
     $this->authorize('viewAny', Inquiry::class);
-    DB::statement("SET SQL_MODE=''");
     $inquiries = Inquiry::select([
       'inquiries.id',
       'inquiries.firstname',
@@ -149,8 +161,7 @@ class InquiryController extends Controller
       // ->whereDoesntHave('user')
       ->with([
         'editor:id,firstname,lastname,middlename',
-      ])
-      ->groupBy('inquiries.id');
+      ]);
 
     return DataTables::of($inquiries)
       ->editColumn('created_at', function (Inquiry $inquiry) {
@@ -165,7 +176,7 @@ class InquiryController extends Controller
         if (auth()->user()->can('block', [Inquiry::class, $inquiry])) {
           $can_block = 1;
         }
-        return '<div class="btn-group" role="group"><button data-bs-toggle="tooltip" data-bs-original-title="Show" class="border-0 bg-transparent" onclick=\'showInquiry(' . json_encode($inquiry, JSON_HEX_APOS) . ', "' . config('items.inquiry_statuses')[$inquiry->status] . '", ' . $can_block . ', this)\'><i class="fa ' . $fa_icons . '"></i></button></div>';
+        return '<div class="btn-group" role="group"><button data-bs-toggle="tooltip" data-bs-original-title="Show" class="border-0 bg-transparent" onclick=\'showInquiry(' . json_encode($inquiry, JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_HEX_TAG) . ', "' . config('items.inquiry_statuses')[$inquiry->status] . '", ' . $can_block . ', this)\'><i class="fa ' . $fa_icons . '"></i></button></div>';
       })
       ->filterColumn('fullname', function ($query, $keyword) {
         $query->whereRaw("CONCAT(inquiries.firstname, ' ', inquiries.lastname) like ?", ["%{$keyword}%"]);
@@ -196,7 +207,9 @@ class InquiryController extends Controller
     }
 
     DB::transaction(function () use ($request, &$inquiry) {
-      DB::table('inquiries')->where('id', $inquiry->id)->lockForUpdate();
+      $inquiry = Inquiry::whereKey($inquiry->id)
+        ->lockForUpdate()
+        ->firstOrFail();
 
       $reply_message = Purifier::clean($request->html_reply, 'allow_quilljs_element');
 
@@ -213,7 +226,11 @@ class InquiryController extends Controller
         $restricted_ip->route = 'userinquiry';
         $restricted_ip->status = 1;
         $restricted_ip->updated_by = null;
-        $restricted_ip->content = "{'email': '" . $inquiry->email . "', 'reason': '" . $request->reason . "', 'requested_by': '" . auth()->id() . "'}";
+        $restricted_ip->content = json_encode([
+          'email' => $inquiry->email,
+          'reason' => $request->reason,
+          'requested_by' => auth()->id(),
+        ]);
         $restricted_ip->save();
         $this->addSystemLogs("Added blocked IP: " . $restricted_ip->ipaddress . "(via inquiry module)", auth()->id(), auth()->user()->email, request()->getClientIp(true), 'restricted_ips', $restricted_ip->id);
       }
@@ -234,8 +251,11 @@ class InquiryController extends Controller
       if (!auth()->user()->canAny(['reply', 'block'], $inquiry)) {
         return response()->json(['error' => 'Unauthorized'], Response::HTTP_UNPROCESSABLE_ENTITY);
       } else {
-        DB::transaction(function () use ($inquiry) {
-          DB::table('inquiries')->where('id', $inquiry->id)->lockForUpdate();
+        DB::transaction(function () use (&$inquiry) {
+          $inquiry = Inquiry::whereKey($inquiry->id)
+            ->lockForUpdate()
+            ->firstOrFail();
+
           $inquiry->status = 2;
           $inquiry->updated_by = auth()->id();
           $inquiry->save();
@@ -245,4 +265,17 @@ class InquiryController extends Controller
       }
     }
   }
+
+  // Format office hours safely
+  private function formatOfficeTime($value): string
+  {
+    if (empty($value)) {
+      return '';
+    }
+
+    $time = DateTime::createFromFormat('H:i', $value);
+
+    return $time ? $time->format('g:i A') : (string) $value;
+  }
+
 }

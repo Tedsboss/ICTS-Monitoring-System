@@ -1,5 +1,4 @@
 <?php
-// app/Models/FinancialPlanTarget.php
 
 namespace App\Models;
 
@@ -13,15 +12,24 @@ class FinancialPlanTarget extends Model
 
     protected $table = 'financial_plan_targets';
 
-    protected $fillable = ['financial_plan_id', 'month', 'amount'];
+    protected $fillable = [
+        'financial_plan_id',
+        'month',
+        'amount',
+    ];
 
     protected $casts = [
-        'month'  => 'integer',
+        'financial_plan_id' => 'integer',
+        'month' => 'integer',
         'amount' => 'decimal:2',
     ];
 
+    // Financial plan row
     public function financialPlan(): BelongsTo
     {
-        return $this->belongsTo(FinancialPlan::class);
+        return $this->belongsTo(
+            FinancialPlan::class,
+            'financial_plan_id'
+        );
     }
 }

@@ -46,7 +46,7 @@ class AuthServiceProvider extends ServiceProvider
    *
    * @var array<class-string, class-string>
    */
-  protected $policies = [
+protected $policies = [
     User::class => UserPolicy::class,
     Agency::class => AgencyPolicy::class,
     Form::class => FormPolicy::class,
@@ -61,10 +61,11 @@ class AuthServiceProvider extends ServiceProvider
     TrustedDevice::class => TrustedDevicePolicy::class,
     UpliftPillar::class => UpliftPillarPolicy::class,
     UpliftSubmission::class => UpliftSubmissionPolicy::class,
-    Saeb::class        => SaebPolicy::class,
-    Procurement ::class => ProcurementPolicy::class,
+
+    Saeb::class => SaebPolicy::class,
+    Procurement::class => ProcurementPolicy::class,
     FinancialPlan::class => FinancialPlanPolicy::class,
-  ];
+];
 
   /**
    * Register any authentication / authorization services.

@@ -9,11 +9,8 @@ use App\Models\User;
 use App\Models\Role;
 use App\Models\Staff;
 use App\Models\Division;
-use App\Models\Unit;
 use App\Models\Position;
-use App\Models\OfficeLocation;
 use App\Traits\TracksHistoryTrait;
-use Carbon\Carbon;
 use Yajra\DataTables\DataTables;
 use Illuminate\Support\Facades\DB;
 
@@ -70,8 +67,7 @@ class UserController extends Controller
     $user->emailnotif = $request->emailnotif ?? 'Y';
     $user->twofactor = $request->twofactor ?? 'Y';
 
-    if ($request->get('new-password') == '' || $request->get('new-password') == null) {
-    } else {
+    if ($request->filled('new-password')) {
       $user->password = $request->get('new-password');
     }
     if ($request->file('avatar')) {
@@ -108,7 +104,7 @@ class UserController extends Controller
     $this->storeAllOldRelationshipValues($user);
 
     DB::transaction(function () use ($request, &$user) {
-      $user = User::where('id', $user->id)->lockForUpdate()->first();
+      $user = User::whereKey($user->id)->lockForUpdate()->firstOrFail();
       $user->firstname = $request->firstname;
       $user->middlename = $request->middlename;
       $user->lastname = $request->lastname;
@@ -126,14 +122,12 @@ class UserController extends Controller
       $user->emailnotif = $request->emailnotif ?? 'N';
       $user->twofactor = $request->twofactor ?? 'N';
 
-      if ($request->get('new-password') == '' || $request->get('new-password') == null) {
-      } else {
+      if ($request->filled('new-password')) {
         $user->password = $request->get('new-password');
       }
       if ($request->file('avatar')) {
         $user->avatar = $request->file('avatar')->store('/', 'avatars');
       }
-      $user->updated_at = Carbon::now();
       $user->save();
     });
 
@@ -153,7 +147,6 @@ class UserController extends Controller
   public function getusers(Request $request)
   {
     $this->authorize('viewAny', User::class);
-    DB::statement("SET SQL_MODE=''");
     $users = User::select([
       'users.id',
       'users.firstname',
@@ -174,7 +167,7 @@ class UserController extends Controller
       'users.enabledark',
       'users.twofactor',
       'users.twofactortype',
-      DB::raw("CONCAT(users.firstname, ' ', users.lastname) as fullname"),
+      DB::raw("TRIM(CONCAT_WS(' ', users.firstname, users.middlename, users.lastname)) as fullname"),
     ])
       ->with([
         'staff:id,name,abbreviation',
@@ -182,8 +175,7 @@ class UserController extends Controller
         'agency:id,UACS_AGY_DSC,Abbreviation',
         'position:id,name',
         'trusted_devices:id,user_id,device_name,ip,last_seen_at,expires_at,revoked_at',
-      ])
-      ->groupBy('users.id');
+      ]);
 
     return DataTables::of($users)
       ->editColumn('designation', function (User $user) {
@@ -219,7 +211,7 @@ class UserController extends Controller
           $delete = '<form action="' . route('users.destroy', $user->id) . '" method="post"><input type="hidden" name="_method" value="DELETE"><input type="hidden" name="_token" value="' . csrf_token() . '"><button onclick="return confirm(\'Are you sure you want to delete?\')" data-bs-toggle="tooltip" data-bs-original-title="Delete" class="border-0 bg-transparent"><i class="fa fa-times text-danger"></i></button></form>';
         }
         if (auth()->user()->can('edit', [User::class, $user])) {
-          $edit = '<button data-bs-toggle="tooltip" data-bs-original-title="Edit" class="border-0 bg-transparent" onclick=\'showUser(' . json_encode($user, JSON_HEX_APOS) . ', "' . route('users.update', $user->id) . '", "' . $user->avatarUrl() . '")\'><i class="fa fa-pencil text-info"></i></button>';
+          $edit = '<button data-bs-toggle="tooltip" data-bs-original-title="Edit" class="border-0 bg-transparent" onclick=\'showUser(' . json_encode($user, JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_HEX_TAG) . ', "' . route('users.update', $user->id) . '", "' . $user->avatarUrl() . '")\'><i class="fa fa-pencil text-info"></i></button>';
         } else if (auth()->id() == $user->id) {
           $edit = '<a data-bs-toggle="tooltip" data-bs-original-title="My Profile" class="border-0 bg-transparent px-1" href="' . route('user-profile') . '"><i class="fa fa-user text-success"></i></a>';
         }

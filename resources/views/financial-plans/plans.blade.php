@@ -1,424 +1,1481 @@
-{{-- resources/views/financial-plans/plans.blade.php --}}
 @extends('layouts.app')
 
 @section('content')
-<nav class="navbar navbar-main navbar-expand-lg px-0 mx-4 shadow-none border-radius-xl z-index-sticky">
+
+@php
+    $isFinancialPlanAdministrator = in_array(
+        (int) auth()->user()->role_id,
+        [1, 29],
+        true
+    );
+@endphp
+
+<nav
+
+    class="navbar navbar-main navbar-expand-lg px-0 mx-4 shadow-none border-radius-xl z-index-sticky"
+
+    id="navbarBlur"
+
+    data-scroll="false"
+
+>
+
     <div class="container-fluid py-2 px-3">
-        @include('layouts.navbars.auth.topnav', ['title' => 'Work & Financial Plans'])
+
+        @include('layouts.navbars.auth.topnav', ['title' => 'All Work & Financial Plans'])
+
         @include('layouts.navbars.auth.topnav-withdatetime')
+
     </div>
+
 </nav>
 
-<div class="container-fluid mt-4 px-4">
+<div class="px-4 pb-8 pt-4">
 
-    @if(session('success'))
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
-            {{ session('success') }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-    @endif
+    {{-- Page Message --}}
 
-    {{-- Stat strip --}}
-    <div class="mb-4">
-        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2
-                    bg-white shadow-sm rounded-3 px-3 py-3 border">
-            <div class="d-flex align-items-center gap-2 flex-wrap">
-                <div class="fw-semibold">Work & Financial Plans</div>
-                <small class="text-muted">All fiscal years / offices</small>
-            </div>
+    <div id="pageMessage"></div>
 
-            <div class="d-flex align-items-center gap-2 flex-wrap">
-                <div class="text-center">
-                    <div class="fw-bold text-primary fs-5" id="totalRecords">—</div>
-                    <small class="text-muted">Total</small>
+    {{-- Filters --}}
+
+    <section
+
+        class="mb-5 rounded-2xl border border-slate-200
+
+               bg-white p-5 shadow-sm"
+
+    >
+
+        <div
+
+            class="flex flex-col gap-5 xl:flex-row
+
+                   xl:items-end xl:justify-between"
+
+        >
+
+            <div class="flex flex-wrap items-end gap-3">
+
+                {{-- Fiscal Year --}}
+
+                <div>
+
+                    <label
+
+                        for="filterFiscalYear"
+
+                        class="mb-1.5 block text-xs font-semibold
+
+                               uppercase tracking-wide text-slate-600"
+
+                    >
+
+                        Fiscal Year
+
+                    </label>
+
+                    <select
+
+                        id="filterFiscalYear"
+
+                        class="block min-w-[150px] rounded-lg
+
+                               border border-slate-300 bg-white
+
+                               px-3 py-2 text-sm text-slate-700
+
+                               shadow-sm outline-none transition
+
+                               focus:border-sky-500 focus:ring-2
+
+                               focus:ring-sky-100"
+
+                    >
+
+                        <option value="">
+
+                            All Fiscal Years
+
+                        </option>
+
+                        @foreach ($fiscalYears as $year)
+
+                            <option value="{{ $year }}">
+
+                                {{ $year }}
+
+                            </option>
+
+                        @endforeach
+
+                    </select>
+
                 </div>
 
-                <div class="vr d-none d-md-block"></div>
+                {{-- Office --}}
 
-                <div class="text-center">
-                    <div class="fw-bold text-secondary fs-5" id="countDraft">—</div>
-                    <small class="text-muted">Draft</small>
-                </div>
+                <div class="w-full sm:w-auto">
 
-                <div class="text-center">
-                    <div class="fw-bold text-success fs-5" id="countFinalized">—</div>
-                    <small class="text-muted">Finalized</small>
-                </div>
-            </div>
-        </div>
-    </div>
+                    <label
 
-    {{-- File a new WFP --}}
-    <div class="card shadow-sm border-0 mb-4">
-        <div class="card-header bg-white">
-            <h6 class="mb-0"><i class="fa fa-plus-circle me-1 text-success"></i> File a New Work & Financial Plan</h6>
-        </div>
-        <div class="card-body p-3">
-            <div class="row g-3 align-items-end">
-                <div class="col-auto">
-                    <label class="form-label mb-1">Fiscal Year</label>
-                    <input type="number" id="newFiscalYear" class="form-control form-control-sm" style="width:120px;" value="{{ now()->year }}">
-                </div>
-                <div class="col-auto">
-                    <label class="form-label mb-1">Name of Office/Staff</label>
-                    <input type="text" id="newOfficeName" class="form-control form-control-sm" style="width:340px;"
-                        list="officeSuggestions" placeholder="Type an existing office, or a brand-new one">
-                    <datalist id="officeSuggestions">
-                        @foreach($offices as $office)
+                        for="filterOffice"
+
+                        class="mb-1.5 block text-xs font-semibold
+
+                               uppercase tracking-wide text-slate-600"
+
+                    >
+
+                        Office/Staff
+
+                    </label>
+
+                    <select
+
+                        id="filterOffice"
+
+                        class="block w-full rounded-lg border
+
+                               border-slate-300 bg-white px-3 py-2
+
+                               text-sm text-slate-700 shadow-sm
+
+                               outline-none transition
+
+                               focus:border-sky-500 focus:ring-2
+
+                               focus:ring-sky-100 sm:min-w-[300px]"
+
+                    >
+
+                        <option value="">
+
+                            All Offices
+
+                        </option>
+
+                        @foreach ($offices as $office)
+
                             <option value="{{ $office }}">
-                        @endforeach
-                    </datalist>
-                </div>
-                <div class="col-auto">
-                    <label class="form-label mb-1 invisible">Action</label>
-                    <button type="button" id="btnStartPlan" class="btn btn-sm btn-success d-flex align-items-center justify-content-center"
-                            style="width:31px; height:31px;" data-bs-toggle="tooltip" title="Start / Open in Builder">
-                        <i class="fa fa-arrow-right"></i>
-                    </button>
-                </div>
-            </div>
-            <p class="text-muted small mb-0 mt-2">
-                If that fiscal year + office combination already has rows on file, the builder loads them for editing.
-                Otherwise it opens a blank plan ready to fill in.
-            </p>
-        </div>
-    </div>
 
-    {{-- All filed plans --}}
-    <div class="card shadow-sm border-0">
-        <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                {{ $office }}
+
+                            </option>
+
+                        @endforeach
+
+                    </select>
+
+                </div>
+
+                {{-- Status --}}
+
+                <div>
+
+                    <label
+
+                        for="filterStatus"
+
+                        class="mb-1.5 block text-xs font-semibold
+
+                               uppercase tracking-wide text-slate-600"
+
+                    >
+
+                        Status
+
+                    </label>
+
+                    <select
+
+                        id="filterStatus"
+
+                        class="block min-w-[170px] rounded-lg
+
+                               border border-slate-300 bg-white
+
+                               px-3 py-2 text-sm text-slate-700
+
+                               shadow-sm outline-none transition
+
+                               focus:border-sky-500 focus:ring-2
+
+                               focus:ring-sky-100"
+
+                    >
+
+                        <option value="">
+
+                            All Status
+
+                        </option>
+
+                        <option value="draft">
+
+                            Draft
+
+                        </option>
+
+                        <option value="submitted">
+
+                            Submitted
+
+                        </option>
+
+                        <option value="returned">
+
+                            Returned
+
+                        </option>
+
+                        <option value="approved">
+
+                            Approved
+
+                        </option>
+
+                        <option value="finalized">
+
+                            Finalized
+
+                        </option>
+
+                    </select>
+
+                </div>
+
+                {{-- Reset --}}
+
+                <button
+
+                    type="button"
+
+                    id="btnResetFilters"
+
+                    class="inline-flex h-[38px] items-center gap-2
+
+                           rounded-lg border border-slate-300
+
+                           bg-white px-4 text-sm font-semibold
+
+                           text-slate-700 shadow-sm transition
+
+                           hover:bg-slate-50"
+
+                >
+
+                    <i class="fa fa-refresh"></i>
+
+                    <span>
+
+                        Reset
+
+                    </span>
+
+                </button>
+
+            </div>
+
+            {{-- New Plan --}}
+
             <div>
-                <h6 class="mb-0">Filed Work & Financial Plans</h6>
-                <small class="text-muted">{{ $plans->count() }} on file</small>
+
+                @can('create', \App\Models\FinancialPlan::class)
+                <a
+
+                    href="{{ route('financial-plans.builder') }}"
+
+                    class="inline-flex items-center gap-2 rounded-lg
+
+                           bg-sky-600 px-4 py-2.5 text-sm
+
+                           font-semibold text-white shadow-sm
+
+                           transition hover:bg-sky-700"
+
+                >
+
+                    <i class="fa fa-plus"></i>
+
+                    <span>
+
+                        New Financial Plan
+
+                    </span>
+
+                </a>
+                @endcan
+
             </div>
+
         </div>
 
-        <div class="card-body p-3">
+    </section>
 
-            {{-- Filters --}}
-            <div class="row gx-3 gy-2 mb-3 align-items-end">
-                <div class="col-auto">
-                    <label class="form-label mb-1">Fiscal Year</label>
-                    <select id="filterFiscalYear" class="form-select form-select-sm">
-                        <option value="">All Years</option>
-                        @foreach($fiscalYears as $fy)
-                            <option value="{{ $fy }}">{{ $fy }}</option>
-                        @endforeach
-                    </select>
-                </div>
+    {{-- Plans --}}
 
-                <div class="col-auto">
-                    <label class="form-label mb-1">Office/Staff</label>
-                    <select id="filterOffice" class="form-select form-select-sm" style="min-width:220px;">
-                        <option value="">All Offices</option>
-                        @foreach($offices as $office)
-                            <option value="{{ $office }}">{{ $office }}</option>
-                        @endforeach
-                    </select>
-                </div>
+    <section
 
-                <div class="col-auto d-flex align-items-center gap-2">
-                    <a href="javascript:void(0)" id="exportBtn" class="text-success"
-                        data-bs-toggle="tooltip" title="Export Excel">
-                        <i class="bi bi-download fs-5"></i>
-                    </a>
-                </div>
+        class="overflow-hidden rounded-2xl border
+
+               border-slate-200 bg-white shadow-sm"
+
+    >
+
+        {{-- Header --}}
+
+        <div
+
+            class="flex flex-col gap-3 border-b border-slate-200
+
+                   px-5 py-4 sm:flex-row sm:items-center
+
+                   sm:justify-between"
+
+        >
+
+            <div>
+
+                <h1 class="text-lg font-bold text-slate-900">
+
+                    Filed Financial Plans
+
+                </h1>
+
+                <p class="mt-1 text-sm text-slate-500">
+
+                    Browse WFPs by fiscal year, office and workflow status.
+
+                </p>
+
             </div>
 
-            <div class="table-responsive">
-                <table id="plansTable" class="table table-bordered table-hover" style="font-size:0.82rem;">
-                    <thead class="table-light">
-                        <tr>
-                            <th>#</th>
-                            <th>Fiscal Year</th>
-                            <th>Office/Staff</th>
-                            <th class="text-end">Rows on File</th>
-                            <th class="text-end">MOOE + CO Total</th>
-                            <th>Status</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach($plans as $plan)
-                            <tr>
-                                <td></td>
-                                <td>{{ $plan->fiscal_year }}</td>
-                                <td>{{ $plan->office_name }}</td>
-                                <td class="text-end" data-order="{{ $plan->row_count }}">{{ $plan->row_count }}</td>
-                                <td class="text-end" data-order="{{ $plan->budget_sum }}">{{ number_format($plan->budget_sum, 2) }}</td>
-                                <td data-status="{{ $plan->finalized === 'yes' ? 'Finalized' : 'Draft' }}">
-                                    @if($plan->finalized === 'yes')
-                                        <span class="badge bg-success">Finalized</span>
-                                    @else
-                                        <span class="badge bg-secondary">Draft</span>
+            <span
+
+                id="visibleCountBadge"
+
+                class="inline-flex w-fit items-center rounded-full
+
+                       bg-slate-100 px-3 py-1.5 text-xs
+
+                       font-semibold text-slate-700"
+
+            >
+
+                {{ $plans->count() }}
+
+                plan{{ $plans->count() === 1 ? '' : 's' }}
+
+            </span>
+
+        </div>
+
+        {{-- Table --}}
+
+        <div class="overflow-x-auto">
+
+            <table
+
+                id="plansTable"
+
+                class="w-full min-w-[950px] border-collapse"
+
+            >
+
+                <thead>
+
+                    <tr class="bg-slate-50">
+
+                        <th
+
+                            class="whitespace-nowrap border-b
+
+                                   border-slate-200 px-5 py-3
+
+                                   text-left text-xs font-bold
+
+                                   uppercase tracking-wide text-slate-500"
+
+                        >
+
+                            Fiscal Year
+
+                        </th>
+
+                        <th
+
+                            class="whitespace-nowrap border-b
+
+                                   border-slate-200 px-4 py-3
+
+                                   text-left text-xs font-bold
+
+                                   uppercase tracking-wide text-slate-500"
+
+                        >
+
+                            Office/Staff
+
+                        </th>
+
+                        <th
+
+                            class="whitespace-nowrap border-b
+
+                                   border-slate-200 px-4 py-3
+
+                                   text-center text-xs font-bold
+
+                                   uppercase tracking-wide text-slate-500"
+
+                        >
+
+                            Budget Lines
+
+                        </th>
+
+                        <th
+
+                            class="whitespace-nowrap border-b
+
+                                   border-slate-200 px-4 py-3
+
+                                   text-right text-xs font-bold
+
+                                   uppercase tracking-wide text-slate-500"
+
+                        >
+
+                            Programmed Budget
+
+                        </th>
+
+                        <th
+
+                            class="whitespace-nowrap border-b
+
+                                   border-slate-200 px-4 py-3
+
+                                   text-center text-xs font-bold
+
+                                   uppercase tracking-wide text-slate-500"
+
+                        >
+
+                            Status
+
+                        </th>
+
+                        <th
+
+                            class="whitespace-nowrap border-b
+
+                                   border-slate-200 px-5 py-3
+
+                                   text-right text-xs font-bold
+
+                                   uppercase tracking-wide text-slate-500"
+
+                        >
+
+                            Actions
+
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                    @forelse ($plans as $plan)
+
+                        @php
+
+                            $isFinalized =
+
+                                ($plan->finalized ?? 'no') === 'yes';
+
+                            $statusKey =
+
+                                $isFinalized
+
+                                    ? 'finalized'
+
+                                    : ($plan->status ?? 'draft');
+
+                            $statusLabel = match ($statusKey) {
+
+                                'submitted' => 'Submitted',
+
+                                'returned' => 'Returned',
+
+                                'approved' => 'Approved',
+
+                                'finalized' => 'Finalized',
+
+                                default => 'Draft',
+
+                            };
+
+                            $statusClass = match ($statusKey) {
+
+                                'submitted' => 'bg-cyan-100 text-cyan-700',
+
+                                'returned' => 'bg-amber-100 text-amber-700',
+
+                                'approved' => 'bg-sky-100 text-sky-700',
+
+                                'finalized' => 'bg-emerald-100 text-emerald-700',
+
+                                default => 'bg-slate-100 text-slate-700',
+
+                            };
+
+                        @endphp
+
+                        <tr
+
+                            class="plan-row transition hover:bg-slate-50"
+
+                            data-fiscal-year="{{ $plan->fiscal_year }}"
+
+                            data-office="{{ strtolower($plan->office_name) }}"
+
+                            data-status="{{ $statusKey }}"
+
+                        >
+
+                            {{-- Fiscal Year --}}
+
+                            <td
+
+                                class="border-b border-slate-100
+
+                                       px-5 py-4 text-sm font-bold
+
+                                       text-slate-900"
+
+                            >
+
+                                FY {{ $plan->fiscal_year }}
+
+                            </td>
+
+                            {{-- Office --}}
+
+                            <td
+
+                                class="border-b border-slate-100
+
+                                       px-4 py-4"
+
+                            >
+
+                                <div
+
+                                    class="max-w-[320px] break-words
+
+                                           text-sm font-semibold
+
+                                           text-slate-800"
+
+                                >
+
+                                    {{ $plan->office_name }}
+
+                                </div>
+
+                            </td>
+
+                            {{-- Budget Lines --}}
+
+                            <td
+
+                                class="border-b border-slate-100
+
+                                       px-4 py-4 text-center"
+
+                            >
+
+                                <span
+
+                                    class="inline-flex min-w-[46px]
+
+                                           items-center justify-center
+
+                                           rounded-full bg-slate-100
+
+                                           px-2.5 py-1 text-xs
+
+                                           font-semibold text-slate-700"
+
+                                >
+
+                                    {{ number_format($plan->row_count) }}
+
+                                </span>
+
+                            </td>
+
+                            {{-- Programmed Budget --}}
+
+                            <td
+
+                                class="whitespace-nowrap border-b
+
+                                       border-slate-100 px-4 py-4
+
+                                       text-right text-sm font-bold
+
+                                       text-slate-900"
+
+                            >
+
+                                ₱{{ number_format((float) $plan->budget_sum, 2) }}
+
+                            </td>
+
+                            {{-- Status --}}
+
+                            <td
+
+                                class="border-b border-slate-100
+
+                                       px-4 py-4 text-center"
+
+                            >
+
+                                <span
+
+                                    class="inline-flex items-center gap-1.5
+
+                                           rounded-full px-3 py-1.5
+
+                                           text-xs font-bold
+
+                                           {{ $statusClass }}"
+
+                                >
+
+                                    @if ($isFinalized)
+
+                                        <i class="fa fa-lock"></i>
+
                                     @endif
-                                </td>
-                                <td>
-                                    <a href="{{ route('financial-plans.index', ['fiscal_year' => $plan->fiscal_year, 'office_name' => $plan->office_name]) }}"
-                                       class="btn btn-sm btn-outline-secondary" data-bs-toggle="tooltip" title="View">
+
+                                    {{ $statusLabel }}
+
+                                </span>
+
+                            </td>
+
+                            {{-- Actions --}}
+
+                            <td
+
+                                class="border-b border-slate-100
+
+                                       px-5 py-4"
+
+                            >
+
+                                <div
+
+                                    class="flex flex-wrap items-center
+
+                                           justify-end gap-2"
+
+                                >
+
+                                    {{-- View --}}
+
+                                    <a
+
+                                        href="{{ route('financial-plans.index', [
+
+                                            'fiscal_year' => $plan->fiscal_year,
+
+                                            'office_name' => $plan->office_name,
+
+                                        ]) }}"
+
+                                        class="inline-flex items-center gap-1.5
+
+                                               rounded-lg border border-sky-200
+
+                                               bg-sky-50 px-3 py-1.5
+
+                                               text-xs font-semibold
+
+                                               text-sky-700 transition
+
+                                               hover:bg-sky-100"
+
+                                        title="View plan"
+
+                                    >
+
                                         <i class="fa fa-eye"></i>
+
+                                        <span>
+
+                                            View
+
+                                        </span>
+
                                     </a>
-                                    <a href="{{ route('financial-plans.builder', ['fiscal_year' => $plan->fiscal_year, 'office_name' => $plan->office_name]) }}"
-                                       class="btn btn-sm btn-outline-primary" data-bs-toggle="tooltip" title="Edit">
-                                        <i class="fa fa-pencil"></i>
-                                    </a>
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
+
+                                    {{-- Edit / Locked --}}
+
+                                    @if (! $isFinalized)
+
+                                        <a
+
+                                            href="{{ route('financial-plans.builder', [
+
+                                                'fiscal_year' => $plan->fiscal_year,
+
+                                                'office_name' => $plan->office_name,
+
+                                            ]) }}"
+
+                                            class="inline-flex items-center gap-1.5
+
+                                                   rounded-lg border
+
+                                                   border-slate-300 bg-white
+
+                                                   px-3 py-1.5 text-xs
+
+                                                   font-semibold text-slate-700
+
+                                                   transition hover:bg-slate-50"
+
+                                            title="Edit plan"
+
+                                        >
+
+                                            <i class="fa fa-pencil"></i>
+
+                                            <span>
+
+                                                Edit
+
+                                            </span>
+
+                                        </a>
+
+                                    @else
+
+                                        <button
+
+                                            type="button"
+
+                                            disabled
+
+                                            class="inline-flex cursor-not-allowed
+
+                                                   items-center gap-1.5
+
+                                                   rounded-lg border
+
+                                                   border-slate-200
+
+                                                   bg-slate-100 px-3 py-1.5
+
+                                                   text-xs font-semibold
+
+                                                   text-slate-400"
+
+                                            title="Reopen the plan before editing"
+
+                                        >
+
+                                            <i class="fa fa-lock"></i>
+
+                                            <span>
+
+                                                Locked
+
+                                            </span>
+
+                                        </button>
+
+                                    @endif
+
+                                    {{-- Delete --}}
+
+                                    @if ($isFinancialPlanAdministrator)
+                                    <button
+
+                                        type="button"
+
+                                        class="btn-delete-plan inline-flex
+
+                                               h-[30px] w-[34px] items-center
+
+                                               justify-center rounded-lg
+
+                                               border border-rose-200
+
+                                               bg-rose-50 text-xs
+
+                                               text-rose-600 transition
+
+                                               hover:bg-rose-100
+
+                                               disabled:cursor-not-allowed
+
+                                               disabled:border-slate-200
+
+                                               disabled:bg-slate-100
+
+                                               disabled:text-slate-400"
+
+                                        data-fiscal-year="{{ $plan->fiscal_year }}"
+
+                                        data-office="{{ $plan->office_name }}"
+
+                                        {{ $isFinalized ? 'disabled' : '' }}
+
+                                        title="{{ $isFinalized
+
+                                            ? 'Reopen the plan before deleting'
+
+                                            : 'Delete entire plan' }}"
+
+                                    >
+
+                                        <i class="fa fa-trash"></i>
+
+                                    </button>
+                                    @endif
+
+                                </div>
+
+                            </td>
+
+                        </tr>
+
+                    @empty
+
+                        <tr id="emptyPlansRow">
+
+                            <td
+
+                                colspan="6"
+
+                                class="px-6 py-14 text-center"
+
+                            >
+
+                                <div
+
+                                    class="mx-auto flex h-12 w-12
+
+                                           items-center justify-center
+
+                                           rounded-full bg-slate-100
+
+                                           text-xl text-slate-400"
+
+                                >
+
+                                    <i class="fa fa-folder-open-o"></i>
+
+                                </div>
+
+                                <p
+
+                                    class="mt-3 text-sm font-semibold
+
+                                           text-slate-600"
+
+                                >
+
+                                    No financial plans have been filed yet.
+
+                                </p>
+
+                                <p
+
+                                    class="mt-1 text-xs text-slate-400"
+
+                                >
+
+                                    Create a new Work and Financial Plan to get started.
+
+                                </p>
+
+                            </td>
+
+                        </tr>
+
+                    @endforelse
+
+                </tbody>
+
+            </table>
+
         </div>
+
+        {{-- No Filter Results --}}
+
+        <div
+
+            id="noFilterResults"
+
+            class="hidden px-6 py-14 text-center"
+
+        >
+
+            <div
+
+                class="mx-auto flex h-12 w-12 items-center
+
+                       justify-center rounded-full bg-slate-100
+
+                       text-xl text-slate-400"
+
+            >
+
+                <i class="fa fa-search"></i>
+
+            </div>
+
+            <p
+
+                class="mt-3 text-sm font-semibold text-slate-600"
+
+            >
+
+                No financial plans match the selected filters.
+
+            </p>
+
+            <p class="mt-1 text-xs text-slate-400">
+
+                Try changing or resetting the filters.
+
+            </p>
+
+        </div>
+
+    </section>
+
+    {{-- Footer --}}
+
+    <div class="mt-6">
+
+        @include('layouts.footers.auth.footer')
+
     </div>
+
 </div>
 
-@include('layouts.footers.auth.footer')
 @endsection
 
 @push('js')
-<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 
 <script>
+
 $(document).ready(function () {
 
-    const STATUS_COLORS_ARGB = {
-        'Finalized': 'FF2dce89',
-        'Draft':     'FFadb5bd',
-    };
+    // Escape message text*
 
-    let table = null;
+    function esc(value) {
 
-    function updateStats() {
-        const rows = table.rows({ search: 'applied' }).nodes();
-        const total = rows.length;
-        let draft = 0, finalized = 0;
+        return String(value ?? '')
 
-        $(rows).each(function () {
-            const status = $(this).find('td[data-status]').data('status');
-            if (status === 'Finalized') finalized++;
-            else draft++;
-        });
+            .replace(/&/g, '&amp;')
 
-        $('#totalRecords').text(total.toLocaleString());
-        $('#countDraft').text(draft.toLocaleString());
-        $('#countFinalized').text(finalized.toLocaleString());
+            .replace(/</g, '&lt;')
+
+            .replace(/>/g, '&gt;')
+
+            .replace(/"/g, '&quot;')
+
+            .replace(/'/g, '&#039;');
+
     }
 
-    function initTable() {
-        table = $('#plansTable').DataTable({
-            columnDefs: [
-                { targets: 0, orderable: false, render: (d, t, r, m) => m.row + 1 },
-                { targets: [3, 4], className: 'text-end' },
-                { targets: [5, 6], orderable: false },
-            ],
-            order: [[1, 'desc'], [2, 'asc']],
-            pageLength: 15,
-        });
+    // Show page message*
 
-        table.on('draw', updateStats);
-        // Run once manually for the very first render.
-        updateStats();
+    function showMessage(message, type = 'success') {
+
+        const styles = {
+
+            success: {
+
+                box: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+
+                icon: 'fa-check-circle'
+
+            },
+
+            danger: {
+
+                box: 'border-rose-200 bg-rose-50 text-rose-800',
+
+                icon: 'fa-exclamation-circle'
+
+            },
+
+            warning: {
+
+                box: 'border-amber-200 bg-amber-50 text-amber-800',
+
+                icon: 'fa-exclamation-triangle'
+
+            },
+
+            info: {
+
+                box: 'border-sky-200 bg-sky-50 text-sky-800',
+
+                icon: 'fa-info-circle'
+
+            }
+
+        };
+
+        const style =
+
+            styles[type] || styles.info;
+
+        $('#pageMessage').html(`
+
+            <div
+
+                class="mb-4 flex items-start gap-3 rounded-xl
+
+                       border px-4 py-3 text-sm ${style.box}"
+
+            >
+
+                <i class="fa ${style.icon} mt-0.5"></i>
+
+                <div class="flex-1">
+
+                    ${esc(message)}
+
+                </div>
+
+                <button
+
+                    type="button"
+
+                    class="page-message-close ml-3 border-0
+
+                           bg-transparent p-0 text-lg leading-none
+
+                           text-current opacity-60 hover:opacity-100"
+
+                    aria-label="Close"
+
+                >
+
+                    &times;
+
+                </button>
+
+            </div>
+
+        `);
+
     }
-    // Custom exact-match filter — avoids regex entirely, so office names
-    // with parentheses, periods, plus signs, etc. can't break the search.
-    $.fn.dataTable.ext.search.push(function (settings, data, dataIndex) {
-        if (settings.nTable.id !== 'plansTable') {
-            return true;
+
+    // Close page message*
+
+    $(document).on(
+
+        'click',
+
+        '.page-message-close',
+
+        function () {
+
+            $('#pageMessage').empty();
+
         }
 
-        const fy     = $('#filterFiscalYear').val();
-        const office = $('#filterOffice').val();
+    );
 
-        if (fy && data[1].trim() !== fy.trim()) {
-            return false;
+    // Get Laravel error message*
+
+    function getErrorMessage(
+
+        xhr,
+
+        fallback = 'Something went wrong.'
+
+    ) {
+
+        if (xhr?.responseJSON?.message) {
+
+            return xhr.responseJSON.message;
+
         }
 
-        if (office && data[2].trim() !== office.trim()) {
-            return false;
+        if (xhr?.responseJSON?.errors) {
+
+            const errors =
+
+                Object.values(
+
+                    xhr.responseJSON.errors
+
+                ).flat();
+
+            if (errors.length) {
+
+                return errors.join('\n');
+
+            }
+
         }
 
-        return true;
-    });
+        return fallback;
+
+    }
+
+    // Filter plan list without server request*
 
     function applyFilters() {
-        console.log('applyFilters fired', $('#filterFiscalYear').val(), $('#filterOffice').val());
-        table.draw();
+
+        const fiscalYear =
+
+            String(
+
+                $('#filterFiscalYear').val() || ''
+
+            );
+
+        const office =
+
+            String(
+
+                $('#filterOffice').val() || ''
+
+            ).toLowerCase();
+
+        const status =
+
+            String(
+
+                $('#filterStatus').val() || ''
+
+            );
+
+        let visibleCount = 0;
+
+        $('.plan-row').each(function () {
+
+            const $row =
+
+                $(this);
+
+            const rowFiscalYear =
+
+                String(
+
+                    $row.data('fiscal-year')
+
+                );
+
+            const rowOffice =
+
+                String(
+
+                    $row.data('office') || ''
+
+                ).toLowerCase();
+
+            const rowStatus =
+
+                String(
+
+                    $row.data('status') || ''
+
+                );
+
+            const matchesFiscalYear =
+
+                !fiscalYear ||
+
+                rowFiscalYear === fiscalYear;
+
+            const matchesOffice =
+
+                !office ||
+
+                rowOffice === office;
+
+            const matchesStatus =
+
+                !status ||
+
+                rowStatus === status;
+
+            const visible =
+
+                matchesFiscalYear &&
+
+                matchesOffice &&
+
+                matchesStatus;
+
+            $row.toggle(visible);
+
+            if (visible) {
+
+                visibleCount++;
+
+            }
+
+        });
+
+        $('#visibleCountBadge')
+
+            .text(
+
+                `${visibleCount} plan${visibleCount === 1 ? '' : 's'}`
+
+            );
+
+        const hasPlans =
+
+            $('.plan-row').length > 0;
+
+        $('#noFilterResults')
+
+            .toggleClass(
+
+                'hidden',
+
+                !hasPlans || visibleCount > 0
+
+            );
+
     }
 
-    // ── Excel Export ─
-    $('#exportBtn').on('click', async function () {
-        const exportRows = table.rows({ search: 'applied' }).nodes();
+    // Apply filters immediately when changed*
 
-        if (!exportRows.length) {
-            alert('No data to export.');
-            return;
+    $('#filterFiscalYear, #filterOffice, #filterStatus')
+
+        .on(
+
+            'change',
+
+            applyFilters
+
+        );
+
+    // Reset filters*
+
+    $('#btnResetFilters').on(
+
+        'click',
+
+        function () {
+
+            $('#filterFiscalYear')
+
+                .val('');
+
+            $('#filterOffice')
+
+                .val('');
+
+            $('#filterStatus')
+
+                .val('');
+
+            applyFilters();
+
         }
 
-        const $btn = $(this);
-        $btn.html('<i class="bi bi-hourglass-split fs-5"></i>').addClass('disabled');
+    );
 
-        try {
-            const COLS = [
-                { key: 'fiscal_year', label: 'Fiscal Year', width: 14 },
-                { key: 'office_name', label: 'Office/Staff', width: 40 },
-                { key: 'row_count',   label: 'Rows on File', width: 16 },
-                { key: 'budget_sum',  label: 'MOOE + CO Total', width: 20 },
-                { key: 'status',      label: 'Status', width: 16 },
-            ];
+    // Delete complete financial plan*
 
-            const HEADER_BG   = 'FF1a3c5e';
-            const HEADER_FONT = 'FFFFFFFF';
+    $('.btn-delete-plan').on(
 
-            const headerStyle = (cell) => {
-                cell.font      = { bold: true, color: { argb: HEADER_FONT }, size: 10, name: 'Calibri' };
-                cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_BG } };
-                cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-                cell.border    = {
-                    top: { style: 'thin', color: { argb: 'FF2a5a8a' } },
-                    left: { style: 'thin', color: { argb: 'FF2a5a8a' } },
-                    bottom: { style: 'thin', color: { argb: 'FF2a5a8a' } },
-                    right: { style: 'thin', color: { argb: 'FF2a5a8a' } },
-                };
-            };
+        'click',
 
-            const dataStyle = (cell, key) => {
-                const isStatus = key === 'status';
-                const argb     = isStatus
-                    ? (STATUS_COLORS_ARGB[cell.value] ?? STATUS_COLORS_ARGB['Draft'])
-                    : 'FFFFFFFF';
+        function () {
 
-                cell.font = {
-                    size : 9,
-                    name : 'Calibri',
-                    bold : isStatus,
-                    color: isStatus ? { argb: 'FFFFFFFF' } : { argb: 'FF333333' },
-                };
-                cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb } };
-                cell.alignment = { horizontal: key === 'budget_sum' || key === 'row_count' ? 'right' : 'left', vertical: 'middle', wrapText: true };
-                cell.border    = {
-                    top:    { style: 'thin', color: { argb: 'FFD0D0D0' } },
-                    left:   { style: 'thin', color: { argb: 'FFD0D0D0' } },
-                    bottom: { style: 'thin', color: { argb: 'FFD0D0D0' } },
-                    right:  { style: 'thin', color: { argb: 'FFD0D0D0' } },
-                };
-            };
+            const $button =
 
-            const workbook = new ExcelJS.Workbook();
-            workbook.creator = 'PPMS – ERPMES';
-            workbook.created = new Date();
+                $(this);
 
-            const ws = workbook.addWorksheet('Financial Plans'.substring(0, 31), {
-                pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true },
+            if ($button.prop('disabled')) {
+
+                return;
+
+            }
+
+            const fiscalYear =
+
+                $button.data('fiscal-year');
+
+            const officeName =
+
+                $button.data('office');
+
+            if (
+
+                !confirm(
+
+                    `Delete the entire FY ${fiscalYear} financial plan for ${officeName}? This cannot be undone.`
+
+                )
+
+            ) {
+
+                return;
+
+            }
+
+            const originalHtml =
+
+                $button.html();
+
+            $button
+
+                .prop('disabled', true)
+
+                .html(
+
+                    '<i class="fa fa-spinner fa-spin"></i>'
+
+                );
+
+            $.ajax({
+
+                url:
+
+                    '{{ route("financial-plans.destroy-plan") }}',
+
+                type:
+
+                    'DELETE',
+
+                data: {
+
+                    fiscal_year:
+
+                        fiscalYear,
+
+                    office_name:
+
+                        officeName,
+
+                    _token:
+
+                        '{{ csrf_token() }}'
+
+                }
+
+            }).done(function (response) {
+
+                if (
+
+                    response.success === false
+
+                ) {
+
+                    showMessage(
+
+                        response.message ||
+
+                        'Failed to delete plan.',
+
+                        'danger'
+
+                    );
+
+                    $button
+
+                        .prop('disabled', false)
+
+                        .html(originalHtml);
+
+                    return;
+
+                }
+
+                showMessage(
+
+                    response.message ||
+
+                    'Financial plan deleted successfully.'
+
+                );
+
+                $button
+
+                    .closest('tr')
+
+                    .fadeOut(
+
+                        200,
+
+                        function () {
+
+                            $(this).remove();
+
+                            applyFilters();
+
+                            if (
+
+                                $('.plan-row').length === 0
+
+                            ) {
+
+                                window.location.reload();
+
+                            }
+
+                        }
+
+                    );
+
+            }).fail(function (xhr) {
+
+                showMessage(
+
+                    getErrorMessage(
+
+                        xhr,
+
+                        'Failed to delete financial plan.'
+
+                    ),
+
+                    'danger'
+
+                );
+
+                $button
+
+                    .prop('disabled', false)
+
+                    .html(originalHtml);
+
             });
 
-            const colCount = COLS.length;
-
-            ws.mergeCells(1, 1, 1, colCount);
-            Object.assign(ws.getCell(1, 1), {
-                value: 'PPMS – ERPMES',
-                font:      { bold: true, size: 13, name: 'Calibri', color: { argb: HEADER_FONT } },
-                fill:      { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_BG } },
-                alignment: { horizontal: 'center', vertical: 'middle' },
-            });
-            ws.getRow(1).height = 22;
-
-            ws.mergeCells(2, 1, 2, colCount);
-            Object.assign(ws.getCell(2, 1), {
-                value: 'Filed Work & Financial Plans',
-                font:      { bold: true, size: 11, name: 'Calibri', color: { argb: HEADER_FONT } },
-                fill:      { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_BG } },
-                alignment: { horizontal: 'center', vertical: 'middle' },
-            });
-            ws.getRow(2).height = 18;
-
-            const fy = $('#filterFiscalYear').val() || 'All';
-            const office = $('#filterOffice').val() || 'All';
-
-            ws.mergeCells(3, 1, 3, colCount);
-            Object.assign(ws.getCell(3, 1), {
-                value: `Fiscal Year: ${fy}   ·   Office: ${office}   ·   Generated: ${new Date().toLocaleString('en-PH')}`,
-                font:      { italic: true, size: 9, name: 'Calibri', color: { argb: 'FF555555' } },
-                fill:      { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFf0f4ff' } },
-                alignment: { horizontal: 'center', vertical: 'middle' },
-            });
-            ws.getRow(3).height = 14;
-
-            const hRow = ws.getRow(4);
-            hRow.height = 24;
-            COLS.forEach((col, i) => {
-                const cell = hRow.getCell(i + 1);
-                cell.value = col.label;
-                headerStyle(cell);
-            });
-
-            $(exportRows).each(function (ri) {
-                const $tr = $(this);
-                const rowData = {
-                    fiscal_year: $tr.find('td').eq(1).text().trim(),
-                    office_name: $tr.find('td').eq(2).text().trim(),
-                    row_count:   $tr.find('td').eq(3).text().trim(),
-                    budget_sum:  $tr.find('td').eq(4).text().trim(),
-                    status:      $tr.find('td[data-status]').data('status'),
-                };
-
-                const eRow = ws.getRow(5 + ri);
-                eRow.height = 18;
-                COLS.forEach((col, ci) => {
-                    const cell = eRow.getCell(ci + 1);
-                    cell.value = rowData[col.key] ?? '—';
-                    dataStyle(cell, col.key);
-                });
-            });
-
-            COLS.forEach((col, i) => {
-                ws.getColumn(i + 1).width = col.width;
-            });
-
-            ws.views = [{ state: 'frozen', ySplit: 4 }];
-
-            const buffer = await workbook.xlsx.writeBuffer();
-            const blob   = new Blob([buffer], {
-                type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            });
-            const url = URL.createObjectURL(blob);
-            const a   = document.createElement('a');
-            a.href     = url;
-            a.download = `financial_plans_${fy}_${office}.xlsx`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-
-        } catch (err) {
-            console.error('[Financial Plans Export]', err);
-            alert('Export failed:\n' + err.message);
-        } finally {
-            $btn.html('<i class="bi bi-download fs-5"></i>').removeClass('disabled');
         }
-    });
 
-    $('#btnStartPlan').on('click', function () {
-        const fiscalYear = $('#newFiscalYear').val();
-        const officeName = $('#newOfficeName').val().trim();
+    );
 
-        if (!fiscalYear) {
-            alert('Fiscal Year is required.');
-            return;
-        }
-        if (!officeName) {
-            alert('Name of Office/Staff is required.');
-            return;
-        }
+    // Initial filter state*
 
-        window.location.href =
-            `{{ route('financial-plans.builder') }}?fiscal_year=${fiscalYear}&office_name=${encodeURIComponent(officeName)}`;
-    });
+    applyFilters();
 
-    // Auto-apply as soon as either filter changes — no need to click the funnel.
-    $('#filterFiscalYear, #filterOffice').on('change', applyFilters);
-
-    initTable();
-    $('[data-bs-toggle="tooltip"]').tooltip();
 });
+
 </script>
+
 @endpush

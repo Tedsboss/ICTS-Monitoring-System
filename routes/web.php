@@ -30,7 +30,7 @@ use App\Http\Controllers\StaffController;
 use App\Http\Controllers\TwoFactorController;
 use App\Http\Controllers\UpliftFormBuilderController;
 use App\Http\Controllers\UpliftSubmissionController;
-
+use App\Http\Controllers\StaffPersonnelController;
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -314,6 +314,16 @@ Route::group(['middleware' => 'check.restricted.ips'], function () {
           'except' => ['show', 'create', 'store'],
         ]);
 
+        // Staff Personnel
+        Route::resource('administrator/staff-personnel', StaffPersonnelController::class, [
+        'except' => ['show', 'create', 'edit'],
+        ]);
+
+        Route::get(
+        'administrator/staff-personnel/{staff_personnel}/switchstatus',
+        [StaffPersonnelController::class, 'switchstatus']
+        )->name('staff-personnel.switchstatus');
+
         Route::resource('administrator/divisions', DivisionController::class, [
           'except' => ['show', 'create', 'store'],
         ]);
@@ -417,9 +427,24 @@ Route::group(['middleware' => 'check.restricted.ips'], function () {
             Route::post('financial-plans/allocation', [FinancialPlanController::class, 'saveAllocation'])->name('financial-plans.allocation.save');
             Route::get('financial-plans/totals', [FinancialPlanController::class, 'totals'])->name('financial-plans.totals');
 
-            Route::post('financial-plans/finalize', [FinancialPlanController::class, 'finalize'])->name('financial-plans.finalize');
-            Route::post('financial-plans/reopen', [FinancialPlanController::class, 'reopen'])->name('financial-plans.reopen');
-            Route::get('financial-plans/status', [FinancialPlanController::class, 'status'])->name('financial-plans.status');
+            // WFP workflow
+            Route::post('financial-plans/submit', [FinancialPlanController::class, 'submitForApproval'])
+                ->name('financial-plans.submit');
+
+            Route::post('financial-plans/approve', [FinancialPlanController::class, 'approve'])
+                ->name('financial-plans.approve');
+
+            Route::post('financial-plans/return', [FinancialPlanController::class, 'returnForRevision'])
+                ->name('financial-plans.return');
+
+            Route::post('financial-plans/finalize', [FinancialPlanController::class, 'finalize'])
+                ->name('financial-plans.finalize');
+
+            Route::post('financial-plans/reopen', [FinancialPlanController::class, 'reopen'])
+                ->name('financial-plans.reopen');
+
+            Route::get('financial-plans/status', [FinancialPlanController::class, 'status'])
+                ->name('financial-plans.status');
 
         });
       });

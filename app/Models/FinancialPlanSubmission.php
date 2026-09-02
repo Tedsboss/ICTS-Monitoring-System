@@ -7,30 +7,70 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class FinancialPlanSubmission extends Model
 {
+    protected $table = 'financial_plan_submissions';
+
     protected $fillable = [
-        'fiscal_year', 'office_name', 'status',
-        'submitted_by', 'submitted_at',
-        'approved_by', 'approved_at', 'return_remarks',
+        'fiscal_year',
+        'office_name',
+        'division_id',
+        'status',
         'finalized',
+        'submitted_by',
+        'submitted_at',
+        'approved_by',
+        'approved_at',
+        'finalized_by',
+        'finalized_at',
+        'return_remarks',
     ];
 
     protected $casts = [
+        'fiscal_year' => 'integer',
+        'division_id' => 'integer',
         'submitted_at' => 'datetime',
-        'approved_at'  => 'datetime',
+        'approved_at' => 'datetime',
+        'finalized_at' => 'datetime',
     ];
 
+    // Check if the plan is locked
     public function isLocked(): bool
     {
         return $this->finalized === 'yes';
     }
 
+    // User who submitted the plan
     public function submittedBy(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'submitted_by');
+        return $this->belongsTo(
+            User::class,
+            'submitted_by'
+        );
     }
 
+    // User who approved the plan
     public function approvedBy(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'approved_by');
+        return $this->belongsTo(
+            User::class,
+            'approved_by'
+        );
+    }
+
+    // User who finalized the plan
+    public function finalizedBy(): BelongsTo
+    {
+        return $this->belongsTo(
+            User::class,
+            'finalized_by'
+        );
+    }
+
+    // Assigned division
+    public function division(): BelongsTo
+    {
+        return $this->belongsTo(
+            Division::class,
+            'division_id'
+        );
     }
 }

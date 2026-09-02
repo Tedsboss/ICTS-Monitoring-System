@@ -49,16 +49,18 @@
     <!-- CSS Files -->
     <link id="pagestyle" href="/assets/css/argon-dashboard.css?v=1.0.8" rel="stylesheet" />
 
-    {{-- <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"> --}}
+    <!-- Tailwind CSS -->
+    <link href="{{ asset('assets/css/tailwind.css') }}" rel="stylesheet" />
+
     <link rel="stylesheet"
         href="https://cdn.jsdelivr.net/npm/bootstrap-select@1.13.1/dist/css/bootstrap-select.min.css">
-    {{-- <link rel="stylesheet" href="https://cdn.datatables.net/fixedcolumns/3.2.4/css/fixedColumns.bootstrap.min.css"> --}}
+
     <link href="{{ asset('assets') }}/css/plugins/datatables.min.css?v=1.0.2" rel="stylesheet" />
-    {{-- <link href="{{ asset('assets') }}/css/ebudget.css?v=1.0.2" rel="stylesheet" /> --}}
+
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 
-    {{-- <link href="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.css" rel="stylesheet"> --}}
     <link id="pagestyle" href="/assets/css/plugins/tom-select.css?v=1.0.9" rel="stylesheet" />
+
     @stack('css')
 
     <style>
@@ -171,9 +173,9 @@
         //   choiceSelects[selectElement.id] = new Choices(selectElement, {
         //                                                                   removeItemButton: true,
         //                                                                   searchEnabled: true,
-        //                                                                   itemSelectText: '', 
-        //                                                                   placeholder: true, 
-        //                                                                   placeholderValue: 'Select an option', 
+        //                                                                   itemSelectText: '',
+        //                                                                   placeholder: true,
+        //                                                                   placeholderValue: 'Select an option',
         //                                                                   shouldSort: sSort,
         //                                                                   // fuseOptions: { includeScore: true, includeMatches: true, threshold: 0.4, location: 0, distance: 100, maxPatternLength: 32, minMatchCharLength: 1 },
         //                                                                 });

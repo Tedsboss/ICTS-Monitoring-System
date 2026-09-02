@@ -1,153 +1,555 @@
 @extends('layouts.app')
 
 @section('content')
-  <nav class="navbar navbar-main navbar-expand-lg px-0 mx-4 shadow-none border-radius-xl z-index-sticky" id="navbarBlur" data-scroll="false">
+
+<nav
+    class="navbar navbar-main navbar-expand-lg px-0 mx-4 shadow-none border-radius-xl z-index-sticky"
+    id="navbarBlur"
+    data-scroll="false"
+>
     <div class="container-fluid py-1 px-3">
-      @include('layouts.navbars.auth.topnav', ['title' => 'SAEB'])
-      @include('layouts.navbars.auth.topnav-withdatetime')
+        @include('layouts.navbars.auth.topnav', ['title' => 'SAEB'])
+        @include('layouts.navbars.auth.topnav-withdatetime')
     </div>
-  </nav>
+</nav>
 
-  <div class="container-fluid">
+<div class="px-4 pb-8 pt-4">
 
-    {{-- KPI summary --}}
-    <div class="row mt-4">
-    <div class="col-lg-3 col-md-6 mb-3">
-        <div class="card shadow-sm border-0 h-100 border-start border-4 border-info">
-        <div class="card-body py-3 px-4">
-            <p class="text-muted text-uppercase mb-1" style="font-size:0.68rem; letter-spacing:.06em;">Total Allotment</p>
-            <h3 class="mb-0 fw-bold text-dark">{{ number_format($fundTotal->sum_allotment, 2) }}</h3>
-        </div>
-        </div>
-    </div>
-    <div class="col-lg-3 col-md-6 mb-3">
-        <div class="card shadow-sm border-0 h-100 border-start border-4 border-info">
-        <div class="card-body py-3 px-4">
-            <p class="text-muted text-uppercase mb-1" style="font-size:0.68rem; letter-spacing:.06em;">Total Obligated</p>
-            <h3 class="mb-0 fw-bold text-dark">{{ number_format($fundTotal->sum_obligated, 2) }}</h3>
-        </div>
-        </div>
-    </div>
-    <div class="col-lg-3 col-md-6 mb-3">
-        <div class="card shadow-sm border-0 h-100 border-start border-4 border-info">
-        <div class="card-body py-3 px-4">
-            <p class="text-muted text-uppercase mb-1" style="font-size:0.68rem; letter-spacing:.06em;">Total Balances</p>
-            <h3 class="mb-0 fw-bold text-dark">{{ number_format($fundTotal->sum_balances, 2) }}</h3>
-        </div>
-        </div>
-    </div>
-    <div class="col-lg-3 col-md-6 mb-3">
-        <div class="card shadow-sm border-0 h-100 border-start border-4 {{ $flaggedFunds->isEmpty() ? 'border-success' : 'border-danger' }}">
-        <div class="card-body py-3 px-4">
-            <p class="text-muted text-uppercase mb-1" style="font-size:0.68rem; letter-spacing:.06em;">Needs Attention</p>
-            <h3 class="mb-0 fw-bold {{ $flaggedFunds->isEmpty() ? 'text-success' : 'text-danger' }}">
-            {{ $flaggedFunds->count() }} {{ Str::plural('fund', $flaggedFunds->count()) }}
-            </h3>
-        </div>
-        </div>
-    </div>
-    </div>
+    {{-- KPI Summary --}}
+    <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
 
-    @if($flaggedFunds->isNotEmpty())
-    <div class="row">
-        <div class="col-12">
-        <div class="alert alert-danger d-flex align-items-center py-2 px-3 mb-0" style="font-size:0.82rem;">
-            <i class="fa fa-exclamation-triangle me-2"></i>
-            <span>
-            {{ $yearProgress }}% of the fiscal year has elapsed, but
-            {{ $flaggedFunds->pluck('funding_source')->join(', ', ' and ') }}
-            {{ $flaggedFunds->count() === 1 ? 'is' : 'are' }} significantly behind on obligations.
-            </span>
+        {{-- Total Allotment --}}
+        <div
+            class="rounded-2xl border border-slate-200 border-l-4 border-l-sky-500
+                   bg-white p-5 shadow-sm"
+        >
+            <div class="flex items-start justify-between gap-4">
+
+                <div>
+                    <p
+                        class="text-xs font-semibold uppercase tracking-[0.12em]
+                               text-slate-500"
+                    >
+                        Total Allotment
+                    </p>
+
+                    <h2
+                        class="mt-2 text-2xl font-bold tracking-tight
+                               text-slate-900"
+                    >
+                        {{ number_format($fundTotal->sum_allotment ?? 0, 2) }}
+                    </h2>
+                </div>
+
+                <div
+                    class="flex h-11 w-11 shrink-0 items-center justify-center
+                           rounded-xl bg-sky-50 text-sky-600"
+                >
+                    <i class="fa fa-money"></i>
+                </div>
+
+            </div>
         </div>
+
+
+        {{-- Total Obligated --}}
+        <div
+            class="rounded-2xl border border-slate-200 border-l-4 border-l-cyan-500
+                   bg-white p-5 shadow-sm"
+        >
+            <div class="flex items-start justify-between gap-4">
+
+                <div>
+                    <p
+                        class="text-xs font-semibold uppercase tracking-[0.12em]
+                               text-slate-500"
+                    >
+                        Total Obligated
+                    </p>
+
+                    <h2
+                        class="mt-2 text-2xl font-bold tracking-tight
+                               text-slate-900"
+                    >
+                        {{ number_format($fundTotal->sum_obligated ?? 0, 2) }}
+                    </h2>
+                </div>
+
+                <div
+                    class="flex h-11 w-11 shrink-0 items-center justify-center
+                           rounded-xl bg-cyan-50 text-cyan-600"
+                >
+                    <i class="fa fa-check-circle"></i>
+                </div>
+
+            </div>
         </div>
-    </div>
+
+
+        {{-- Total Balances --}}
+        <div
+            class="rounded-2xl border border-slate-200 border-l-4 border-l-violet-500
+                   bg-white p-5 shadow-sm"
+        >
+            <div class="flex items-start justify-between gap-4">
+
+                <div>
+                    <p
+                        class="text-xs font-semibold uppercase tracking-[0.12em]
+                               text-slate-500"
+                    >
+                        Total Balances
+                    </p>
+
+                    <h2
+                        class="mt-2 text-2xl font-bold tracking-tight
+                               text-slate-900"
+                    >
+                        {{ number_format($fundTotal->sum_balances ?? 0, 2) }}
+                    </h2>
+                </div>
+
+                <div
+                    class="flex h-11 w-11 shrink-0 items-center justify-center
+                           rounded-xl bg-violet-50 text-violet-600"
+                >
+                    <i class="fa fa-balance-scale"></i>
+                </div>
+
+            </div>
+        </div>
+
+
+        {{-- Needs Attention --}}
+        <div
+            class="rounded-2xl border border-slate-200 border-l-4
+                   {{ $flaggedFunds->isEmpty() ? 'border-l-emerald-500' : 'border-l-rose-500' }}
+                   bg-white p-5 shadow-sm"
+        >
+            <div class="flex items-start justify-between gap-4">
+
+                <div>
+                    <p
+                        class="text-xs font-semibold uppercase tracking-[0.12em]
+                               text-slate-500"
+                    >
+                        Needs Attention
+                    </p>
+
+                    <h2
+                        class="mt-2 text-2xl font-bold tracking-tight
+                               {{ $flaggedFunds->isEmpty() ? 'text-emerald-600' : 'text-rose-600' }}"
+                    >
+                        {{ $flaggedFunds->count() }}
+                        {{ \Illuminate\Support\Str::plural('fund', $flaggedFunds->count()) }}
+                    </h2>
+                </div>
+
+                <div
+                    class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl
+                           {{ $flaggedFunds->isEmpty()
+                               ? 'bg-emerald-50 text-emerald-600'
+                               : 'bg-rose-50 text-rose-600' }}"
+                >
+                    <i
+                        class="fa {{ $flaggedFunds->isEmpty()
+                            ? 'fa-check'
+                            : 'fa-exclamation-triangle' }}"
+                    ></i>
+                </div>
+
+            </div>
+        </div>
+
+    </section>
+
+
+    {{-- Attention Alert --}}
+    @if ($flaggedFunds->isNotEmpty())
+
+        <section class="mt-4">
+
+            <div
+                class="flex items-start gap-3 rounded-xl border border-rose-200
+                       bg-rose-50 px-4 py-3 text-sm text-rose-800"
+            >
+                <div
+                    class="flex h-8 w-8 shrink-0 items-center justify-center
+                           rounded-lg bg-rose-100 text-rose-600"
+                >
+                    <i class="fa fa-exclamation-triangle"></i>
+                </div>
+
+                <div class="leading-6">
+                    <span class="font-semibold">
+                        Obligation monitoring alert.
+                    </span>
+
+                    {{ $yearProgress }}% of the fiscal year has elapsed, but
+                    {{ $flaggedFunds->pluck('funding_source')->join(', ', ' and ') }}
+                    {{ $flaggedFunds->count() === 1 ? 'is' : 'are' }}
+                    significantly behind on obligations.
+                </div>
+            </div>
+
+        </section>
+
     @endif
 
-    {{-- Detail tables --}}
-    <div class="row mt-5">
-      <div class="col-lg-6 mb-4">
-        <div class="card h-100 shadow-sm border-0">
-          <div class="card-header bg-white border-0 pt-3 pb-2 px-4">
-            <h6 class="text-dark fw-bold mb-0" style="font-size:0.85rem;">Estimated Balances by Class</h6>
-          </div>
-          <div class="card-body p-4 pt-2">
-            <div class="table-responsive">
-              <table class="table table-sm align-middle mb-0" style="font-size:0.82rem;">
-                <thead>
-                  <tr class="text-muted text-uppercase" style="font-size:0.66rem; letter-spacing:.05em;">
-                    <th class="border-bottom-0">Funding Source</th>
-                    <th class="text-end border-bottom-0">CO</th>
-                    <th class="text-end border-bottom-0">MOOE</th>
-                    <th class="text-end border-bottom-0">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @foreach($saebBalancesByClass as $row)
-                    @php $isTotal = $row->funding_source === 'Grand Total'; @endphp
-                    <tr class="{{ $isTotal ? 'fw-bold border-top' : '' }}">
-                      <td class="{{ $isTotal ? 'text-dark' : 'text-secondary' }}">{{ $row->funding_source }}</td>
-                      <td class="text-end text-secondary">{{ number_format($row->co, 2) }}</td>
-                      <td class="text-end text-secondary">{{ number_format($row->mooe, 2) }}</td>
-                      <td class="text-end {{ $isTotal ? 'text-dark' : 'text-secondary' }}">{{ number_format($row->grand_total, 2) }}</td>
-                    </tr>
-                  @endforeach
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
 
-      <div class="col-lg-6 mb-4">
-        <div class="card h-100 shadow-sm border-0">
-          <div class="card-header bg-white border-0 pt-3 pb-2 px-4">
-            <h6 class="text-dark fw-bold mb-0" style="font-size:0.85rem;">Fund Summary</h6>
-          </div>
-          <div class="card-body p-4 pt-2">
-            <div class="table-responsive">
-              <table class="table table-sm align-middle mb-0" style="font-size:0.8rem;">
-                <thead>
-                  <tr class="text-muted text-uppercase" style="font-size:0.66rem; letter-spacing:.05em;">
-                    <th class="border-bottom-0">Funding Source</th>
-                    <th class="text-end border-bottom-0">Allotment</th>
-                    <th class="text-end border-bottom-0">Obligated</th>
-                    <th class="text-end border-bottom-0">Allocation Allotment</th>
-                    <th class="text-end border-bottom-0">Balances</th>
-                    <th class="text-end border-bottom-0">% Obl.</th>
-                  </tr>
-                </thead>
-                <tbody>
-                    @foreach($saebFundSummary as $row)
-                    @php
-                        $isTotal = $row->funding_source === 'Grand Total';
-                        $isFlagged = ! $isTotal && $row->pct_obligated < ($yearProgress - 15);
-                    @endphp
-                    <tr class="{{ $isTotal ? 'fw-bold border-top' : '' }} {{ $isFlagged ? 'table-danger bg-opacity-10' : '' }}">
-                        <td class="{{ $isTotal ? 'text-dark' : 'text-secondary' }}">
-                        {{ $row->funding_source }}
-                        @if($isFlagged)
-                            <i class="fa fa-exclamation-triangle text-danger ms-1" data-bs-toggle="tooltip" title="Behind schedule for this point in the fiscal year"></i>
-                        @endif
-                        </td>
-                        <td class="text-end text-secondary">{{ number_format($row->sum_allotment, 2) }}</td>
-                        <td class="text-end text-secondary">{{ number_format($row->sum_obligated, 2) }}</td>
-                        <td class="text-end text-secondary">{{ number_format($row->sum_aa, 2) }}</td>
-                        <td class="text-end {{ $isTotal ? 'text-dark' : 'text-secondary' }}">{{ number_format($row->sum_balances, 2) }}</td>
-                        <td class="text-end">
-                        <span class="badge {{ $row->pct_obligated >= 80 ? 'bg-success' : ($row->pct_obligated >= 50 ? 'bg-warning text-dark' : 'bg-secondary') }}">
-                            {{ number_format($row->pct_obligated, 2) }}%
-                        </span>
-                        </td>
-                    </tr>
-                    @endforeach
-                </tbody>
-              </table>
+    {{-- Detail Tables --}}
+    <section class="mt-6 grid gap-6 xl:grid-cols-2">
+
+        {{-- Estimated Balances by Class --}}
+        <div
+            class="overflow-hidden rounded-2xl border border-slate-200
+                   bg-white shadow-sm"
+        >
+            <div
+                class="flex items-center justify-between border-b
+                       border-slate-200 px-5 py-4"
+            >
+                <div>
+                    <h2 class="text-base font-bold text-slate-900">
+                        Estimated Balances by Class
+                    </h2>
+
+                    <p class="mt-1 text-xs text-slate-500">
+                        Breakdown of balances by funding source and expense class.
+                    </p>
+                </div>
+
+                <div
+                    class="flex h-10 w-10 items-center justify-center rounded-xl
+                           bg-sky-50 text-sky-600"
+                >
+                    <i class="fa fa-table"></i>
+                </div>
             </div>
-          </div>
+
+            <div class="overflow-x-auto">
+
+                <table class="min-w-full divide-y divide-slate-200">
+
+                    <thead class="bg-slate-50">
+                        <tr>
+
+                            <th
+                                scope="col"
+                                class="px-5 py-3 text-left text-xs font-semibold
+                                       uppercase tracking-wider text-slate-500"
+                            >
+                                Funding Source
+                            </th>
+
+                            <th
+                                scope="col"
+                                class="px-5 py-3 text-right text-xs font-semibold
+                                       uppercase tracking-wider text-slate-500"
+                            >
+                                CO
+                            </th>
+
+                            <th
+                                scope="col"
+                                class="px-5 py-3 text-right text-xs font-semibold
+                                       uppercase tracking-wider text-slate-500"
+                            >
+                                MOOE
+                            </th>
+
+                            <th
+                                scope="col"
+                                class="px-5 py-3 text-right text-xs font-semibold
+                                       uppercase tracking-wider text-slate-500"
+                            >
+                                Total
+                            </th>
+
+                        </tr>
+                    </thead>
+
+                    <tbody class="divide-y divide-slate-100 bg-white">
+
+                        @forelse ($saebBalancesByClass as $row)
+
+                            @php
+                                $isTotal = $row->funding_source === 'Grand Total';
+                            @endphp
+
+                            <tr
+                                class="{{ $isTotal ? 'bg-slate-50 font-bold' : 'hover:bg-slate-50' }}"
+                            >
+
+                                <td
+                                    class="whitespace-nowrap px-5 py-3 text-sm
+                                           {{ $isTotal ? 'text-slate-900' : 'text-slate-600' }}"
+                                >
+                                    {{ $row->funding_source }}
+                                </td>
+
+                                <td
+                                    class="whitespace-nowrap px-5 py-3 text-right
+                                           text-sm text-slate-600"
+                                >
+                                    {{ number_format($row->co ?? 0, 2) }}
+                                </td>
+
+                                <td
+                                    class="whitespace-nowrap px-5 py-3 text-right
+                                           text-sm text-slate-600"
+                                >
+                                    {{ number_format($row->mooe ?? 0, 2) }}
+                                </td>
+
+                                <td
+                                    class="whitespace-nowrap px-5 py-3 text-right text-sm
+                                           {{ $isTotal ? 'font-bold text-slate-900' : 'text-slate-600' }}"
+                                >
+                                    {{ number_format($row->grand_total ?? 0, 2) }}
+                                </td>
+
+                            </tr>
+
+                        @empty
+
+                            <tr>
+                                <td
+                                    colspan="4"
+                                    class="px-5 py-10 text-center text-sm
+                                           text-slate-500"
+                                >
+                                    No SAEB balance data available.
+                                </td>
+                            </tr>
+
+                        @endforelse
+
+                    </tbody>
+
+                </table>
+
+            </div>
         </div>
-      </div>
+
+
+        {{-- Fund Summary --}}
+        <div
+            class="overflow-hidden rounded-2xl border border-slate-200
+                   bg-white shadow-sm"
+        >
+            <div
+                class="flex items-center justify-between border-b
+                       border-slate-200 px-5 py-4"
+            >
+                <div>
+                    <h2 class="text-base font-bold text-slate-900">
+                        Fund Summary
+                    </h2>
+
+                    <p class="mt-1 text-xs text-slate-500">
+                        Allotment, obligations, balances, and utilization by fund.
+                    </p>
+                </div>
+
+                <div
+                    class="flex h-10 w-10 items-center justify-center rounded-xl
+                           bg-emerald-50 text-emerald-600"
+                >
+                    <i class="fa fa-bar-chart"></i>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+
+                <table class="min-w-full divide-y divide-slate-200">
+
+                    <thead class="bg-slate-50">
+                        <tr>
+
+                            <th
+                                scope="col"
+                                class="px-4 py-3 text-left text-xs font-semibold
+                                       uppercase tracking-wider text-slate-500"
+                            >
+                                Funding Source
+                            </th>
+
+                            <th
+                                scope="col"
+                                class="px-4 py-3 text-right text-xs font-semibold
+                                       uppercase tracking-wider text-slate-500"
+                            >
+                                Allotment
+                            </th>
+
+                            <th
+                                scope="col"
+                                class="px-4 py-3 text-right text-xs font-semibold
+                                       uppercase tracking-wider text-slate-500"
+                            >
+                                Obligated
+                            </th>
+
+                            <th
+                                scope="col"
+                                class="px-4 py-3 text-right text-xs font-semibold
+                                       uppercase tracking-wider text-slate-500"
+                            >
+                                Allocation Allotment
+                            </th>
+
+                            <th
+                                scope="col"
+                                class="px-4 py-3 text-right text-xs font-semibold
+                                       uppercase tracking-wider text-slate-500"
+                            >
+                                Balances
+                            </th>
+
+                            <th
+                                scope="col"
+                                class="px-4 py-3 text-right text-xs font-semibold
+                                       uppercase tracking-wider text-slate-500"
+                            >
+                                % Obl.
+                            </th>
+
+                        </tr>
+                    </thead>
+
+                    <tbody class="divide-y divide-slate-100 bg-white">
+
+                        @forelse ($saebFundSummary as $row)
+
+                            @php
+                                $isTotal = $row->funding_source === 'Grand Total';
+
+                                $isFlagged =
+                                    ! $isTotal
+                                    && (float) $row->pct_obligated
+                                        < ($yearProgress - $attentionBuffer);
+                            @endphp
+
+                            <tr
+                                class="
+                                    {{ $isTotal ? 'bg-slate-50 font-bold' : 'hover:bg-slate-50' }}
+                                    {{ $isFlagged ? 'bg-rose-50' : '' }}
+                                "
+                            >
+
+                                <td
+                                    class="whitespace-nowrap px-4 py-3 text-sm
+                                           {{ $isTotal ? 'text-slate-900' : 'text-slate-600' }}"
+                                >
+                                    <div class="flex items-center gap-2">
+
+                                        <span>
+                                            {{ $row->funding_source }}
+                                        </span>
+
+                                        @if ($isFlagged)
+
+                                            <span
+                                                class="inline-flex h-6 w-6 items-center
+                                                       justify-center rounded-full
+                                                       bg-rose-100 text-rose-600"
+                                                data-bs-toggle="tooltip"
+                                                title="Behind schedule for this point in the fiscal year"
+                                            >
+                                                <i
+                                                    class="fa fa-exclamation-triangle"
+                                                    style="font-size: 10px;"
+                                                ></i>
+                                            </span>
+
+                                        @endif
+
+                                    </div>
+                                </td>
+
+                                <td
+                                    class="whitespace-nowrap px-4 py-3 text-right
+                                           text-sm text-slate-600"
+                                >
+                                    {{ number_format($row->sum_allotment ?? 0, 2) }}
+                                </td>
+
+                                <td
+                                    class="whitespace-nowrap px-4 py-3 text-right
+                                           text-sm text-slate-600"
+                                >
+                                    {{ number_format($row->sum_obligated ?? 0, 2) }}
+                                </td>
+
+                                <td
+                                    class="whitespace-nowrap px-4 py-3 text-right
+                                           text-sm text-slate-600"
+                                >
+                                    {{ number_format($row->sum_aa ?? 0, 2) }}
+                                </td>
+
+                                <td
+                                    class="whitespace-nowrap px-4 py-3 text-right text-sm
+                                           {{ $isTotal ? 'font-bold text-slate-900' : 'text-slate-600' }}"
+                                >
+                                    {{ number_format($row->sum_balances ?? 0, 2) }}
+                                </td>
+
+                                <td
+                                    class="whitespace-nowrap px-4 py-3 text-right text-sm"
+                                >
+                                    @php
+                                        $pctObligated = (float) ($row->pct_obligated ?? 0);
+                                    @endphp
+
+                                    <span
+                                        class="
+                                            inline-flex min-w-[70px] items-center justify-center
+                                            rounded-full px-2.5 py-1 text-xs font-semibold
+
+                                            {{ $pctObligated >= 80
+                                                ? 'bg-emerald-100 text-emerald-700'
+                                                : ($pctObligated >= 50
+                                                    ? 'bg-amber-100 text-amber-700'
+                                                    : 'bg-slate-100 text-slate-600') }}
+                                        "
+                                    >
+                                        {{ number_format($pctObligated, 2) }}%
+                                    </span>
+                                </td>
+
+                            </tr>
+
+                        @empty
+
+                            <tr>
+                                <td
+                                    colspan="6"
+                                    class="px-5 py-10 text-center text-sm
+                                           text-slate-500"
+                                >
+                                    No SAEB fund summary data available.
+                                </td>
+                            </tr>
+
+                        @endforelse
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <div class="mt-6">
+        @include('layouts.footers.auth.footer')
     </div>
 
-    @include('layouts.footers.auth.footer')
-  </div>
+</div>
+
 @endsection

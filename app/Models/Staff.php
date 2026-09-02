@@ -7,26 +7,22 @@ use Illuminate\Database\Eloquent\Model;
 
 class Staff extends Model
 {
-  use HasFactory;
-  public $table = 'staffs';
+    use HasFactory;
 
-  public function office()
-  {
-    return $this->belongsTo(Office::class);
-  }
+    public $table = 'staffs';
 
-  public function group()
-  {
-    return $this->belongsTo(Group::class);
-  }
+    public function office()
+    {
+        return $this->belongsTo(Office::class);
+    }
 
-  public function divisions()
-  {
-    return $this->hasMany(Division::class);
-  }
+    public function group()
+    {
+        return $this->belongsTo(Group::class);
+    }
 
-  // public function centers()
-  // {
-  //   return $this->hasMany(Center::class);
-  // }
+    public function divisions()
+    {
+        return $this->hasMany(Division::class);
+    }
 }

@@ -578,6 +578,9 @@
 .min-w-\[80px\] {
     min-width: 80px
 }
+.min-w-\[900px\] {
+    min-width: 900px
+}
 .min-w-\[950px\] {
     min-width: 950px
 }
@@ -598,6 +601,12 @@
 }
 .max-w-\[320px\] {
     max-width: 320px
+}
+.max-w-\[420px\] {
+    max-width: 420px
+}
+.max-w-lg {
+    max-width: 32rem
 }
 .max-w-xl {
     max-width: 36rem
@@ -991,6 +1000,9 @@
 .bg-slate-900\/50 {
     background-color: rgb(15 23 42 / 0.5)
 }
+.bg-slate-900\/60 {
+    background-color: rgb(15 23 42 / 0.6)
+}
 .bg-transparent {
     background-color: transparent
 }
@@ -1376,6 +1388,10 @@
     --tw-text-opacity: 1;
     color: rgb(17 24 39 / var(--tw-text-opacity, 1))
 }
+.text-rose-500 {
+    --tw-text-opacity: 1;
+    color: rgb(244 63 94 / var(--tw-text-opacity, 1))
+}
 .text-rose-600 {
     --tw-text-opacity: 1;
     color: rgb(225 29 72 / var(--tw-text-opacity, 1))
@@ -1571,6 +1587,10 @@
     --tw-bg-opacity: 1;
     background-color: rgb(3 105 161 / var(--tw-bg-opacity, 1))
 }
+.hover\:bg-slate-100:hover {
+    --tw-bg-opacity: 1;
+    background-color: rgb(241 245 249 / var(--tw-bg-opacity, 1))
+}
 .hover\:bg-slate-200:hover {
     --tw-bg-opacity: 1;
     background-color: rgb(226 232 240 / var(--tw-bg-opacity, 1))
@@ -1590,6 +1610,10 @@
 .hover\:text-gray-500:hover {
     --tw-text-opacity: 1;
     color: rgb(107 114 128 / var(--tw-text-opacity, 1))
+}
+.hover\:text-slate-700:hover {
+    --tw-text-opacity: 1;
+    color: rgb(51 65 85 / var(--tw-text-opacity, 1))
 }
 .hover\:opacity-100:hover {
     opacity: 1
@@ -1702,6 +1726,9 @@
     }
     .sm\:min-w-\[300px\] {
         min-width: 300px
+    }
+    .sm\:min-w-\[360px\] {
+        min-width: 360px
     }
     .sm\:flex-1 {
         flex: 1 1 0%
