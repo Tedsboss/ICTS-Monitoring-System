@@ -82,6 +82,36 @@
             /* Adjust as needed */
         }
     </style>
+
+    <style>
+        /*
+        |--------------------------------------------------------------------------
+        | DIREK Main Layout
+        |--------------------------------------------------------------------------
+        | Keep authenticated page content clear of the fixed desktop sidebar.
+        | Mobile/tablet layout remains controlled by Argon.
+        */
+
+        @media (min-width: 1200px) {
+            body.g-sidenav-show #sidenav-main {
+                width: 250px;
+            }
+
+            body.g-sidenav-show .main-content {
+                margin-left: 270px !important;
+                width: calc(100% - 270px);
+                min-height: 100vh;
+            }
+        }
+
+        @media (max-width: 1199.98px) {
+            body.g-sidenav-show .main-content {
+                margin-left: 0 !important;
+                width: 100%;
+            }
+        }
+    </style>
+
 </head>
 {{-- <body class="g-sidenav-show bg-gray-100 {{ $class ?? '' }}"> --}}
 

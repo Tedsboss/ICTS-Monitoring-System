@@ -2,97 +2,178 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Http\Requests\ProfileRequest;
-use Illuminate\Support\Facades\Hash;
-use App\Models\User;
 use App\Models\Agency;
-use App\Models\Staff;
 use App\Models\Division;
-use App\Models\Unit;
 use App\Models\Position;
-use App\Models\OfficeLocation;
+use App\Models\Staff;
 use App\Models\TrustedDevice;
+use App\Models\User;
 use App\Traits\GenerateLogs;
 
 class ProfileController extends Controller
 {
+    use GenerateLogs;
 
-  use GenerateLogs;
+    public function show()
+    {
+        $agencies = Agency::query()
+            ->orderBy('UACS_AGY_DSC')
+            ->get();
 
-  public function show()
-  {
-    $agencies = Agency::query()->orderBy('UACS_AGY_DSC')->get();
-    $staffs = Staff::orderBy('office_id', 'asc')->orderBy('name', 'asc')->get();
-    $divisions = Division::all();
-    $positions = Position::all();
-    $depDevAgencyIds = Agency::depDevIds();
-    return view('users.user-profile', compact('agencies', 'staffs', 'divisions', 'positions', 'depDevAgencyIds'));
-  }
+        $staffs = Staff::query()
+            ->orderBy('office_id')
+            ->orderBy('name')
+            ->get();
 
-  public function update(ProfileRequest $request)
-  {
-    $profile = auth()->user();
-    $old_first_login = $profile->first_login;
-    $profile->gender = $request->gender;
-    $profile->birthday = $request->birthday;
+        $divisions = Division::query()
+            ->orderBy('name')
+            ->get();
 
-    if ($profile->isSuperAdmin()) {
-      $profile->agency_id = $request->agency_id;
-    } elseif ($profile->first_login == 'Y' && empty($profile->agency_id)) {
-      $profile->agency_id = $request->agency_id;
+        $positions = Position::query()
+            ->orderBy('name')
+            ->get();
+
+        $depDevAgencyIds = Agency::depDevIds();
+
+        return view('users.user-profile', compact(
+            'agencies',
+            'staffs',
+            'divisions',
+            'positions',
+            'depDevAgencyIds'
+        ));
     }
 
-    $profile->position_id = $request->position_id;
-    if ($profile->first_login == 'Y' && Agency::isDepDevId($profile->agency_id)) {
-      $profile->staff_id = $request->staff_id;
-      $profile->division_id = $request->division_id;
-    } elseif (!Agency::isDepDevId($profile->agency_id)) {
-      $profile->staff_id = null;
-      $profile->division_id = null;
+    public function update(ProfileRequest $request)
+    {
+        $profile = auth()->user();
+        $oldFirstLogin = $profile->first_login;
+
+        // Personal profile information.
+        $profile->gender = $request->gender;
+        $profile->birthday = $request->birthday;
+        $profile->position_id = $request->position_id;
+        $profile->location = $request->location;
+        $profile->phone = $request->phone;
+
+        // Agency may only be changed by Super Admin or during initial setup.
+        if ($profile->isSuperAdmin()) {
+            $profile->agency_id = $request->agency_id;
+        } elseif (
+            $profile->first_login === 'Y' &&
+            empty($profile->agency_id)
+        ) {
+            $profile->agency_id = $request->agency_id;
+        }
+
+        // Staff and Division are required only for DepDev users.
+        if (
+            $profile->first_login === 'Y' &&
+            Agency::isDepDevId($profile->agency_id)
+        ) {
+            $profile->staff_id = $request->staff_id;
+            $profile->division_id = $request->division_id;
+        } elseif (!Agency::isDepDevId($profile->agency_id)) {
+            $profile->staff_id = null;
+            $profile->division_id = null;
+        }
+
+        // User preferences.
+        $profile->enabledark = $request->enabledark ?? 'N';
+
+        if (
+            $profile->can(
+                'enableMyEmailNotification',
+                [User::class, $profile]
+            )
+        ) {
+            $profile->emailnotif = $request->emailnotif ?? 'N';
+        }
+
+        // Two-factor authentication.
+        $profile->twofactor = $request->twofactor ?? 'N';
+
+        if ($profile->twofactor === 'Y') {
+            $profile->twofactortype = $request->twofactortype ?: 'Email';
+        } else {
+            $profile->twofactortype = null;
+        }
+
+        // Password is changed only when a new password was provided.
+        if ($request->filled('new-password')) {
+            $profile->password = $request->get('new-password');
+        }
+
+        // Store the new avatar when one was uploaded.
+        if ($request->hasFile('avatar')) {
+            $profile->avatar = $request
+                ->file('avatar')
+                ->store('/', 'avatars');
+        }
+
+        // Initial profile setup is complete after a successful update.
+        $profile->first_login = 'N';
+
+        $profile->save();
+
+        // Keep the current session theme synchronized.
+        session([
+            'user_settings' => [
+                'class_theme' => $profile->enabledark === 'Y'
+                    ? 'dark'
+                    : '',
+            ],
+        ]);
+
+        if ($oldFirstLogin === 'Y') {
+            return redirect()
+                ->route('home')
+                ->with(
+                    'succes',
+                    'Profile updated successfully. You may now proceed to use the system'
+                );
+        }
+
+        return back()->with(
+            'succes',
+            'Profile successfully updated'
+        );
     }
 
-    $profile->location = $request->location;
-    $profile->phone = $request->phone;
+    public function revoke(TrustedDevice $trusteddevice)
+    {
+        $this->authorize(
+            'view',
+            [TrustedDevice::class, $trusteddevice]
+        );
 
-    $profile->enabledark = $request->enabledark ?? 'N';
-    if ($profile->can('enableMyEmailNotification', [User::class, $profile])) {
-      $profile->emailnotif = $request->emailnotif ?? 'N';
+        $remarks = '';
+
+        if ($trusteddevice->user_id == auth()->id()) {
+            $remarks = 'own ';
+        }
+
+        $trusteddevice->revoked_at = now();
+        $trusteddevice->save();
+
+        $this->addSystemLogs(
+            'Revoked ' .
+                $remarks .
+                'trusted device: ' .
+                $trusteddevice->device_name .
+                ' - ' .
+                $trusteddevice->ip,
+            auth()->id(),
+            auth()->user()->email,
+            request()->getClientIp(true),
+            'trusted_devices',
+            $trusteddevice->id
+        );
+
+        return back()->with(
+            'succes',
+            'Device successfully revoked'
+        );
     }
-    $profile->twofactor = $request->twofactor ?? 'N';
-
-    if ($request->get('new-password') == '' || $request->get('new-password') == null) {
-    } else {
-      $profile->password = $request->get('new-password');
-    }
-
-    if ($request->file('avatar')) {
-      auth()->user()->update(['avatar' => $request->file('avatar')->store('/', 'avatars')]);
-    }
-
-    $profile->first_login = 'N';
-    $profile->save();
-
-    session(['user_settings' => [
-      'class_theme' => $request->enabledark == 'Y' ? 'dark' : '',
-    ]]);
-
-    if ($old_first_login == 'Y') {
-      return redirect()->route('home')->with('succes', 'Profile updated successfully. You may now proceed to use the system');
-    }
-    return back()->with('succes', 'Profile succesfully updated');
-  }
-
-  public function revoke(TrustedDevice $trusteddevice)
-  {
-    $this->authorize('view', [TrustedDevice::class, $trusteddevice]);
-    $remarks = '';
-    if ($trusteddevice->user_id == auth()->id()) {
-      $remarks = 'own ';
-    }
-    $trusteddevice->revoked_at = now();
-    $trusteddevice->save();
-    $this->addSystemLogs("Revoked " . $remarks . "trusted device: " . $trusteddevice->device_name . ' - ' . $trusteddevice->ip, auth()->id(), auth()->user()->email, request()->getClientIp(true), 'trusted_devices', $trusteddevice->id);
-    return back()->with('succes', 'Device succesfully revoked');
-  }
 }

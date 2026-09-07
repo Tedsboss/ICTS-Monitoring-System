@@ -9,97 +9,82 @@ class FinancialPlanPolicy
 {
     private const MODULE_NAME = 'Financial Plan';
 
-    // Check if user can open the WFP module
+    // Check if user can open the Financial Plan module
     public function viewAny(User $user): bool
     {
-        if ($this->isAdministrator($user)) {
-            return true;
-        }
-
-        return $this->hasPermission($user, 'view');
+        return $this->isAdministrator($user)
+            || $this->hasPermission($user, 'view');
     }
 
-    // Check if user can create a WFP
+    // Check if user can create a Financial Plan
     public function create(User $user): bool
     {
-        if ($this->isAdministrator($user)) {
-            return true;
-        }
-
-        return $user->staff_id !== null
-            && $this->hasPermission($user, 'add');
+        return $this->isAdministrator($user)
+            || ($user->staff_id !== null && $this->hasPermission($user, 'add'));
     }
 
-    // Check if user can view a WFP
+    // Check if user can view a Financial Plan
     public function view(User $user, FinancialPlan $plan): bool
     {
-        if ($this->isAdministrator($user)) {
-            return true;
-        }
-
-        return $this->ownsStaff($user, $plan)
-            && $this->hasPermission($user, 'view');
+        return $this->isAdministrator($user)
+            || ($this->ownsStaff($user, $plan) && $this->hasPermission($user, 'view'));
     }
 
-    // Check if user can update a WFP
+    // Check if user can update a Financial Plan
     public function update(User $user, FinancialPlan $plan): bool
     {
-        if ($this->isAdministrator($user)) {
-            return true;
-        }
-
-        return $this->ownsStaff($user, $plan)
-            && $this->hasPermission($user, 'edit');
+        return $this->isAdministrator($user)
+            || ($this->ownsStaff($user, $plan) && $this->hasPermission($user, 'edit'));
     }
 
-    // Only administrators can delete a WFP
+    // Only administrators can delete a Financial Plan
     public function delete(User $user, FinancialPlan $plan): bool
     {
         return $this->isAdministrator($user);
     }
 
-    // Check if user can submit a WFP
+    // Check if user can submit a Financial Plan
     public function submit(User $user, FinancialPlan $plan): bool
     {
-        if ($this->isAdministrator($user)) {
-            return true;
-        }
-
-        return $this->ownsStaff($user, $plan)
-            && $this->hasPermission($user, 'submit');
+        return $this->isAdministrator($user)
+            || ($this->ownsStaff($user, $plan) && $this->hasPermission($user, 'submit'));
     }
 
-    // Only administrators can approve a WFP
-    public function approve(User $user): bool
+    // Check if user can approve a Financial Plan
+    public function approve(User $user, FinancialPlan $plan): bool
     {
-        return $this->isAdministrator($user);
+        return $this->isAdministrator($user)
+            || ($this->ownsStaff($user, $plan) && $this->hasPermission($user, 'approve'));
     }
 
-    // Only administrators can return a WFP for revision
-    public function return(User $user): bool
+    // Check if user can return a Financial Plan for revision
+    public function return(User $user, FinancialPlan $plan): bool
     {
-        return $this->isAdministrator($user);
+        return $this->isAdministrator($user)
+            || ($this->ownsStaff($user, $plan) && $this->hasPermission($user, 'return'));
     }
 
-    // Only administrators can finalize a WFP
-    public function finalize(User $user): bool
+    // Check if user can finalize a Financial Plan
+    public function finalize(User $user, FinancialPlan $plan): bool
     {
-        return $this->isAdministrator($user);
+        return $this->isAdministrator($user)
+            || ($this->ownsStaff($user, $plan) && $this->hasPermission($user, 'finalize'));
     }
 
-    // Only administrators can reopen a finalized WFP
-    public function reopen(User $user): bool
+    // Check if user can reopen a finalized Financial Plan
+    public function reopen(User $user, FinancialPlan $plan): bool
     {
-        return $this->isAdministrator($user);
+        return $this->isAdministrator($user)
+            || ($this->ownsStaff($user, $plan) && $this->hasPermission($user, 'reopen'));
     }
 
-    // Super Admin and System Admin
+    // Temporary administrator bypass while legacy System Admin role still exists
     private function isAdministrator(User $user): bool
     {
         return in_array((int) $user->role_id, [1, 29], true);
     }
 
-    // Check if the WFP belongs to the user's staff
+    // Check if the Financial Plan belongs to the user's staff/office
     private function ownsStaff(User $user, FinancialPlan $plan): bool
     {
         if ($user->staff_id === null || $plan->staff_id === null) {
@@ -112,14 +97,24 @@ class FinancialPlanPolicy
     // Check if the user's role has the required Financial Plan permission
     private function hasPermission(User $user, string $permissionName): bool
     {
-        if (! $user->role) {
+        $role = $user->role;
+
+        if (! $role) {
             return false;
         }
 
-        return $user->role->permissions->contains(function ($permission) use ($permissionName) {
-            return $permission->name === $permissionName
-                && $permission->module
-                && $permission->module->name === self::MODULE_NAME;
+        $permissionName = strtolower(trim($permissionName));
+        $moduleName = strtolower(self::MODULE_NAME);
+
+        return $role->permissions->contains(function ($permission) use ($permissionName, $moduleName) {
+            $module = $permission->module;
+
+            if (! $module) {
+                return false;
+            }
+
+            return strtolower(trim((string) $permission->name)) === $permissionName
+                && strtolower(trim((string) $module->name)) === $moduleName;
         });
     }
 }

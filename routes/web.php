@@ -9,6 +9,7 @@ use App\Http\Controllers\AgencyController;
 use App\Http\Controllers\ApiClientController;
 use App\Http\Controllers\DivisionController;
 use App\Http\Controllers\FinancialPlanController;
+use App\Http\Controllers\FinancialPlanAllocationTypeController;
 use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\HolidayController;
 use App\Http\Controllers\HomeController;
@@ -401,6 +402,18 @@ Route::group(['middleware' => 'check.restricted.ips'], function () {
           ->name('inquiries.updatestatus');
 
         Route::prefix('administrator')->group(function () {
+
+            // Financial Plan Allocation Types
+            Route::resource(
+                'financial-plan-allocation-types',
+                FinancialPlanAllocationTypeController::class,
+                [
+                    'except' => ['show', 'create', 'edit'],
+                    'parameters' => [
+                        'financial-plan-allocation-types' => 'financialPlanAllocationType',
+                    ],
+                ]
+            );
 
             Route::get('saebs/data', [SaebController::class, 'data'])->name('saebs.data');
             Route::resource('saebs', SaebController::class);

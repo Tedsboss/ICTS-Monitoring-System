@@ -1,222 +1,1647 @@
 @extends('layouts.app')
 
 @section('content')
-    <nav class="navbar navbar-main navbar-expand-lg  px-0 mx-4 shadow-none border-radius-xl z-index-sticky " id="navbarBlur"
-        data-scroll="false">
-        <div class="container-fluid py-1 px-3">
-            @include('layouts.navbars.auth.topnav', ['title' => 'Category Management'])
-            <div class="sidenav-toggler sidenav-toggler-inner d-xl-block d-none ">
-                <a href="javascript:;" class="nav-link p-0">
-                    <div class="sidenav-toggler-inner">
-                        <i class="sidenav-toggler-line bg-white"></i>
-                        <i class="sidenav-toggler-line bg-white"></i>
-                        <i class="sidenav-toggler-line bg-white"></i>
-                    </div>
-                </a>
-            </div>
-            <div class="collapse navbar-collapse mt-sm-0 mt-2 me-md-0 me-sm-4" id="navbar">
-                <div class="ms-md-auto pe-md-3 d-flex align-items-center">
-                    <div class="input-group">
-                        <span class="input-group-text text-body"><i class="fas fa-search" aria-hidden="true"></i></span>
-                        <input type="text" class="form-control" placeholder="Type here...">
-                    </div>
-                </div>
-                <ul class="navbar-nav  justify-content-end">
-                    <li class="nav-item d-flex align-items-center">
-                        @include('auth.logout')
-                    </li>
-                    <li class="nav-item d-xl-none ps-3 d-flex align-items-center">
-                        <a href="javascript:;" class="nav-link text-white p-0" id="iconNavbarSidenav">
-                            <div class="sidenav-toggler-inner">
-                                <i class="sidenav-toggler-line bg-white"></i>
-                                <i class="sidenav-toggler-line bg-white"></i>
-                                <i class="sidenav-toggler-line bg-white"></i>
-                            </div>
-                        </a>
-                    </li>
-                    <li class="nav-item px-3 d-flex align-items-center">
-                        <a href="javascript:;" class="nav-link text-white p-0">
-                            <i class="fa fa-cog fixed-plugin-button-nav cursor-pointer"></i>
-                        </a>
-                    </li>
-                    <li class="nav-item position-relative pe-2 d-flex align-items-center">
-                        <a href="#" class="nav-link text-white p-0" id="dropdownMenuButton"
-                            data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="fa fa-bell cursor-pointer"></i>
-                        </a>
-                        <ul class="dropdown-menu dropdown-menu-end px-2 py-3 me-sm-n4" aria-labelledby="dropdownMenuButton">
-                            <li class="mb-2">
-                                <a class="dropdown-item border-radius-md" href="#">
-                                    <div class="d-flex py-1">
-                                        <div class="my-auto">
-                                            <img src="/assets/img/team-2.jpg" class="avatar avatar-sm  me-3 "
-                                                alt="user image">
-                                        </div>
-                                        <div class="d-flex flex-column justify-content-center">
-                                            <h6 class="text-sm font-weight-normal mb-1">
-                                                <span class="font-weight-bold">New message</span> from Laur
-                                            </h6>
-                                            <p class="text-xs text-secondary mb-0">
-                                                <i class="fa fa-clock me-1"></i>
-                                                13 minutes ago
-                                            </p>
-                                        </div>
-                                    </div>
-                                </a>
-                            </li>
-                            <li class="mb-2">
-                                <a class="dropdown-item border-radius-md" href="#">
-                                    <div class="d-flex py-1">
-                                        <div class="my-auto">
-                                            <img src="/assets/img/small-logos/logo-spotify.svg"
-                                                class="avatar avatar-sm bg-gradient-dark  me-3 " alt="logo spotify">
-                                        </div>
-                                        <div class="d-flex flex-column justify-content-center">
-                                            <h6 class="text-sm font-weight-normal mb-1">
-                                                <span class="font-weight-bold">New album</span> by Travis Scott
-                                            </h6>
-                                            <p class="text-xs text-secondary mb-0">
-                                                <i class="fa fa-clock me-1"></i>
-                                                1 day
-                                            </p>
-                                        </div>
-                                    </div>
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item border-radius-md" href="#">
-                                    <div class="d-flex py-1">
-                                        <div class="avatar avatar-sm bg-gradient-secondary  me-3  my-auto">
-                                            <svg width="12px" height="12px" viewBox="0 0 43 36" version="1.1"
-                                                xmlns="http://www.w3.org/2000/svg"
-                                                xmlns:xlink="http://www.w3.org/1999/xlink">
-                                                <title>credit-card</title>
-                                                <g stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
-                                                    <g transform="translate(-2169.000000, -745.000000)" fill="#FFFFFF"
-                                                        fill-rule="nonzero">
-                                                        <g transform="translate(1716.000000, 291.000000)">
-                                                            <g transform="translate(453.000000, 454.000000)">
-                                                                <path class="color-background"
-                                                                    d="M43,10.7482083 L43,3.58333333 C43,1.60354167 41.3964583,0 39.4166667,0 L3.58333333,0 C1.60354167,0 0,1.60354167 0,3.58333333 L0,10.7482083 L43,10.7482083 Z"
-                                                                    opacity="0.593633743"></path>
-                                                                <path class="color-background"
-                                                                    d="M0,16.125 L0,32.25 C0,34.2297917 1.60354167,35.8333333 3.58333333,35.8333333 L39.4166667,35.8333333 C41.3964583,35.8333333 43,34.2297917 43,32.25 L43,16.125 L0,16.125 Z M19.7083333,26.875 L7.16666667,26.875 L7.16666667,23.2916667 L19.7083333,23.2916667 L19.7083333,26.875 Z M35.8333333,26.875 L28.6666667,26.875 L28.6666667,23.2916667 L35.8333333,23.2916667 L35.8333333,26.875 Z">
-                                                                </path>
-                                                            </g>
-                                                        </g>
-                                                    </g>
-                                                </g>
-                                            </svg>
-                                        </div>
-                                        <div class="d-flex flex-column justify-content-center">
-                                            <h6 class="text-sm font-weight-normal mb-1">
-                                                Payment successfully completed
-                                            </h6>
-                                            <p class="text-xs text-secondary mb-0">
-                                                <i class="fa fa-clock me-1"></i>
-                                                2 days
-                                            </p>
-                                        </div>
-                                    </div>
-                                </a>
-                            </li>
-                        </ul>
-                    </li>
-                </ul>
-            </div>
-        </div>
-    </nav>
-    <!-- End Navbar -->
-    <div class="container-fluid py-4">
-        <div class="row mt-4">
-            <div class="col-12">
-                <div class="card">
-                    <!-- Card header -->
-                    <div class="card-header d-flex justify-content-between">
-                        <h5 class="mb-0">Users Management</h5>
-                        <a href="{{ route('user-new') }}" class="btn bg-gradient-dark btn-sm float-end mb-0">Add User</a>
-                    </div>
-                    <div class="table-responsive">
-                        <table class="table table-flush" id="datatable-basic">
-                            <thead class="thead-light">
-                                <tr>
-                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">
-                                        Avatar
-                                    </th>
-                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">
-                                        Name
-                                    </th>
-                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">
-                                        Email
-                                    </th>
-                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">
-                                        Role
-                                    </th>
-                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">
-                                        Creation Date
-                                    </th>
-                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">
-                                        Action
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach ($users as $user)
-                                    <tr>
-                                        <td class="text-sm font-weight-normal">
-                                            <span class="my-2 text-xs">
-                                                <img src="{{ $user->avatarUrl() }}" alt="bruce"
-                                                    class="border-radius-lg shadow-sm height-100 w-auto">
-                                            </span>
-                                        </td>
-                                        <td class="text-sm font-weight-normal">{{ $user->firstname }}
-                                            {{ $user->lastname }}</td>
-                                        <td class="text-sm font-weight-normal">{{ $user->email }}</td>
-                                        <td class="text-sm font-weight-normal">{{ $user->role->name }}</td>
-                                        <td class="text-sm font-weight-normal">{{ $user->created_at }}</td>
-                                        <td class="text-sm">
-                                            <span class="d-flex">
-                                                @can('update', $user)
-                                                    <a href="{{ route('user-edit', $user->id) }}" class="me-3"
-                                                        data-bs-toggle="tooltip" data-bs-original-title="Edit user">
-                                                        <i class="fas fa-user-edit text-secondary"></i>
-                                                    </a>
-                                                @endcan
-                                                @can('delete', $user)
-                                                    <form action="{{ route('user-destroy', $user->id) }}" method="post">
-                                                        @csrf
-                                                        <button
-                                                            onclick="return confirm('Are you sure you want to remove the tag?')"
-                                                            data-bs-toggle="tooltip" data-bs-original-title="Delete user"
-                                                            class="border-0 bg-white">
-                                                            <i class="fas fa-trash text-secondary"></i>
-                                                        </button>
-                                                    </form>
-                                                @endcan
-                                            </span>
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-        @include('layouts.footers.auth.footer')
+
+<nav
+
+    class="navbar navbar-main navbar-expand-lg px-0 mx-4 shadow-none border-radius-xl z-index-sticky"
+
+    id="navbarBlur"
+
+    data-scroll="false"
+
+>
+
+    <div class="container-fluid py-2 px-3">
+
+        @include('layouts.navbars.auth.topnav', ['title' => 'User Management'])
+
+        @include('layouts.navbars.auth.topnav-withdatetime')
+
     </div>
+
+</nav>
+
+<div class="px-4 pb-8 pt-4">
+
+    {{-- Page Header --}}
+
+    <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+
+        <div>
+
+            <h1 class="text-xl font-bold text-slate-900">
+
+                User Management
+
+            </h1>
+
+            <p class="mt-1 text-sm text-slate-500">
+
+                Manage DIREK user accounts, organizational assignments, and access roles.
+
+            </p>
+
+        </div>
+
+        <button
+
+            type="button"
+
+            id="btnAddUser"
+
+            class="inline-flex items-center justify-center gap-2 rounded-lg
+
+                   bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white
+
+                   shadow-sm transition hover:bg-sky-700"
+
+        >
+
+            <i class="fa fa-plus"></i>
+
+            <span>Add User</span>
+
+        </button>
+
+    </div>
+
+    {{-- Validation Errors --}}
+
+    @if ($errors->any())
+
+        <div
+
+            class="mb-5 rounded-xl border border-rose-200 bg-rose-50
+
+                   px-4 py-3 text-sm text-rose-800"
+
+        >
+
+            <div class="flex items-start gap-3">
+
+                <i class="fa fa-exclamation-circle mt-0.5"></i>
+
+                <div>
+
+                    <p class="font-semibold">
+
+                        Please review the information below.
+
+                    </p>
+
+                    <ul class="mt-2 list-disc space-y-1 pl-5">
+
+                        @foreach ($errors->all() as $error)
+
+                            <li>{{ $error }}</li>
+
+                        @endforeach
+
+                    </ul>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    @endif
+
+    {{-- Users Table --}}
+
+    <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+
+        <div class="border-b border-slate-200 px-5 py-4">
+
+            <h2 class="text-sm font-bold uppercase tracking-wide text-slate-800">
+
+                DIREK Users
+
+            </h2>
+
+            <p class="mt-1 text-xs text-slate-500">
+
+                Role determines authority. Staff/Office determines which office records the user can access.
+
+            </p>
+
+        </div>
+
+        <div class="overflow-x-auto p-4">
+
+            <table
+
+                id="usersTable"
+
+                class="min-w-full divide-y divide-slate-200"
+
+                style="width: 100%;"
+
+            >
+
+                <thead class="bg-slate-50">
+
+                    <tr>
+
+                        <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-600">
+
+                            Name
+
+                        </th>
+
+                        <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-600">
+
+                            Email
+
+                        </th>
+
+                        <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-600">
+
+                            Staff / Office
+
+                        </th>
+
+                        <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-600">
+
+                            Division
+
+                        </th>
+
+                        <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-600">
+
+                            Position
+
+                        </th>
+
+                        <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-600">
+
+                            Role
+
+                        </th>
+
+                        <th class="px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-slate-600">
+
+                            Actions
+
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+                <tbody></tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+    <div class="mt-6">
+
+        @include('layouts.footers.auth.footer')
+
+    </div>
+
+</div>
+
+{{-- User Modal --}}
+
+<div
+
+    id="userModal"
+
+    class="fixed inset-0 z-[1055] hidden overflow-y-auto bg-slate-900/50 p-4"
+
+    aria-hidden="true"
+
+>
+
+    <div class="flex min-h-full items-start justify-center py-8">
+
+        <div
+
+            class="w-full max-w-4xl overflow-hidden rounded-2xl bg-white shadow-2xl"
+
+            role="dialog"
+
+            aria-modal="true"
+
+            aria-labelledby="userModalTitle"
+
+        >
+
+            {{-- Modal Header --}}
+
+            <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+
+                <div>
+
+                    <h2
+
+                        id="userModalTitle"
+
+                        class="text-lg font-bold text-slate-900"
+
+                    >
+
+                        Add User
+
+                    </h2>
+
+                    <p
+
+                        id="userModalSubtitle"
+
+                        class="mt-1 text-xs text-slate-500"
+
+                    >
+
+                        Create a new DIREK user account.
+
+                    </p>
+
+                </div>
+
+                <button
+
+                    type="button"
+
+                    id="btnCloseUserModal"
+
+                    class="inline-flex h-9 w-9 items-center justify-center
+
+                           rounded-lg text-slate-500 transition hover:bg-slate-100
+
+                           hover:text-slate-800"
+
+                    aria-label="Close"
+
+                >
+
+                    <i class="fa fa-times"></i>
+
+                </button>
+
+            </div>
+
+            {{-- User Form --}}
+
+            <form
+
+                id="userForm"
+
+                method="POST"
+
+                action="{{ route('users.store') }}"
+
+            >
+
+                @csrf
+
+                <input
+
+                    type="hidden"
+
+                    name="_method"
+
+                    id="userFormMethod"
+
+                    value="POST"
+
+                >
+
+                <div class="max-h-[72vh] overflow-y-auto p-5">
+
+                    {{-- Account Information --}}
+
+                    <section class="mb-6">
+
+                        <div class="mb-4">
+
+                            <h3 class="text-sm font-bold uppercase tracking-wide text-slate-800">
+
+                                Account Information
+
+                            </h3>
+
+                            <p class="mt-1 text-xs text-slate-500">
+
+                                Basic information used to identify the DIREK user.
+
+                            </p>
+
+                        </div>
+
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+
+                            <div>
+
+                                <label
+
+                                    for="firstname"
+
+                                    class="mb-1.5 block text-sm font-semibold text-slate-700"
+
+                                >
+
+                                    First Name
+
+                                    <span class="text-rose-500">\*</span>
+
+                                </label>
+
+                                <input
+
+                                    type="text"
+
+                                    id="firstname"
+
+                                    name="firstname"
+
+                                    required
+
+                                    maxlength="255"
+
+                                    autocomplete="given-name"
+
+                                    class="block w-full rounded-lg border border-slate-300
+
+                                           bg-white px-3 py-2.5 text-sm text-slate-700
+
+                                           shadow-sm outline-none transition
+
+                                           focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+
+                                >
+
+                            </div>
+
+                            <div>
+
+                                <label
+
+                                    for="middlename"
+
+                                    class="mb-1.5 block text-sm font-semibold text-slate-700"
+
+                                >
+
+                                    Middle Name
+
+                                </label>
+
+                                <input
+
+                                    type="text"
+
+                                    id="middlename"
+
+                                    name="middlename"
+
+                                    maxlength="255"
+
+                                    autocomplete="additional-name"
+
+                                    class="block w-full rounded-lg border border-slate-300
+
+                                           bg-white px-3 py-2.5 text-sm text-slate-700
+
+                                           shadow-sm outline-none transition
+
+                                           focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+
+                                >
+
+                            </div>
+
+                            <div>
+
+                                <label
+
+                                    for="lastname"
+
+                                    class="mb-1.5 block text-sm font-semibold text-slate-700"
+
+                                >
+
+                                    Last Name
+
+                                    <span class="text-rose-500">\*</span>
+
+                                </label>
+
+                                <input
+
+                                    type="text"
+
+                                    id="lastname"
+
+                                    name="lastname"
+
+                                    required
+
+                                    maxlength="255"
+
+                                    autocomplete="family-name"
+
+                                    class="block w-full rounded-lg border border-slate-300
+
+                                           bg-white px-3 py-2.5 text-sm text-slate-700
+
+                                           shadow-sm outline-none transition
+
+                                           focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+
+                                >
+
+                            </div>
+
+                            <div>
+
+                                <label
+
+                                    for="email"
+
+                                    class="mb-1.5 block text-sm font-semibold text-slate-700"
+
+                                >
+
+                                    Email Address
+
+                                    <span class="text-rose-500">\*</span>
+
+                                </label>
+
+                                <input
+
+                                    type="email"
+
+                                    id="email"
+
+                                    name="email"
+
+                                    required
+
+                                    maxlength="255"
+
+                                    autocomplete="email"
+
+                                    class="block w-full rounded-lg border border-slate-300
+
+                                           bg-white px-3 py-2.5 text-sm text-slate-700
+
+                                           shadow-sm outline-none transition
+
+                                           focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+
+                                >
+
+                            </div>
+
+                        </div>
+
+                    </section>
+
+                    <hr class="mb-6 border-slate-200">
+
+                    {{-- Organizational Assignment --}}
+
+                    <section class="mb-6">
+
+                        <div class="mb-4">
+
+                            <h3 class="text-sm font-bold uppercase tracking-wide text-slate-800">
+
+                                Organizational Assignment
+
+                            </h3>
+
+                            <p class="mt-1 text-xs text-slate-500">
+
+                                Assign the user's agency, staff/office, division, and position.
+
+                            </p>
+
+                        </div>
+
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+
+                            <div>
+
+                                <label
+
+                                    for="agency_id"
+
+                                    class="mb-1.5 block text-sm font-semibold text-slate-700"
+
+                                >
+
+                                    Agency
+
+                                    <span class="text-rose-500">\*</span>
+
+                                </label>
+
+                                <select
+
+                                    id="agency_id"
+
+                                    name="agency_id"
+
+                                    required
+
+                                    class="block w-full rounded-lg border border-slate-300
+
+                                           bg-white px-3 py-2.5 text-sm text-slate-700
+
+                                           shadow-sm outline-none transition
+
+                                           focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+
+                                >
+
+                                    <option value="">
+
+                                        Select Agency
+
+                                    </option>
+
+                                    @foreach ($agencies as $agency)
+
+                                        <option value="{{ $agency->id }}">
+
+                                            {{ $agency->display_name }}
+
+                                        </option>
+
+                                    @endforeach
+
+                                </select>
+
+                            </div>
+
+                            <div id="staffField">
+
+                                <label
+
+                                    for="staff_id"
+
+                                    class="mb-1.5 block text-sm font-semibold text-slate-700"
+
+                                >
+
+                                    Staff / Office
+
+                                    <span class="text-rose-500">\*</span>
+
+                                </label>
+
+                                <select
+
+                                    id="staff_id"
+
+                                    name="staff_id"
+
+                                    class="block w-full rounded-lg border border-slate-300
+
+                                           bg-white px-3 py-2.5 text-sm text-slate-700
+
+                                           shadow-sm outline-none transition
+
+                                           focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+
+                                >
+
+                                    <option value="">
+
+                                        Select Staff / Office
+
+                                    </option>
+
+                                    @foreach ($staffs as $staff)
+
+                                        <option value="{{ $staff->id }}">
+
+                                            {{ $staff->name }}
+
+                                            @if ($staff->abbreviation)
+
+                                                ({{ $staff->abbreviation }})
+
+                                            @endif
+
+                                        </option>
+
+                                    @endforeach
+
+                                </select>
+
+                            </div>
+
+                            <div id="divisionField">
+
+                                <label
+
+                                    for="division_id"
+
+                                    class="mb-1.5 block text-sm font-semibold text-slate-700"
+
+                                >
+
+                                    Division
+
+                                    <span class="text-rose-500">\*</span>
+
+                                </label>
+
+                                <select
+
+                                    id="division_id"
+
+                                    name="division_id"
+
+                                    class="block w-full rounded-lg border border-slate-300
+
+                                           bg-white px-3 py-2.5 text-sm text-slate-700
+
+                                           shadow-sm outline-none transition
+
+                                           focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+
+                                >
+
+                                    <option value="">
+
+                                        Select Division
+
+                                    </option>
+
+                                    @foreach ($divisions as $division)
+
+                                        <option
+
+                                            value="{{ $division->id }}"
+
+                                            data-staff-id="{{ $division->staff_id }}"
+
+                                        >
+
+                                            {{ $division->name }}
+
+                                        </option>
+
+                                    @endforeach
+
+                                </select>
+
+                            </div>
+
+                            <div>
+
+                                <label
+
+                                    for="position_id"
+
+                                    class="mb-1.5 block text-sm font-semibold text-slate-700"
+
+                                >
+
+                                    Position
+
+                                </label>
+
+                                <select
+
+                                    id="position_id"
+
+                                    name="position_id"
+
+                                    class="block w-full rounded-lg border border-slate-300
+
+                                           bg-white px-3 py-2.5 text-sm text-slate-700
+
+                                           shadow-sm outline-none transition
+
+                                           focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+
+                                >
+
+                                    <option value="">
+
+                                        Select Position
+
+                                    </option>
+
+                                    @foreach ($positions as $position)
+
+                                        <option value="{{ $position->id }}">
+
+                                            {{ $position->name }}
+
+                                        </option>
+
+                                    @endforeach
+
+                                </select>
+
+                            </div>
+
+                        </div>
+
+                    </section>
+
+                    <hr class="mb-6 border-slate-200">
+
+                    {{-- DIREK Access --}}
+
+                    <section class="mb-6">
+
+                        <div class="mb-4">
+
+                            <h3 class="text-sm font-bold uppercase tracking-wide text-slate-800">
+
+                                DIREK Access
+
+                            </h3>
+
+                            <p class="mt-1 text-xs text-slate-500">
+
+                                Role determines what actions the user is authorized to perform.
+
+                            </p>
+
+                        </div>
+
+                        <div>
+
+                            <label
+
+                                for="role_id"
+
+                                class="mb-1.5 block text-sm font-semibold text-slate-700"
+
+                            >
+
+                                Role
+
+                                <span class="text-rose-500">\*</span>
+
+                            </label>
+
+                            <select
+
+                                id="role_id"
+
+                                name="role_id"
+
+                                required
+
+                                class="block w-full rounded-lg border border-slate-300
+
+                                       bg-white px-3 py-2.5 text-sm text-slate-700
+
+                                       shadow-sm outline-none transition
+
+                                       focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+
+                            >
+
+                                <option value="">
+
+                                    Select DIREK Role
+
+                                </option>
+
+                                @foreach ($roles as $role)
+
+                                    <option value="{{ $role->id }}">
+
+                                        {{ $role->name }}
+
+                                    </option>
+
+                                @endforeach
+
+                            </select>
+
+                            <p class="mt-2 text-xs text-slate-500">
+
+                                Staff/Office controls which records the user can access.
+
+                                Role controls what the user can do with those records.
+
+                            </p>
+
+                        </div>
+
+                    </section>
+
+                    <hr class="mb-6 border-slate-200">
+
+                    {{-- Password --}}
+
+                    <section>
+
+                        <div class="mb-4">
+
+                            <h3 class="text-sm font-bold uppercase tracking-wide text-slate-800">
+
+                                Password
+
+                            </h3>
+
+                            <p
+
+                                id="passwordHelp"
+
+                                class="mt-1 text-xs text-slate-500"
+
+                            >
+
+                                Set the initial password for this account.
+
+                            </p>
+
+                        </div>
+
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+
+                            <div>
+
+                                <label
+
+                                    for="new-password"
+
+                                    class="mb-1.5 block text-sm font-semibold text-slate-700"
+
+                                >
+
+                                    New Password
+
+                                    <span
+
+                                        id="passwordRequired"
+
+                                        class="text-rose-500"
+
+                                    >\*</span>
+
+                                </label>
+
+                                <input
+
+                                    type="password"
+
+                                    id="new-password"
+
+                                    name="new-password"
+
+                                    minlength="6"
+
+                                    autocomplete="new-password"
+
+                                    class="block w-full rounded-lg border border-slate-300
+
+                                           bg-white px-3 py-2.5 text-sm text-slate-700
+
+                                           shadow-sm outline-none transition
+
+                                           focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+
+                                >
+
+                            </div>
+
+                            <div>
+
+                                <label
+
+                                    for="confirm-password"
+
+                                    class="mb-1.5 block text-sm font-semibold text-slate-700"
+
+                                >
+
+                                    Confirm Password
+
+                                    <span
+
+                                        id="confirmPasswordRequired"
+
+                                        class="text-rose-500"
+
+                                    >\*</span>
+
+                                </label>
+
+                                <input
+
+                                    type="password"
+
+                                    id="confirm-password"
+
+                                    name="confirm-password"
+
+                                    minlength="6"
+
+                                    autocomplete="new-password"
+
+                                    class="block w-full rounded-lg border border-slate-300
+
+                                           bg-white px-3 py-2.5 text-sm text-slate-700
+
+                                           shadow-sm outline-none transition
+
+                                           focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+
+                                >
+
+                            </div>
+
+                        </div>
+
+                    </section>
+
+                </div>
+
+                {{-- Modal Footer --}}
+
+                <div
+
+                    class="flex flex-col-reverse gap-3 border-t border-slate-200
+
+                           bg-slate-50 px-5 py-4 sm:flex-row sm:justify-end"
+
+                >
+
+                    <button
+
+                        type="button"
+
+                        id="btnCancelUser"
+
+                        class="inline-flex items-center justify-center rounded-lg
+
+                               border border-slate-300 bg-white px-5 py-2.5
+
+                               text-sm font-semibold text-slate-700 shadow-sm
+
+                               transition hover:bg-slate-50"
+
+                    >
+
+                        Cancel
+
+                    </button>
+
+                    <button
+
+                        type="submit"
+
+                        class="inline-flex items-center justify-center gap-2 rounded-lg
+
+                               bg-sky-600 px-5 py-2.5 text-sm font-semibold
+
+                               text-white shadow-sm transition hover:bg-sky-700"
+
+                    >
+
+                        <i class="fa fa-save"></i>
+
+                        <span id="btnSaveUserText">
+
+                            Save User
+
+                        </span>
+
+                    </button>
+
+                </div>
+
+            </form>
+
+        </div>
+
+    </div>
+
+</div>
+
 @endsection
 
 @push('js')
-    <script src="/assets/js/plugins/datatables.js"></script>
-    <script>
-        const dataTableBasic = new simpleDatatables.DataTable("#datatable-basic", {
-            searchable: true,
-            fixedHeight: true,
-            columns: [{
-                select: [0, 5],
-                sortable: false
-            }]
+
+<script>
+
+document.addEventListener('DOMContentLoaded', function () {
+
+    const storeUrl = @json(route('users.store'));
+
+    const getUsersUrl = @json(route('getusers'));
+
+    const csrfToken = @json(csrf_token());
+
+    const depDevAgencyIds = @json(collect($depDevAgencyIds)->values()->all());
+
+    const modal = document.getElementById('userModal');
+
+    const form = document.getElementById('userForm');
+
+    const formMethod = document.getElementById('userFormMethod');
+
+    const modalTitle = document.getElementById('userModalTitle');
+
+    const modalSubtitle = document.getElementById('userModalSubtitle');
+
+    const passwordHelp = document.getElementById('passwordHelp');
+
+    const passwordRequired = document.getElementById('passwordRequired');
+
+    const confirmPasswordRequired = document.getElementById('confirmPasswordRequired');
+
+    const newPassword = document.getElementById('new-password');
+
+    const confirmPassword = document.getElementById('confirm-password');
+
+    const agencySelect = document.getElementById('agency_id');
+
+    const staffSelect = document.getElementById('staff_id');
+
+    const divisionSelect = document.getElementById('division_id');
+
+    const staffField = document.getElementById('staffField');
+
+    const divisionField = document.getElementById('divisionField');
+
+    // Keep original Division options for Staff/Office filtering.
+    const divisionOptions = Array.from(divisionSelect.options)
+
+        .slice(1)
+
+        .map(function (option) {
+
+            return {
+
+                value: option.value,
+
+                text: option.textContent.trim(),
+
+                staffId: option.dataset.staffId || ''
+
+            };
+
         });
-    </script>
+
+    function isDepDevAgency(agencyId) {
+
+        return depDevAgencyIds
+
+            .map(String)
+
+            .includes(String(agencyId || ''));
+
+    }
+
+    function openModal() {
+
+        modal.classList.remove('hidden');
+
+        modal.setAttribute('aria-hidden', 'false');
+
+        document.body.classList.add('overflow-hidden');
+
+    }
+
+    function closeModal() {
+
+        modal.classList.add('hidden');
+
+        modal.setAttribute('aria-hidden', 'true');
+
+        document.body.classList.remove('overflow-hidden');
+
+    }
+
+    function resetForm() {
+
+        form.reset();
+
+        form.action = storeUrl;
+
+        formMethod.value = 'POST';
+
+        modalTitle.textContent = 'Add User';
+
+        modalSubtitle.textContent =
+
+            'Create a new DIREK user account.';
+
+        document.getElementById('btnSaveUserText').textContent =
+
+            'Save User';
+
+        passwordHelp.textContent =
+
+            'Set the initial password for this account.';
+
+        passwordRequired.classList.remove('hidden');
+
+        confirmPasswordRequired.classList.remove('hidden');
+
+        newPassword.required = true;
+
+        confirmPassword.required = true;
+
+        updateAgencyFields();
+
+        filterDivisions('');
+
+    }
+
+    function updateAgencyFields() {
+
+        const requiresOrganization =
+
+            isDepDevAgency(agencySelect.value);
+
+        staffField.classList.toggle(
+
+            'hidden',
+
+            !requiresOrganization
+
+        );
+
+        divisionField.classList.toggle(
+
+            'hidden',
+
+            !requiresOrganization
+
+        );
+
+        staffSelect.required = requiresOrganization;
+
+        divisionSelect.required = requiresOrganization;
+
+        if (!requiresOrganization) {
+
+            staffSelect.value = '';
+
+            divisionSelect.value = '';
+
+            filterDivisions('');
+
+        }
+
+    }
+
+    function filterDivisions(*selectedDivisionId* = '') {
+
+        const selectedStaffId =
+
+            String(staffSelect.value || '');
+
+        divisionSelect.innerHTML =
+
+            '<option value="">Select Division</option>';
+
+        divisionOptions.forEach(function (option) {
+
+            if (
+
+                selectedStaffId !== '' &&
+
+                String(option.staffId) === selectedStaffId
+
+            ) {
+
+                const newOption =
+
+                    document.createElement('option');
+
+                newOption.value = option.value;
+
+                newOption.textContent = option.text;
+
+                if (
+
+                    selectedDivisionId !== '' &&
+
+                    String(option.value) ===
+
+                        String(selectedDivisionId)
+
+                ) {
+
+                    newOption.selected = true;
+
+                }
+
+                divisionSelect.appendChild(newOption);
+
+            }
+
+        });
+
+    }
+
+    function setFieldValue(*id*, *value*) {
+
+        const field = document.getElementById(id);
+
+        if (!field) {
+
+            return;
+
+        }
+
+        field.value =
+
+            value === null || value === undefined
+
+                ? ''
+
+                : String(value);
+
+    }
+
+    // Add User.
+    document
+
+        .getElementById('btnAddUser')
+
+        .addEventListener('click', function () {
+
+            resetForm();
+
+            openModal();
+
+        });
+
+    // Close User modal.
+    document
+
+        .getElementById('btnCloseUserModal')
+
+        .addEventListener('click', closeModal);
+
+    document
+
+        .getElementById('btnCancelUser')
+
+        .addEventListener('click', closeModal);
+
+    // Close when clicking outside modal card.
+    modal.addEventListener('click', function (event) {
+
+        if (event.target === modal) {
+
+            closeModal();
+
+        }
+
+    });
+
+    // Close modal with Escape.
+    document.addEventListener('keydown', function (event) {
+
+        if (
+
+            event.key === 'Escape' &&
+
+            !modal.classList.contains('hidden')
+
+        ) {
+
+            closeModal();
+
+        }
+
+    });
+
+    agencySelect.addEventListener('change', function () {
+
+        updateAgencyFields();
+
+        filterDivisions('');
+
+    });
+
+    staffSelect.addEventListener('change', function () {
+
+        filterDivisions('');
+
+    });
+
+    // Called by the Edit button returned by UserController\@getusers.
+    window.showUser = function (*user*, *updateUrl*) {
+
+        form.reset();
+
+        form.action = updateUrl;
+
+        formMethod.value = 'PUT';
+
+        modalTitle.textContent = 'Edit User';
+
+        modalSubtitle.textContent =
+
+            'Update the DIREK account and organizational assignment.';
+
+        document.getElementById('btnSaveUserText').textContent =
+
+            'Save Changes';
+
+        passwordHelp.textContent =
+
+            'Leave both password fields blank to keep the current password.';
+
+        passwordRequired.classList.add('hidden');
+
+        confirmPasswordRequired.classList.add('hidden');
+
+        newPassword.required = false;
+
+        confirmPassword.required = false;
+
+        setFieldValue(
+
+            'firstname',
+
+            user.firstname
+
+        );
+
+        setFieldValue(
+
+            'middlename',
+
+            user.middlename
+
+        );
+
+        setFieldValue(
+
+            'lastname',
+
+            user.lastname
+
+        );
+
+        setFieldValue(
+
+            'email',
+
+            user.email
+
+        );
+
+        setFieldValue(
+
+            'agency_id',
+
+            user.agency_id
+
+        );
+
+        updateAgencyFields();
+
+        setFieldValue(
+
+            'staff_id',
+
+            user.staff_id
+
+        );
+
+        filterDivisions(
+
+            user.division_id === null ||
+
+            user.division_id === undefined
+
+                ? ''
+
+                : String(user.division_id)
+
+        );
+
+        setFieldValue(
+
+            'position_id',
+
+            user.position_id
+
+        );
+
+        setFieldValue(
+
+            'role_id',
+
+            user.role_id
+
+        );
+
+        openModal();
+
+    };
+
+    // DIREK User Management DataTable.
+    const table = $('#usersTable').DataTable({
+
+        processing: true,
+
+        serverSide: true,
+
+        responsive: true,
+
+        autoWidth: false,
+
+        ajax: {
+
+            url: getUsersUrl,
+
+            type: 'POST',
+
+            headers: {
+
+                'X-CSRF-TOKEN': csrfToken
+
+            }
+
+        },
+
+        order: [
+
+            [0, 'asc']
+
+        ],
+
+        columns: [
+
+            {
+
+                data: 'fullname',
+
+                name: 'fullname'
+
+            },
+
+            {
+
+                data: 'email',
+
+                name: 'email'
+
+            },
+
+            {
+
+                data: 'staff',
+
+                name: 'staff.name',
+
+                defaultContent: ''
+
+            },
+
+            {
+
+                data: 'division',
+
+                name: 'division.name',
+
+                defaultContent: ''
+
+            },
+
+            {
+
+                data: 'designation',
+
+                name: 'position.name',
+
+                defaultContent: ''
+
+            },
+
+            {
+
+                data: 'role',
+
+                name: 'role.name',
+
+                defaultContent: ''
+
+            },
+
+            {
+
+                data: 'actions',
+
+                name: 'actions',
+
+                orderable: false,
+
+                searchable: false,
+
+                className: 'text-center'
+
+            }
+
+        ]
+
+    });
+
+    // Re-open Add form after validation failure.
+    @if ($errors->any())
+
+        resetForm();
+
+        setFieldValue(
+
+            'firstname',
+
+            @json(old('firstname'))
+
+        );
+
+        setFieldValue(
+
+            'middlename',
+
+            @json(old('middlename'))
+
+        );
+
+        setFieldValue(
+
+            'lastname',
+
+            @json(old('lastname'))
+
+        );
+
+        setFieldValue(
+
+            'email',
+
+            @json(old('email'))
+
+        );
+
+        setFieldValue(
+
+            'agency_id',
+
+            @json(old('agency_id'))
+
+        );
+
+        updateAgencyFields();
+
+        setFieldValue(
+
+            'staff_id',
+
+            @json(old('staff_id'))
+
+        );
+
+        filterDivisions(
+
+            @json(old('division_id'))
+
+                ? String(@json(old('division_id')))
+
+                : ''
+
+        );
+
+        setFieldValue(
+
+            'position_id',
+
+            @json(old('position_id'))
+
+        );
+
+        setFieldValue(
+
+            'role_id',
+
+            @json(old('role_id'))
+
+        );
+
+        openModal();
+
+    @endif
+
+});
+
+</script>
+
 @endpush

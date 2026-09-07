@@ -3,102 +3,243 @@
 namespace App\Http\Requests;
 
 use App\Models\Agency;
-use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
-use App\Models\Position;
-use App\Models\Staff;
-use App\Models\Division;
-use App\Models\Unit;
-use App\Models\OfficeLocation;
 use App\Models\Role;
 use Illuminate\Database\Query\Builder;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UserRequest extends FormRequest
 {
-  /**
-   * Determine if the user is authorized to make this request.
-   */
-  public function authorize(): bool
-  {
-    return true;
-  }
-
-  /**
-   * Get the validation rules that apply to the request.
-   *
-   * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
-   */
-  public function rules(): array
-  {
-    $requiresStaffDivision = $this->requiresStaffDivision();
-
-    return [
-      'firstname' => ['required', 'string', 'min:1', 'max:255'],
-      'middlename' => ['nullable', 'string', 'min:1', 'max:255'],
-      'lastname' => ['required', 'string', 'min:1', 'max:255'],
-      'gender' => ['nullable', 'in:Male,Female'],
-      'birthday' => ['nullable', 'date', 'before_or_equal:now'],
-      'agency_id' => ['required', 'integer', 'exists:agencies,id'],
-      'position_id' => ['required', 'nullable', 'integer', 'exists:positions,id'],
-      'phone' => ['required', 'string', 'min:11', 'max:13'],
-      'staff_id' => [Rule::requiredIf($requiresStaffDivision), 'nullable', 'integer', 'exists:staffs,id'],
-      'division_id' => [Rule::requiredIf($requiresStaffDivision), 'nullable', 'integer', Rule::exists('divisions', 'id')->where(function (Builder $query) {
-        return $query->where('staff_id', $this->input('staff_id'));
-      })],
-      'location' => ['nullable', 'string', 'min:1', 'max:255'],
-      'role_id' => ['required', 'integer', 'exists:' . (new Role)->getTable() . ',id'],
-
-      // 'emailnotif' => ['required', 'in:Y,N', Rule::prohibitedIf($this->input('role_id') == 4 && $this->input('emailnotif') == 'N')],
-      'avatar' => ['nullable', 'image'],
-      // 'email' => ['required', 'email', Rule::unique('users')->ignore($this->route()->user->id ?? null)],
-      'email' => [
-        'required',
-        'email:rfc',
-        'not_regex:/\s/',
-        Rule::unique('users', 'email')->ignore($this->route()->user->id ?? null),
-      ],
-      'new-password' => [$this->route()->user == null ? 'required' : 'nullable', 'min:6'],
-      'confirm-password' => [$this->route()->user == null ? 'required' : 'required_with:new-password', $this->route()->user == null ? 'required' : 'nullable', 'min:6', 'same:new-password'],
+    // Roles that can be assigned through DIREK User Management.
+    private const DIREK_ROLES = [
+        'Super Admin',
+        'Director',
+        'Planning and Finance Staff',
     ];
-  }
 
-  protected function prepareForValidation(): void
-  {
-    if (!$this->requiresStaffDivision()) {
-      $this->merge([
-        'staff_id' => null,
-        'division_id' => null,
-      ]);
+    /**
+     * Determine if the user is authorized to make this request.
+     */
+    public function authorize(): bool
+    {
+        return true;
     }
-  }
 
-  private function requiresStaffDivision(): bool
-  {
-    return Agency::isDepDevId($this->input('agency_id'));
-  }
+    /**
+     * Get the validation rules that apply to the request.
+     */
+    public function rules(): array
+    {
+        $userId = $this->currentUserId();
+        $requiresStaffDivision = $this->requiresStaffDivision();
 
-  public function messages(): array
-  {
-    return [
-      'emailnotif.prohibited' => 'The email notification is required for user role',
-      'staff_id.required' => 'The staff field is required',
-      'staff_id.required_if' => 'The staff field is required',
-      'division_id.required' => 'The division field is required',
-      'division_id.required_if' => 'The division field is required',
-      'position_id.required_if' => 'The position field is required',
-      'email.unique' => 'This email already has an active/pending account.',
-    ];
-  }
+        return [
+            'firstname' => [
+                'required',
+                'string',
+                'min:1',
+                'max:255',
+            ],
 
-  public function attributes(): array
-  {
-    return [
-      'role_id' => 'role',
-      'agency_id' => 'agency',
-      'confirm-email' => 'confirmed email',
-      'new-password' => 'new password',
-      'confirm-password' => 'confirmed password',
-    ];
-  }
+            'middlename' => [
+                'nullable',
+                'string',
+                'min:1',
+                'max:255',
+            ],
+
+            'lastname' => [
+                'required',
+                'string',
+                'min:1',
+                'max:255',
+            ],
+
+            'email' => [
+                'required',
+                'email:rfc',
+                'not_regex:/\s/',
+                'max:255',
+                Rule::unique('users', 'email')->ignore($userId),
+            ],
+
+            'agency_id' => [
+                'required',
+                'integer',
+                'exists:agencies,id',
+            ],
+
+            'staff_id' => [
+                Rule::requiredIf($requiresStaffDivision),
+                'nullable',
+                'integer',
+                'exists:staffs,id',
+            ],
+
+            'division_id' => [
+                Rule::requiredIf($requiresStaffDivision),
+                'nullable',
+                'integer',
+                Rule::exists('divisions', 'id')
+                    ->where(function (Builder $query) {
+                        $query->where(
+                            'staff_id',
+                            $this->input('staff_id')
+                        );
+                    }),
+            ],
+
+            'position_id' => [
+                'nullable',
+                'integer',
+                'exists:positions,id',
+            ],
+
+            'role_id' => [
+                'required',
+                'integer',
+                Rule::exists((new Role())->getTable(), 'id')
+                    ->where(function (Builder $query) {
+                        $query->whereIn(
+                            'name',
+                            self::DIREK_ROLES
+                        );
+                    }),
+            ],
+
+            'new-password' => [
+                $userId === null ? 'required' : 'nullable',
+                'string',
+                'min:6',
+                'max:255',
+            ],
+
+            'confirm-password' => [
+                $userId === null
+                    ? 'required'
+                    : 'required_with:new-password',
+                'nullable',
+                'string',
+                'min:6',
+                'max:255',
+                'same:new-password',
+            ],
+        ];
+    }
+
+    /**
+     * Prepare request data before validation.
+     */
+    protected function prepareForValidation(): void
+    {
+        $userId = $this->currentUserId();
+
+        // Remember whether validation came from Edit User.
+        $this->merge([
+            '_editing_user_id' => $userId,
+        ]);
+
+        // Non-DepDev accounts do not use Staff/Office and Division.
+        if (! $this->requiresStaffDivision()) {
+            $this->merge([
+                'staff_id' => null,
+                'division_id' => null,
+            ]);
+        }
+    }
+
+    /**
+     * Always return validation failures to the modal-based
+     * User Management page.
+     */
+    protected function getRedirectUrl(): string
+    {
+        return route('users.index');
+    }
+
+    /**
+     * Get the user ID from the current resource route.
+     */
+    private function currentUserId(): ?int
+    {
+        $user = $this->route('user');
+
+        if ($user === null) {
+            return null;
+        }
+
+        if (is_object($user) && isset($user->id)) {
+            return (int) $user->id;
+        }
+
+        if (is_numeric($user)) {
+            return (int) $user;
+        }
+
+        return null;
+    }
+
+    /**
+     * Determine whether Staff/Office and Division are required.
+     */
+    private function requiresStaffDivision(): bool
+    {
+        return Agency::isDepDevId(
+            $this->input('agency_id')
+        );
+    }
+
+    /**
+     * Custom validation messages.
+     */
+    public function messages(): array
+    {
+        return [
+            'staff_id.required' =>
+                'The staff/office field is required.',
+
+            'staff_id.exists' =>
+                'Please select a valid staff/office.',
+
+            'division_id.required' =>
+                'The division field is required.',
+
+            'division_id.exists' =>
+                'The selected division does not belong to the selected staff/office.',
+
+            'role_id.exists' =>
+                'Please select a valid DIREK role.',
+
+            'email.unique' =>
+                'This email is already assigned to another user account.',
+
+            'confirm-password.required' =>
+                'The password confirmation field is required.',
+
+            'confirm-password.required_with' =>
+                'Please confirm the new password.',
+
+            'confirm-password.same' =>
+                'The password confirmation does not match the new password.',
+        ];
+    }
+
+    /**
+     * Friendly field names used by validation messages.
+     */
+    public function attributes(): array
+    {
+        return [
+            'firstname' => 'first name',
+            'middlename' => 'middle name',
+            'lastname' => 'last name',
+            'agency_id' => 'agency',
+            'staff_id' => 'staff/office',
+            'division_id' => 'division',
+            'position_id' => 'position',
+            'role_id' => 'role',
+            'new-password' => 'new password',
+            'confirm-password' => 'password confirmation',
+        ];
+    }
 }

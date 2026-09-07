@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class FinancialPlanAllocation extends Model
 {
@@ -12,6 +13,7 @@ class FinancialPlanAllocation extends Model
     protected $fillable = [
         'fiscal_year',
         'office_name',
+        'staff_id',
         'division_id',
         'mooe_allocation',
         'capital_outlay_allocation',
@@ -20,11 +22,21 @@ class FinancialPlanAllocation extends Model
 
     protected $casts = [
         'fiscal_year' => 'integer',
+        'staff_id' => 'integer',
         'division_id' => 'integer',
         'mooe_allocation' => 'decimal:2',
         'capital_outlay_allocation' => 'decimal:2',
         'ninp_allocation' => 'decimal:2',
     ];
+
+    // Assigned staff or office
+    public function staff(): BelongsTo
+    {
+        return $this->belongsTo(
+            Staff::class,
+            'staff_id'
+        );
+    }
 
     // Assigned division
     public function division(): BelongsTo
@@ -32,6 +44,15 @@ class FinancialPlanAllocation extends Model
         return $this->belongsTo(
             Division::class,
             'division_id'
+        );
+    }
+
+    // Generic allocation amounts
+    public function items(): HasMany
+    {
+        return $this->hasMany(
+            FinancialPlanAllocationItem::class,
+            'financial_plan_allocation_id'
         );
     }
 }

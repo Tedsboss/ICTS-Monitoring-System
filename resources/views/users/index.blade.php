@@ -1,669 +1,1689 @@
-@php
-  $class_theme = session('user_settings.class_theme', '');
-@endphp
 @extends('layouts.app')
 
 @section('content')
-  <!-- Navbar -->
-  <nav class="navbar navbar-main navbar-expand-lg  px-0 mx-4 shadow-none border-radius-xl z-index-sticky " id="navbarBlur" data-scroll="false">
-    <div class="container-fluid py-1 px-3">
-      @include('layouts.navbars.auth.topnav', ['title' => 'Users'])
-      @include('layouts.navbars.auth.topnav-withdatetime')
-    </div>
-  </nav>
-  <!-- End Navbar -->
 
-  <div class="container-fluid">
-    <div class="row mt-4">
-      <div class="col-12">
-        <div class="card">
-          <div class="card-header d-flex justify-content-between">
-            <div class="d-flex align-items-center">
-              <h5 class="mb-0">Users Management</h5>
+<style>
+
+    */ User Management V2 */
+
+    .direk-users-shell { margin-top: 0.5rem; }
+
+    .direk-users-card { border: 1px solid #e2e8f0; border-radius: 18px; background: #fff; box-shadow: 0 10px 30px rgba(15,23,42,.08); overflow: hidden; }
+
+    .direk-users-toolbar { padding: 1.25rem 1.5rem; border-bottom: 1px solid #e2e8f0; background: linear-gradient(180deg,#fff 0%,#f8fafc 100%); }
+
+    .direk-user-count { display:inline-flex; align-items:center; min-height:26px; padding:0 10px; border-radius:999px; background:#e0f2fe; color:#0369a1; font-size:12px; font-weight:700; }
+
+    .direk-users-table-wrap { padding: 0.5rem 1.25rem 1.25rem; overflow-x:auto; }
+
+    #usersTable { border-collapse: separate !important; border-spacing: 0 !important; }
+
+    #usersTable thead th { background:#f8fafc; border-bottom:1px solid #e2e8f0 !important; color:#64748b; font-size:11px; font-weight:800; letter-spacing:.06em; padding:13px 12px !important; white-space:nowrap; }
+
+    #usersTable tbody td { border-bottom:1px solid #f1f5f9 !important; color:#475569; font-size:13px; padding:14px 12px !important; vertical-align:middle; }
+
+    #usersTable tbody tr:hover td { background:#f8fafc; }
+
+    #usersTable tbody tr:last-child td { border-bottom:0 !important; }
+
+    .direk-user-cell { display:flex; align-items:center; gap:10px; min-width:190px; }
+
+    .direk-user-initials { width:36px; height:36px; flex:0 0 36px; display:inline-flex; align-items:center; justify-content:center; border-radius:10px; background:#e0f2fe; color:#0369a1; font-size:12px; font-weight:800; letter-spacing:.02em; }
+
+    .direk-user-name { color:#0f172a; font-weight:700; line-height:1.25; white-space:nowrap; }
+
+    .direk-role-badge { display:inline-flex; align-items:center; border-radius:999px; padding:5px 9px; background:#f1f5f9; color:#334155; font-size:11px; font-weight:700; line-height:1.2; }
+
+    .direk-role-badge.is-admin { background:#ede9fe; color:#6d28d9; }
+
+    .direk-role-badge.is-director { background:#dbeafe; color:#1d4ed8; }
+
+    .direk-role-badge.is-staff { background:#dcfce7; color:#15803d; }
+
+    #usersTable td:last-child { white-space:nowrap; min-width:86px; }
+
+    #usersTable td:last-child a, #usersTable td:last-child button { display:inline-flex !important; align-items:center; justify-content:center; width:32px; height:32px; margin:0 2px; border-radius:8px; transition:.15s ease; }
+
+    #usersTable td:last-child a:hover, #usersTable td:last-child button:hover { background:#f1f5f9; transform:translateY(-1px); }
+
+    #usersTable_wrapper .dataTables_length, #usersTable_wrapper .dataTables_filter { margin: 0.75rem 0; color:#64748b; font-size:12px; }
+
+    #usersTable_wrapper .dataTables_filter input { min-width:230px; border:1px solid #cbd5e1; border-radius:10px; padding:8px 11px; outline:none; background:#fff; }
+
+    #usersTable_wrapper .dataTables_filter input:focus { border-color:#0ea5e9; box-shadow:0 0 0 3px rgba(14,165,233,.12); }
+
+    #usersTable_wrapper .dataTables_length select { border:1px solid #cbd5e1; border-radius:9px; padding:6px 28px 6px 9px; background:#fff; }
+
+    #usersTable_wrapper .dataTables_info { color:#64748b; font-size:12px; padding-top:1rem; }
+
+    #usersTable_wrapper .dataTables_paginate { padding-top:.75rem; }
+
+    @media (max-width: 900px) { .direk-users-table-wrap { padding-left:.75rem; padding-right:.75rem; } #usersTable_wrapper .dataTables_filter input { min-width:170px; } }
+
+</style>
+
+<nav
+
+    class="navbar navbar-main navbar-expand-lg px-0 mx-4 shadow-none border-radius-xl z-index-sticky"
+
+    id="navbarBlur"
+
+    data-scroll="false"
+
+>
+
+    <div class="container-fluid py-2 px-3">
+
+        @include('layouts.navbars.auth.topnav', ['title' => 'User Management'])
+
+        @include('layouts.navbars.auth.topnav-withdatetime')
+
+    </div>
+
+</nav>
+
+<div class="px-4 pb-8 pt-4">
+
+    <div class="direk-users-shell">
+
+        {{-- Validation Errors --}}
+
+        @if ($errors->any())
+
+            <div class="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+
+                <div class="flex items-start gap-3">
+
+                    <i class="fa fa-exclamation-circle mt-0.5"></i>
+
+                    <div>
+
+                        <p class="font-semibold">Please review the information below.</p>
+
+                        <ul class="mt-2 list-disc space-y-1 pl-5">
+
+                            @foreach ($errors->all() as $error)
+
+                                <li>{{ $error }}</li>
+
+                            @endforeach
+
+                        </ul>
+
+                    </div>
+
+                </div>
+
             </div>
-            <div class="text-end ms-auto">
-              @can('create', App\Models\User::class)
-                <button type="button" data-bs-toggle="tooltip" data-bs-original-title="Add New User" class="btn btn-xs btn-dark mb-0" onclick="showUser()">
-                  <i class="fa fa-plus pe-2"></i> User
+
+        @endif
+
+        <div class="direk-users-card">
+
+            <div class="direk-users-toolbar">
+
+                <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+
+                    <div>
+
+                        <div class="flex flex-wrap items-center gap-2">
+
+                            <h1 class="text-xl font-bold text-slate-900">User Management</h1>
+
+                            <span id="userCountBadge" class="direk-user-count">Users</span>
+
+                        </div>
+
+                        <p class="mt-1 text-sm text-slate-500">
+
+                            Manage DIREK accounts, office assignments, and access roles.
+
+                        </p>
+
+                    </div>
+
+                    <button type="button" id="btnAddUser"
+
+                        class="inline-flex items-center justify-center gap-2 rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700">
+
+                        <i class="fa fa-plus"></i>
+
+                        <span>Add User</span>
+
+                    </button>
+
+                </div>
+
+            </div>
+
+            <div class="direk-users-table-wrap">
+
+                <table id="usersTable" class="min-w-full" style="width: 100%;">
+
+                    <thead>
+
+                        <tr>
+
+                            <th>Name</th>
+
+                            <th>Email</th>
+
+                            <th>Staff / Office</th>
+
+                            <th>Division</th>
+
+                            <th>Position</th>
+
+                            <th>Role</th>
+
+                            <th class="text-center">Actions</th>
+
+                        </tr>
+
+                    </thead>
+
+                    <tbody></tbody>
+
+                </table>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="mt-6">
+
+        @include('layouts.footers.auth.footer')
+
+    </div>
+
+</div>
+
+{{-- User Modal --}}
+
+<div
+
+    id="userModal"
+
+    class="fixed inset-0 z-[1055] hidden overflow-y-auto bg-slate-900/50 p-4"
+
+    aria-hidden="true"
+
+>
+
+    <div class="flex min-h-full items-start justify-center py-8">
+
+        <div
+
+            class="w-full max-w-4xl overflow-hidden rounded-2xl bg-white shadow-2xl"
+
+            role="dialog"
+
+            aria-modal="true"
+
+            aria-labelledby="userModalTitle"
+
+        >
+
+            {{-- Modal Header --}}
+
+            <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+
+                <div>
+
+                    <h2
+
+                        id="userModalTitle"
+
+                        class="text-lg font-bold text-slate-900"
+
+                    >
+
+                        Add User
+
+                    </h2>
+
+                    <p
+
+                        id="userModalSubtitle"
+
+                        class="mt-1 text-xs text-slate-500"
+
+                    >
+
+                        Create a new DIREK user account.
+
+                    </p>
+
+                </div>
+
+                <button
+
+                    type="button"
+
+                    id="btnCloseUserModal"
+
+                    class="inline-flex h-9 w-9 items-center justify-center
+
+                           rounded-lg text-slate-500 transition hover:bg-slate-100
+
+                           hover:text-slate-800"
+
+                    aria-label="Close"
+
+                >
+
+                    <i class="fa fa-times"></i>
+
                 </button>
-              @endcan
-            </div>
-          </div>
 
-          <div class="card-body p-3">
-            <div class="table-responsive">
-              <table class="table table-bordered table-hover" id="datatable-users" cellspacing="0" width="100%" style="width:100%">
-                <thead class="thead-light">
-                  <tr>
-                    <th class="text-uppercase text-center text-secondary text-xxs font-weight-bolder opacity-7 p-2">
-                      Photo
-                    </th>
-                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 p-2">
-                      Name
-                    </th>
-                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 p-2">
-                      Staff
-                    </th>
-                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 p-2">
-                      Agency
-                    </th>
-                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 p-2">
-                      Email
-                    </th>
-                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 p-2">
-                      Designation
-                    </th>
-                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 p-2">
-                      Role
-                    </th>
-                    <th class="text-uppercase text-center text-secondary text-xxs font-weight-bolder opacity-7 p-2">
-                      Action
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                </tbody>
-              </table>
             </div>
 
-          </div>
-        </div>
-      </div>
-    </div>
-    @include('layouts.footers.auth.footer')
-  </div>
+            {{-- User Form --}}
 
-  <form method="post" id="frmUser" autocomplete="off" enctype="multipart/form-data" class="form-horizontal">
-    @csrf
-    @method('post')
-    <div class="modal fade" id="user-modal" style="display: none" tabindex="-1" user="dialog" hidden>
-      <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content {{ isset($class_theme) && $class_theme == 'dark' ? 'bg-default' : '' }}">
-          <div class="modal-header">
-            <h5 class="h5 modal-title" id="h5userTitle"></h5>
-            <div hidden>
-              <input name="userTitle" id="userTitle" value="{{ old('userTitle') }}"/>
-              <input name="userAction" id="userAction" value="{{ old('userAction') }}"/>
-              <input name="userMethod" id="userMethod" value="{{ old('userMethod') }}"/>
-              <input name="userAvatar" id="userAvatar" value="{{ old('userAvatar') }}"/>
-            </div>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-          </div>
-          <div class="pt-2 modal-body">
-            <div class="multisteps-form__content">
-              <div class="row">
-                <div class="col-4">
-                  <input type="file" name="avatar" id="file-input" accept="image/*" class="d-none" onchange="updateavatar()">
-                  <div class="avatar position-relative" style="height: auto !important; width: auto !important;">
-                    <label for="file-input" class="btn btn-sm btn-icon-only bg-gradient-light position-absolute bottom-0 end-0 mb-n2 me-n2">
-                      <i class="fa fa-pencil top-0" data-bs-toggle="tooltip" data-bs-placement="top" title="" aria-hidden="true" data-bs-original-title="Edit Image" aria-label="Edit Image"></i>
-                      <span class="sr-only">Edit Image</span>
-                    </label>
-                    <span class="h-12 w-12 rounded-full overflow-hidden bg-gray-100">
-                      <img id="avatar-preview" alt="..." class="w-100 border-radius-lg shadow-sm" src="/assets/img/default-avatar.jpg">
-                    </span>
-                  </div>
-                  @error('avatar')<p class='text-danger text-xs pt-1'> {{ $message }} </p>@enderror
-                </div>
-                <div class="col-8">
-                  <div class="row">
-                    <div class="col-12">
-                      <label class="form-label">First Name <span class="text-danger">*</span></label>
-                      <div class="input-group">
-                        <input id="firstname" name="firstname" class="form-control" type="text" value="{{ old('firstname') }}" placeholder="First Name">
-                      </div>
-                      @error('firstname')<p class='text-danger text-xs pt-1'> {{ $message }} </p>@enderror
-                    </div>
-                  </div>
-                  <div class="row mt-3">
-                    <div class="col-12">
-                      <label class="form-label">Middle Name</label>
-                      <div class="input-group">
-                        <input id="middlename" name="middlename" class="form-control" type="text" value="{{ old('middlename') }}" placeholder="Middle Name">
-                      </div>
-                      @error('middlename')<p class='text-danger text-xs pt-1'> {{ $message }} </p>@enderror
-                    </div>
-                  </div>
-                  <div class="row mt-3">
-                    <div class="col-12">
-                      <label class="form-label">Last Name <span class="text-danger">*</span></label>
-                      <div class="input-group">
-                        <input id="lastname" name="lastname" class="form-control" type="text" value="{{ old('lastname') }}" placeholder="Last Name">
-                      </div>
-                      @error('lastname')<p class='text-danger text-xs pt-1'> {{ $message }} </p>@enderror
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div class="row mt-3">
+            <form
 
-                <div class="col-4">
-                  <label class="form-label">Email <span class="text-danger">*</span></label>
-                  <div class="input-group">
-                    <input id="email" name="email" class="form-control" type="email" value="{{ old('email') }}" placeholder="example@email.com">
-                  </div>
-                  @error('email')<p class='text-danger text-xs pt-1'> {{ $message }} </p>@enderror
-                </div>
+                id="userForm"
 
-                
-                    <div class="col-4">
-                      <label class="form-label">Birth Date</label>
-                      <div class="input-group">
-                        <input id="birthday" name="birthday" class="form-control" type="date" value="{{ old('birthday') }}" placeholder="Birth Date">
-                      </div>
-                      @error('birthday')<p class='text-danger text-xs pt-1'> {{ $message }} </p>@enderror
-                    </div>
-                    <div class="col-4">
-                      <label class="form-label">Gender</label>
-                      <select name="gender" id="gender" placeholder="Gender" autocomplete="off" class="hide-search">
-                        <option value="">Gender</option>
-                        <option value="Male" {{ old('gender') == 'Male' ? 'selected' : '' }}>Male</option>
-                        <option value="Female" {{ old('gender') == 'Female' ? 'selected' : '' }}>Female</option>
-                      </select>
-                      @error('gender')<p class='text-danger text-xs pt-1'> {{ $message }} </p>@enderror
-                    </div>
+                method="POST"
 
+                action="{{ route('users.store') }}"
 
-                <div class="col-12">
-                  <label class="form-label">Agency <span class="text-danger">*</span></label>
-                  <select name="agency_id" id="agency_id" placeholder="Agency" autocomplete="off" onchange="updateNedaFields()">
-                    <option value="">Agency</option>
-                    @foreach ($agencies as $agency)
-                      <option value="{{ $agency->id }}" @if (old('agency_id') == $agency->id) selected @endif>{{ $agency->display_name }}</option>
-                    @endforeach
-                  </select>
-                  @error('agency_id')<p class='text-danger text-xs pt-1'> {{ $message }} </p>@enderror
-                </div>
-              </div>
-              <div class="row mt-3">
-                <div class="col-6">
-                  <label class="form-label">Role <span class="text-danger">*</span></label>
-                  <select name="role_id" id="role_id" placeholder="Role" autocomplete="off" class="hide-search" >
-                    <option value="">Role</option>
-                    @foreach ($roles as $role)
-                      <option value="{{ $role->id }}" @if (old('role_id') == $role->id) selected @endif>{{ $role->name }}</option>
-                    @endforeach
-                  </select>
-                  @error('role_id')<p class='text-danger text-xs pt-1'> {{ $message }} </p>@enderror
-                </div>
-                <div class="col-6" id="divPositionId" hidden>
-                  <label class="form-label">Position <span class="text-danger">*</span></label>
-                  <select name="position_id" id="position_id" placeholder="Position" autocomplete="off">
-                    <option value="">Position</option>
-                    @foreach ($positions as $position)
-                      <option value="{{ $position->id }}" @if (old('position_id') == $position->id) selected @endif>{{ $position->name }}</option>
-                    @endforeach
-                  </select>
-                  @error('position_id')<p class='text-danger text-xs pt-1'> {{ $message }} </p>@enderror
-                </div>
-              </div>
+            >
 
-              <div class="row mt-3">
-                <div class="col-6" id="divStaffId" hidden>
-                  <label class="form-label">Staff/Region <span class="text-danger">*</span></label>
-                  <select name="staff_id" id="staff_id" placeholder="Staff" autocomplete="off" onchange="ocStaff()">
-                    <option value="">Staff</option>
-                    @php $old_office_id = null; @endphp
-                    @foreach ($staffs as $staff)
-                      @php
-                        $staff_office_id = $staff->office_id;
-                        $office_label = 'Central Office';
-                        if ($staff->office_id != 1) {
-                          $staff_office_id = 2;
-                          $office_label = 'Regional Office';
-                        }
-                      @endphp
-                      @if ($old_office_id != $staff_office_id)
-                        @if ($old_office_id != null)
-                          </optgroup>
-                        @endif
-                        <optgroup label="{{ $office_label }}">
-                      @endif
-                      <option value="{{ $staff->id }}" @if (old('staff_id') == $staff->id) selected @endif>{{ $staff->name . ' (' . $staff->abbreviation . ')' }}</option>
-                      @php $old_office_id = $staff_office_id; @endphp
-                    @endforeach
-                    </optgroup>
-                  </select>
-                  @error('staff_id')<p class='text-danger text-xs pt-1'> {{ $message }} </p>@enderror
-                </div>
-                <div class="col-6" id="divDivisionId" hidden>
-                  <label class="form-label">Division <span class="text-danger">*</span></label>
-                  <select name="division_id" id="division_id" placeholder="Division" autocomplete="off">
-                    <option value="">Division</option>
-                    @foreach ($divisions as $division)
-                      <option value="{{ $division->id }}" data-name="{{ $division->name }}" data-abbreviation="{{ $division->abbreviation }}" @if (old('division_id') == $division->id) selected @endif>{{ $division->name . ' (' . $division->abbreviation . ')' }}</option>
-                    @endforeach
-                  </select>
-                  @error('division_id')<p class='text-danger text-xs pt-1'> {{ $message }} </p>@enderror
-                </div>
-              </div>
-              <div class="row mt-3">
-                <div class="col-6">
-                  <label class="form-label">Office Location</label>
-                  <div class="input-group">
-                    <input id="location" name="location" class="form-control" type="text" value="{{ old('location') }}" placeholder="Location">
-                  </div>
-                  @error('location')<p class='text-danger text-xs pt-1'> {{ $message }} </p>@enderror
-                </div>
-                <div class="col-6">
-                  <label class="form-label">Phone Number <span class="text-danger">*</span></label>
-                  <div class="input-group">
-                    <input id="phone" name="phone" class="form-control" type="text" value="{{ old('phone') }}" placeholder="+63 901 567 8910" required>
-                  </div>
-                  @error('phone')<p class='text-danger text-xs pt-1'> {{ $message }} </p>@enderror
-                </div>
-              </div>
-              <div class="row mt-3">
-                <div class="col-6">
-                  <label class="form-label">Password <span id="spanNP" class="text-danger">*</span></label>
-                  <div class="input-group">
-                    <input id="new-password" name="new-password" value="{{ old('new-password') }}" class="form-control" type="password" placeholder="Password">
-                  </div>
-                  @error('new-password') <p class='text-danger text-xs pt-1'> {{ $message }} </p>@enderror
-                </div>
-                <div class="col-6">
-                  <label class="form-label">Confirm Password <span id="spanCP" class="text-danger">*</span></label>
-                  <div class="input-group">
-                    <input id="confirm-password" name="confirm-password" class="form-control" type="password" placeholder="Confirm Password">
-                  </div>
-                  @error('confirm-password') <p class='text-danger text-xs pt-1'> {{ $message }} </p>@enderror
-                </div>
-              </div>
+                @csrf
 
-              <div class="row mx-2 my-3" id="divAdditionalSettings">
-                <ul class="list-group">
-                  <div class="accordion" id="accordionRental">
+                <input
 
-                    <div class="accordion-item mb-3">
-                      <h5 class="accordion-header" id="headingAcSecurity">
-                        <button style="font-size: 1rem !important;" data-bs-target="#collapseAcSecurity" aria-controls="collapseAcSecurity" aria-expanded="false" data-bs-toggle="collapse" class="accordion-button border-bottom font-weight-bold" type="button" >
-                          Security and Settings
-                          <i class="collapse-open fa fa-minus text-xs pt-1 position-absolute end-0 me-3"></i>
-                          <i class="collapse-close fa fa-plus text-xs pt-1 position-absolute end-0 me-3"></i>
-                        </button>
-                      </h5>
-                      <div id="collapseAcSecurity" data-bs-parent="#accordionRental" class="accordion-collapse collapse" aria-labelledby="headingAcSecurity">
-                        <div class="accordion-body">
-                          @include('users.components.settings', ['user' => null])
+                    type="hidden"
+
+                    name="_method"
+
+                    id="userFormMethod"
+
+                    value="POST"
+
+                >
+
+                <input
+                    type="hidden"
+                    name="_editing_user_id"
+                    id="editingUserId"
+                    value=""
+                >
+
+                <div class="max-h-[72vh] overflow-y-auto p-5">
+
+                    {{-- Account Information --}}
+
+                    <section class="mb-6">
+
+                        <div class="mb-4">
+
+                            <h3 class="text-sm font-bold uppercase tracking-wide text-slate-800">
+
+                                Account Information
+
+                            </h3>
+
+                            <p class="mt-1 text-xs text-slate-500">
+
+                                Basic information used to identify the DIREK user.
+
+                            </p>
+
                         </div>
-                      </div>
-                    </div>
 
-                    <div class="accordion-item mb-3" id="divAcSession">
-                      <h5 class="accordion-header" id="headingAcSession">
-                        <button style="font-size: 1rem !important;" data-bs-target="#collapseAcSession" aria-controls="collapseAcSession" aria-expanded="false" data-bs-toggle="collapse" class="accordion-button border-bottom font-weight-bold" type="button" >
-                          Trusted Devices
-                          <i class="collapse-open fa fa-minus text-xs pt-1 position-absolute end-0 me-3"></i>
-                          <i class="collapse-close fa fa-plus text-xs pt-1 position-absolute end-0 me-3"></i>
-                        </button>
-                      </h5>
-                      <div id="collapseAcSession" data-bs-parent="#accordionRental" class="accordion-collapse collapse" aria-labelledby="headingAcSession">
-                        <div class="accordion-body">
-                          @include('users.components.sessions', ['user' => null])
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+
+                            <div>
+
+                                <label
+
+                                    for="firstname"
+
+                                    class="mb-1.5 block text-sm font-semibold text-slate-700"
+
+                                >
+
+                                    First Name
+
+                                    <span class="text-rose-500">*</span>
+
+                                </label>
+
+                                <input
+
+                                    type="text"
+
+                                    id="firstname"
+
+                                    name="firstname"
+
+                                    required
+
+                                    maxlength="255"
+
+                                    autocomplete="given-name"
+
+                                    class="block w-full rounded-lg border border-slate-300
+
+                                           bg-white px-3 py-2.5 text-sm text-slate-700
+
+                                           shadow-sm outline-none transition
+
+                                           focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+
+                                >
+
+                            </div>
+
+                            <div>
+
+                                <label
+
+                                    for="middlename"
+
+                                    class="mb-1.5 block text-sm font-semibold text-slate-700"
+
+                                >
+
+                                    Middle Name
+
+                                </label>
+
+                                <input
+
+                                    type="text"
+
+                                    id="middlename"
+
+                                    name="middlename"
+
+                                    maxlength="255"
+
+                                    autocomplete="additional-name"
+
+                                    class="block w-full rounded-lg border border-slate-300
+
+                                           bg-white px-3 py-2.5 text-sm text-slate-700
+
+                                           shadow-sm outline-none transition
+
+                                           focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+
+                                >
+
+                            </div>
+
+                            <div>
+
+                                <label
+
+                                    for="lastname"
+
+                                    class="mb-1.5 block text-sm font-semibold text-slate-700"
+
+                                >
+
+                                    Last Name
+
+                                    <span class="text-rose-500">*</span>
+
+                                </label>
+
+                                <input
+
+                                    type="text"
+
+                                    id="lastname"
+
+                                    name="lastname"
+
+                                    required
+
+                                    maxlength="255"
+
+                                    autocomplete="family-name"
+
+                                    class="block w-full rounded-lg border border-slate-300
+
+                                           bg-white px-3 py-2.5 text-sm text-slate-700
+
+                                           shadow-sm outline-none transition
+
+                                           focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+
+                                >
+
+                            </div>
+
+                            <div>
+
+                                <label
+
+                                    for="email"
+
+                                    class="mb-1.5 block text-sm font-semibold text-slate-700"
+
+                                >
+
+                                    Email Address
+
+                                    <span class="text-rose-500">*</span>
+
+                                </label>
+
+                                <input
+
+                                    type="email"
+
+                                    id="email"
+
+                                    name="email"
+
+                                    required
+
+                                    maxlength="255"
+
+                                    autocomplete="email"
+
+                                    class="block w-full rounded-lg border border-slate-300
+
+                                           bg-white px-3 py-2.5 text-sm text-slate-700
+
+                                           shadow-sm outline-none transition
+
+                                           focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+
+                                >
+
+                            </div>
+
                         </div>
-                      </div>
-                    </div>
 
-                  </div>
-                </ul>
-              </div>
+                    </section>
 
-            </div>
-            <div class="text-center pt-4">
-              <button class="m-1 btn btn-primary" type="button" id="btnSave" data-toggle="modal" onclick="ocSubmit()">
-                Save
-              </button>
-              <button class="m-1 btn btn-primary" type="button" id="btnSaveDisabled" disabled hidden>
-                <span class="spinner-grow spinner-grow-sm" user="status" aria-hidden="true"></span>
-                Saving...
-              </button>
-            </div>
-          </div>
+                    <hr class="mb-6 border-slate-200">
+
+                    {{-- Organizational Assignment --}}
+
+                    <section class="mb-6">
+
+                        <div class="mb-4">
+
+                            <h3 class="text-sm font-bold uppercase tracking-wide text-slate-800">
+
+                                Organizational Assignment
+
+                            </h3>
+
+                            <p class="mt-1 text-xs text-slate-500">
+
+                                Assign the user's agency, staff/office, division, and position.
+
+                            </p>
+
+                        </div>
+
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+
+                            <div>
+
+                                <label
+
+                                    for="agency_id"
+
+                                    class="mb-1.5 block text-sm font-semibold text-slate-700"
+
+                                >
+
+                                    Agency
+
+                                    <span class="text-rose-500">*</span>
+
+                                </label>
+
+                                <select
+
+                                    id="agency_id"
+
+                                    name="agency_id"
+
+                                    required
+
+                                    class="block w-full rounded-lg border border-slate-300
+
+                                           bg-white px-3 py-2.5 text-sm text-slate-700
+
+                                           shadow-sm outline-none transition
+
+                                           focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+
+                                >
+
+                                    <option value="">
+
+                                        Select Agency
+
+                                    </option>
+
+                                    @foreach ($agencies as $agency)
+
+                                        <option value="{{ $agency->id }}">
+
+                                            {{ $agency->display_name }}
+
+                                        </option>
+
+                                    @endforeach
+
+                                </select>
+
+                            </div>
+
+                            <div id="staffField">
+
+                                <label
+
+                                    for="staff_id"
+
+                                    class="mb-1.5 block text-sm font-semibold text-slate-700"
+
+                                >
+
+                                    Staff / Office
+
+                                    <span class="text-rose-500">*</span>
+
+                                </label>
+
+                                <select
+
+                                    id="staff_id"
+
+                                    name="staff_id"
+
+                                    class="block w-full rounded-lg border border-slate-300
+
+                                           bg-white px-3 py-2.5 text-sm text-slate-700
+
+                                           shadow-sm outline-none transition
+
+                                           focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+
+                                >
+
+                                    <option value="">
+
+                                        Select Staff / Office
+
+                                    </option>
+
+                                    @foreach ($staffs as $staff)
+
+                                        <option value="{{ $staff->id }}">
+
+                                            {{ $staff->name }}
+
+                                            @if ($staff->abbreviation)
+
+                                                ({{ $staff->abbreviation }})
+
+                                            @endif
+
+                                        </option>
+
+                                    @endforeach
+
+                                </select>
+
+                            </div>
+
+                            <div id="divisionField">
+
+                                <label
+
+                                    for="division_id"
+
+                                    class="mb-1.5 block text-sm font-semibold text-slate-700"
+
+                                >
+
+                                    Division
+
+                                    <span class="text-rose-500">*</span>
+
+                                </label>
+
+                                <select
+
+                                    id="division_id"
+
+                                    name="division_id"
+
+                                    class="block w-full rounded-lg border border-slate-300
+
+                                           bg-white px-3 py-2.5 text-sm text-slate-700
+
+                                           shadow-sm outline-none transition
+
+                                           focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+
+                                >
+
+                                    <option value="">
+
+                                        Select Division
+
+                                    </option>
+
+                                    @foreach ($divisions as $division)
+
+                                        <option
+
+                                            value="{{ $division->id }}"
+
+                                            data-staff-id="{{ $division->staff_id }}"
+
+                                        >
+
+                                            {{ $division->name }}
+
+                                        </option>
+
+                                    @endforeach
+
+                                </select>
+
+                            </div>
+
+                            <div>
+
+                                <label
+
+                                    for="position_id"
+
+                                    class="mb-1.5 block text-sm font-semibold text-slate-700"
+
+                                >
+
+                                    Position
+
+                                </label>
+
+                                <select
+
+                                    id="position_id"
+
+                                    name="position_id"
+
+                                    class="block w-full rounded-lg border border-slate-300
+
+                                           bg-white px-3 py-2.5 text-sm text-slate-700
+
+                                           shadow-sm outline-none transition
+
+                                           focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+
+                                >
+
+                                    <option value="">
+
+                                        Select Position
+
+                                    </option>
+
+                                    @foreach ($positions as $position)
+
+                                        <option value="{{ $position->id }}">
+
+                                            {{ $position->name }}
+
+                                        </option>
+
+                                    @endforeach
+
+                                </select>
+
+                            </div>
+
+                        </div>
+
+                    </section>
+
+                    <hr class="mb-6 border-slate-200">
+
+                    {{-- DIREK Access --}}
+
+                    <section class="mb-6">
+
+                        <div class="mb-4">
+
+                            <h3 class="text-sm font-bold uppercase tracking-wide text-slate-800">
+
+                                DIREK Access
+
+                            </h3>
+
+                            <p class="mt-1 text-xs text-slate-500">
+
+                                Role determines what actions the user is authorized to perform.
+
+                            </p>
+
+                        </div>
+
+                        <div>
+
+                            <label
+
+                                for="role_id"
+
+                                class="mb-1.5 block text-sm font-semibold text-slate-700"
+
+                            >
+
+                                Role
+
+                                <span class="text-rose-500">*</span>
+
+                            </label>
+
+                            <select
+
+                                id="role_id"
+
+                                name="role_id"
+
+                                required
+
+                                class="block w-full rounded-lg border border-slate-300
+
+                                       bg-white px-3 py-2.5 text-sm text-slate-700
+
+                                       shadow-sm outline-none transition
+
+                                       focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+
+                            >
+
+                                <option value="">
+
+                                    Select DIREK Role
+
+                                </option>
+
+                                @foreach ($roles as $role)
+
+                                    <option value="{{ $role->id }}">
+
+                                        {{ $role->name }}
+
+                                    </option>
+
+                                @endforeach
+
+                            </select>
+
+                            <p class="mt-2 text-xs text-slate-500">
+
+                                Staff/Office controls which records the user can access.
+
+                                Role controls what the user can do with those records.
+
+                            </p>
+
+                        </div>
+
+                    </section>
+
+                    <hr class="mb-6 border-slate-200">
+
+                    {{-- Password --}}
+
+                    <section>
+
+                        <div class="mb-4">
+
+                            <h3 class="text-sm font-bold uppercase tracking-wide text-slate-800">
+
+                                Password
+
+                            </h3>
+
+                            <p
+
+                                id="passwordHelp"
+
+                                class="mt-1 text-xs text-slate-500"
+
+                            >
+
+                                Set the initial password for this account.
+
+                            </p>
+
+                        </div>
+
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+
+                            <div>
+
+                                <label
+
+                                    for="new-password"
+
+                                    class="mb-1.5 block text-sm font-semibold text-slate-700"
+
+                                >
+
+                                    New Password
+
+                                    <span
+
+                                        id="passwordRequired"
+
+                                        class="text-rose-500"
+
+                                    >*</span>
+
+                                </label>
+
+                                <input
+
+                                    type="password"
+
+                                    id="new-password"
+
+                                    name="new-password"
+
+                                    minlength="6"
+
+                                    autocomplete="new-password"
+
+                                    class="block w-full rounded-lg border border-slate-300
+
+                                           bg-white px-3 py-2.5 text-sm text-slate-700
+
+                                           shadow-sm outline-none transition
+
+                                           focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+
+                                >
+
+                            </div>
+
+                            <div>
+
+                                <label
+
+                                    for="confirm-password"
+
+                                    class="mb-1.5 block text-sm font-semibold text-slate-700"
+
+                                >
+
+                                    Confirm Password
+
+                                    <span
+
+                                        id="confirmPasswordRequired"
+
+                                        class="text-rose-500"
+
+                                    >*</span>
+
+                                </label>
+
+                                <input
+
+                                    type="password"
+
+                                    id="confirm-password"
+
+                                    name="confirm-password"
+
+                                    minlength="6"
+
+                                    autocomplete="new-password"
+
+                                    class="block w-full rounded-lg border border-slate-300
+
+                                           bg-white px-3 py-2.5 text-sm text-slate-700
+
+                                           shadow-sm outline-none transition
+
+                                           focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+
+                                >
+
+                            </div>
+
+                        </div>
+
+                    </section>
+
+                </div>
+
+                {{-- Modal Footer --}}
+
+                <div
+
+                    class="flex flex-col-reverse gap-3 border-t border-slate-200
+
+                           bg-slate-50 px-5 py-4 sm:flex-row sm:justify-end"
+
+                >
+
+                    <button
+
+                        type="button"
+
+                        id="btnCancelUser"
+
+                        class="inline-flex items-center justify-center rounded-lg
+
+                               border border-slate-300 bg-white px-5 py-2.5
+
+                               text-sm font-semibold text-slate-700 shadow-sm
+
+                               transition hover:bg-slate-50"
+
+                    >
+
+                        Cancel
+
+                    </button>
+
+                    <button
+
+                        type="submit"
+
+                        class="inline-flex items-center justify-center gap-2 rounded-lg
+
+                               bg-sky-600 px-5 py-2.5 text-sm font-semibold
+
+                               text-white shadow-sm transition hover:bg-sky-700"
+
+                    >
+
+                        <i class="fa fa-save"></i>
+
+                        <span id="btnSaveUserText">
+
+                            Save User
+
+                        </span>
+
+                    </button>
+
+                </div>
+
+            </form>
+
         </div>
-      </div>
+
     </div>
-  </form>
+
+</div>
 
 @endsection
 
 @push('js')
-  @include('users.components.scripts')
-  <script>
-    var divisions = @php echo json_encode($divisions) @endphp;
-    var depDevAgencyIds = @json($depDevAgencyIds);
 
-    initTomSelect('agency_id', true);
-    initTomSelect('gender');
-    initTomSelect('role_id');
-    initTomSelect('staff_id', false);
+<script>
 
-    $customRender = {
-      option: function(data, escape) {
-        return `<div>
-                      <span class="title">${escape(data.name)}</span>
-                      <span class="title"> (${escape(data.abbreviation)})</span>
-                    </div>`;
-      },
-      item: function(data, escape) {
-        return `<div>${escape(data.name)} (${escape(data.abbreviation)})</div>`;
-      }
-    };
-    initTomSelect('division_id', true, false, false, null, null, $customRender);
-    initTomSelect('position_id', true);
+document.addEventListener('DOMContentLoaded', function () {
 
-    var table = null;
-    var newAction = "{{ route('users.store') }}";
-    var dummyImage = "";
+    const storeUrl = @json(route('users.store'));
 
-    $(document).ready(function() {
-      dtName = 'datatable-users';
-      createColumnSearch(dtName, [0, 7], [4, 5]);
-      table = $('#' + dtName).DataTable({
-        ajax: getAjaxConfig("{{ route('getusers') }}", "{{ csrf_token() }}"),
-        stateSave: true,
-        stateLoadParams: function(settings, data) {
-          setupStateLoadParams(dtName, data)
-        },
-        searchDelay: 500,
-        serverSide: true,
-        processing: true,
-        columns:[
-          { data: 'photo' },
-          { data: 'fullname' },
-          { data: 'staff', name: 'staff.name' },
-          { data: 'agency', name: 'agency.UACS_AGY_DSC' },
-          { data: 'email' },
-          { data: 'designation', name: 'position.name' },
-          { data: 'role', name: 'role.name' },
-          { data: 'actions' },
-        ],
-        columnDefs: [
-          { targets: [0], className: "text-sm2 text-center font-weight-normal text-truncate align-middle mnw-40 mxw-60", orderable: false, searchable: false },
-          { targets: [1], className: "text-sm2 font-weight-normal text-truncate align-middle mnw-140 mxw-160" },
-          { targets: [2], className: "text-sm2 font-weight-normal text-truncate align-middle mnw-140 mxw-160" },
-          { targets: [3], className: "text-sm2 font-weight-normal text-truncate align-middle mnw-180 mxw-220" },
-          { targets: [4], className: "text-sm2 font-weight-normal text-truncate align-middle mnw-140 mxw-140" },
-          { targets: [5], className: "text-sm2 text-center font-weight-normal text-truncate align-middle mnw-100 mxw-120" },
-          { targets: [6], className: "text-sm2 text-center font-weight-normal text-truncate align-middle mnw-80 mxw-100" },
-          { targets: [7], className: "text-sm2 text-center text-truncate align-middle mnw-60 mxw-80", orderable: false, searchable: false },
-        ],
-        order: [[1, 'asc']],
-        pagingType: "full_numbers",
-        lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "All"]],
-        responsive: false,
-        language: getLanguageConfig('User'),
-        initComplete : function(settings, json){
-          setupInitComplete(table, dtName, 1);
-        }
-      });
-      setupKeyUpColumnSearch(table, dtName);
+    const getUsersUrl = @json(route('getusers'));
 
-      @if($errors->any())
-        $('#h5userTitle').text($('#userTitle').val());
-        $('input[name="_method"]').val($('#userMethod').val());
-        $('#frmUser').attr('action', $('#userAction').val());
+    const csrfToken = @json(csrf_token());
 
-        updateNedaFields();
-        $("#divAcSession").attr("hidden", true);
-        if ($('#userMethod').val() == 'put') {
-          generateTDTable(@php echo json_encode(old('trustedDevice'), JSON_HEX_APOS); @endphp);
-          $("#divAcSession").attr("hidden", false);
-        }
-        
-        $("#user-modal").attr("hidden", false);
-        $("#user-modal").modal("show");
-      @endif
-    });
+    const depDevAgencyIds = @json(collect($depDevAgencyIds)->values()->all());
 
-    $('#datatable-users').on('draw.dt', function() {
-      refreshToolTip();
-    });
+    const modal = document.getElementById('userModal');
 
-    function ocSubmit() {
-      $("#btnSave").attr("hidden", true);
-      $("#btnSaveDisabled").attr("hidden", false);
-      $("#frmUser").submit();
-    }
+    const form = document.getElementById('userForm');
 
-    function showUser(myData = [], myAction = '', myPhoto = '/assets/img/default-avatar.jpg') {
-      removeAllElementError();
-      if (myData.length == 0) {
-        $('#userTitle').val('New User');
-        $('#userMethod').val('post');
-        $('#userAction').val(newAction);
+    const formMethod = document.getElementById('userFormMethod');
+    const editingUserId = document.getElementById('editingUserId');
 
-        $('#firstname').val('');
-        $('#middlename').val('');
-        $('#lastname').val('');
-        $('#birthday').val('');
-        $('#designation').val('');
-        $('#email').val('');
-        $('#phone').val('');
+    const modalTitle = document.getElementById('userModalTitle');
 
-        $('#usec_lastname').val('');
-        $('#usec_firstname').val('');
-        $('#usec_middlename').val('');
-        $('#usec_designation').val('');
-        $('#usec_email').val('');
-        $('#usec_phone').val('');
-        $('#director_lastname').val('');
-        $('#director_firstname').val('');
-        $('#director_middlename').val('');
-        $('#director_designation').val('');
-        $('#director_email').val('');
-        $('#director_phone').val('');
+    const modalSubtitle = document.getElementById('userModalSubtitle');
 
-        $('#division').val('');
-        $('#unit').val('');
-        $('#location').val('');
-        $('#new-password').val('');
-        $('#confirm-password').val('');
+    const passwordHelp = document.getElementById('passwordHelp');
 
-        tomSelects['agency_id'].setValue('');
-        tomSelects['gender'].setValue('');
-        // tomSelects['emailnotif'].setValue('');
-        tomSelects['role_id'].setValue('');
-        
-        tomSelects['staff_id'].setValue('');
-        tomSelects['position_id'].setValue('');
-        tomSelects['division_id'].setValue('');
+    const passwordRequired = document.getElementById('passwordRequired');
 
-        $("#spanNP").attr("hidden", false);
-        $("#spanCP").attr("hidden", false);
-        // $("#divAdditionalSettings").attr("hidden", true);
+    const confirmPasswordRequired = document.getElementById('confirmPasswordRequired');
 
-        $('#enabledark').prop('checked', false);
-        $('#autohidecharts').prop('checked', false);
-        $('#emailnotif').prop('checked', true);
-        $('#twofactor').prop('checked', true);
-        $('#twofactortype_email').prop('checked', true);
-        $('#twofactortype_sms').prop('checked', false);
-        $('#twofactortype_auth_app').prop('checked', false);
-        $('#pEmail').text('');
-        $('#pSMS').text('');
-        $('#pAuthApp').text('Microsoft Authenticator');
+    const newPassword = document.getElementById('new-password');
 
-        generateTDTable([]);
-        $("#divAcSession").attr("hidden", true);
-      } else {
-        $('#userTitle').val('Edit User : ' + myData.email);
-        $('#userMethod').val('put');
-        $('#userAction').val(myAction);
+    const confirmPassword = document.getElementById('confirm-password');
 
-        $('#firstname').val(myData.firstname);
-        $('#middlename').val(myData.middlename);
-        $('#lastname').val(myData.lastname);
-        $('#birthday').val(myData.birthday);
-        $('#designation').val(myData.designation);
-        $('#email').val(myData.email);
-        $('#phone').val(myData.phone);
+    const agencySelect = document.getElementById('agency_id');
 
-        $('#usec_lastname').val(myData.usec_lastname);
-        $('#usec_firstname').val(myData.usec_firstname);
-        $('#usec_middlename').val(myData.usec_middlename);
-        $('#usec_designation').val(myData.usec_designation);
-        $('#usec_email').val(myData.usec_email);
-        $('#usec_phone').val(myData.usec_phone);
-        $('#director_lastname').val(myData.director_lastname);
-        $('#director_firstname').val(myData.director_lastname);
-        $('#director_middlename').val(myData.director_middlename);
-        $('#director_designation').val(myData.director_designation);
-        $('#director_email').val(myData.director_email);
-        $('#director_phone').val(myData.director_phone);
+    const staffSelect = document.getElementById('staff_id');
 
-        $('#division').val(myData.division);
-        $('#unit').val(myData.unit);
-        $('#location').val(myData.location);
-        $('#new-password').val('');
-        $('#confirm-password').val('');
+    const divisionSelect = document.getElementById('division_id');
 
-        tomSelects['agency_id'].setValue(myData.agency_id);
-        tomSelects['gender'].setValue(myData.gender);
-        // tomSelects['emailnotif'].setValue(myData.emailnotif);
-        tomSelects['role_id'].setValue(myData.role_id);
-        
-        tomSelects['staff_id'].setValue(myData.staff_id);
-        tomSelects['position_id'].setValue(myData.position_id);
-        tomSelects['division_id'].setValue(myData.division_id);
+    const staffField = document.getElementById('staffField');
 
-        $("#spanNP").attr("hidden", true);
-        $("#spanCP").attr("hidden", true);
-        // $("#divAdditionalSettings").attr("hidden", false);
+    const divisionField = document.getElementById('divisionField');
 
-        $('#enabledark').prop('checked', (myData.enabledark == 'Y' ? true : false));
-        $('#autohidecharts').prop('checked', (myData.autohidecharts == 'Y' ? true : false));
-        $('#emailnotif').prop('checked', (myData.emailnotif == 'Y' ? true : false));
-        $('#twofactor').prop('checked', (myData.twofactor == 'Y' ? true : false));
-        $('#twofactortype_email').prop('checked', (myData.twofactortype == 'Email' ? true : false));
-        $('#twofactortype_sms').prop('checked', false);
-        $('#twofactortype_auth_app').prop('checked', false);
-        $('#pEmail').text(myData.email);
-        $('#pSMS').text(myData.phone);
-        $('#pAuthApp').text('Microsoft Authenticator');
-        
-        generateTDTable(myData.trusted_devices);
-        $("#divAcSession").attr("hidden", false);
-      }
-      ocTwoFactor();
-      updateNedaFields();
+    // Keep original Division options for Staff/Office filtering.
 
-      $('#old_avatar').val(myPhoto);
-      $('#avatar-preview').attr('src', myPhoto);
+    const divisionOptions = Array.from(divisionSelect.options)
 
-      $('#h5userTitle').text($('#userTitle').val());
-      $('input[name="_method"]').val($('#userMethod').val());
-      $('#frmUser').attr('action', $('#userAction').val());
-      $("#user-modal").attr("hidden", false);
-      $("#user-modal").modal("show");
-    }
+        .slice(1)
 
-    function generateTDTable(myTrustedDevices) {
-      $('#tbodyTrustedDevices').empty();
-      $.each(myTrustedDevices, function (key, value) {
-        badge_color = '';
-        revoke_btn = ``;
-        location_rem = ``;
-        if (value.status == 'Revoked') {
-          badge_color = 'danger';
-        } else if (value.status == 'Expired') {
-          badge_color = 'warning';
-        } else {
-          badge_color = 'success';
-          revoke_btn = `<a data-bs-toggle="tooltip" data-bs-original-title="Revoke" class="border-0 bg-transparent px-1" href="/user-profile/${value.id}"><i class="fa fa-close text-danger"></i></a>`;
-        }
-        if (value.location_city == null || value.location_city == '') {
+        .map(function (option) {
 
-        } else {
-          location_rem = ` - near ${value.location_city}`;
-        }
-        $('#tbodyTrustedDevices').append(`
-          <tr>
-            <td class="ps-1">
-              <div class="my-auto">
-                <span class="text-sm d-block text-sm">${value.device_name}${location_rem}</span>
-                <input name="trustedDevice[${key}][id]" value="${value.id}" hidden>
-                <input name="trustedDevice[${key}][device_name]" value="${value.device_name}" hidden>
-                <input name="trustedDevice[${key}][location_city]" value="${value.location_city ?? ''}" hidden>
-              </div>
-            </td>
-            <td class="ps-1">
-              <div class="text-center">
-                <span class="d-block text-sm">${value.ip}</span>
-                <input name="trustedDevice[${key}][ip]" value="${value.ip}" hidden>
-              </div>
-            </td>
-            <td class="ps-1">
-              <div class="text-center">
-                <span class="d-block text-sm">${value.last_seen_at}</span>
-                <input name="trustedDevice[${key}][last_seen_at]" value="${value.last_seen_at}" hidden>
-              </div>
-            </td>
-            <td class="ps-1">
-              <div class="text-center">
-                <span class="badge badge-${badge_color} badge-sm my-auto ms-auto">${value.status}</span>
-                <input name="trustedDevice[${key}][status]" value="${value.status}" hidden>
-              </div>
-            </td>
-            <td class="ps-1">
-              <div class="text-center">${revoke_btn}</div>
-            </td>
-          </tr>
-        `);
-      });
-      refreshToolTip();
-    }
+            return {
 
-    function updateavatar() {
-      var reader = new FileReader();
-      reader.onload = function (e) {
-        $('#avatar-preview').attr('src', e.target.result);
-      };
-      reader.readAsDataURL($('#file-input').prop('files')[0]);
-    }
+                value: option.value,
 
-    function updateNedaFields() {
-      $("#divPositionId").attr("hidden", false);
-      if (depDevAgencyIds.includes(String($('#agency_id').val()))) {
-        $("#divDivisionId").attr("hidden", false);
-        $("#divStaffId").attr("hidden", false);
-        ocStaff();
-      } else {
-        $("#divDivisionId").attr("hidden", true);
-        $("#divStaffId").attr("hidden", true);
-        tomSelects['staff_id'].setValue('');
-        tomSelects['division_id'].setValue('');
-        tomSelects['division_id'].clearOptions();
-      }
-    }
+                text: option.textContent.trim(),
 
-    
-    function ocStaff() {
-      let old_division_id = $('#division_id').val();
+                staffId: option.dataset.staffId || ''
 
-      tomSelects['division_id'].clear();
-      tomSelects['division_id'].clearOptions();
-      if ($('#staff_id').val() == '' || $('#staff_id').val() == null) {
-      } else {
-        let newOptions = [];
-        let filteredobjects = divisions.filter(item => item.staff_id == $('#staff_id').val());
-        let hit = 0;
-        $.each(filteredobjects, function (key, value) {
-          newOptions.push({
-            value: value.id.toString(),
-            text: value.name + ' (' + value.abbreviation + ')',
-            name: value.name,
-            abbreviation: value.abbreviation,
-          });
-          if (value.id == old_division_id) {
-            hit = 1;
-          }
+            };
+
         });
-        tomSelects['division_id'].addOptions(newOptions); 
-        if (hit == 1) {
-          tomSelects['division_id'].setValue(old_division_id);
-        }
-      }
-      // tomSelects['division_id'].refreshOptions();
+
+    function isDepDevAgency(agencyId) {
+
+        return depDevAgencyIds
+
+            .map(String)
+
+            .includes(String(agencyId || ''));
+
     }
-  </script>
+
+    function openModal() {
+
+        modal.classList.remove('hidden');
+
+        modal.setAttribute('aria-hidden', 'false');
+
+        document.body.classList.add('overflow-hidden');
+
+    }
+
+    function closeModal() {
+
+        modal.classList.add('hidden');
+
+        modal.setAttribute('aria-hidden', 'true');
+
+        document.body.classList.remove('overflow-hidden');
+
+    }
+
+    function resetForm() {
+
+        form.reset();
+
+        form.action = storeUrl;
+
+        formMethod.value = 'POST';
+        editingUserId.value = '';
+
+        modalTitle.textContent = 'Add User';
+
+        modalSubtitle.textContent =
+
+            'Create a new DIREK user account.';
+
+        document.getElementById('btnSaveUserText').textContent =
+
+            'Save User';
+
+        passwordHelp.textContent =
+
+            'Set the initial password for this account.';
+
+        passwordRequired.classList.remove('hidden');
+
+        confirmPasswordRequired.classList.remove('hidden');
+
+        newPassword.required = true;
+
+        confirmPassword.required = true;
+
+        updateAgencyFields();
+
+        filterDivisions('');
+
+    }
+
+    function updateAgencyFields() {
+
+        const requiresOrganization =
+
+            isDepDevAgency(agencySelect.value);
+
+        staffField.classList.toggle(
+
+            'hidden',
+
+            !requiresOrganization
+
+        );
+
+        divisionField.classList.toggle(
+
+            'hidden',
+
+            !requiresOrganization
+
+        );
+
+        staffSelect.required = requiresOrganization;
+
+        divisionSelect.required = requiresOrganization;
+
+        if (!requiresOrganization) {
+
+            staffSelect.value = '';
+
+            divisionSelect.value = '';
+
+            filterDivisions('');
+
+        }
+
+    }
+
+    function filterDivisions(selectedDivisionId = '') {
+
+        const selectedStaffId =
+
+            String(staffSelect.value || '');
+
+        divisionSelect.innerHTML =
+
+            '<option value="">Select Division</option>';
+
+        divisionOptions.forEach(function (option) {
+
+            if (
+
+                selectedStaffId !== '' &&
+
+                String(option.staffId) === selectedStaffId
+
+            ) {
+
+                const newOption =
+
+                    document.createElement('option');
+
+                newOption.value = option.value;
+
+                newOption.textContent = option.text;
+
+                if (
+
+                    selectedDivisionId !== '' &&
+
+                    String(option.value) ===
+
+                        String(selectedDivisionId)
+
+                ) {
+
+                    newOption.selected = true;
+
+                }
+
+                divisionSelect.appendChild(newOption);
+
+            }
+
+        });
+
+    }
+
+    function setFieldValue(id, value) {
+
+        const field = document.getElementById(id);
+
+        if (!field) {
+
+            return;
+
+        }
+
+        field.value =
+
+            value === null || value === undefined
+
+                ? ''
+
+                : String(value);
+
+    }
+
+    // Add User.
+
+    document
+
+        .getElementById('btnAddUser')
+
+        .addEventListener('click', function () {
+
+            resetForm();
+
+            openModal();
+
+        });
+
+    // Close User modal.
+
+    document
+
+        .getElementById('btnCloseUserModal')
+
+        .addEventListener('click', closeModal);
+
+    document
+
+        .getElementById('btnCancelUser')
+
+        .addEventListener('click', closeModal);
+
+    // Close when clicking outside modal card.
+
+    modal.addEventListener('click', function (event) {
+
+        if (event.target === modal) {
+
+            closeModal();
+
+        }
+
+    });
+
+    // Close modal with Escape.
+
+    document.addEventListener('keydown', function (event) {
+
+        if (
+
+            event.key === 'Escape' &&
+
+            !modal.classList.contains('hidden')
+
+        ) {
+
+            closeModal();
+
+        }
+
+    });
+
+    agencySelect.addEventListener('change', function () {
+
+        updateAgencyFields();
+
+        filterDivisions('');
+
+    });
+
+    staffSelect.addEventListener('change', function () {
+
+        filterDivisions('');
+
+    });
+
+    // Called by the Edit button returned by UserController@getusers.
+
+    window.showUser = function (user, updateUrl) {
+
+        form.reset();
+
+        form.action = updateUrl;
+
+        formMethod.value = 'PUT';
+        editingUserId.value = String(user.id || '');
+
+        modalTitle.textContent = 'Edit User';
+
+        modalSubtitle.textContent =
+
+            'Update the DIREK account and organizational assignment.';
+
+        document.getElementById('btnSaveUserText').textContent =
+
+            'Save Changes';
+
+        passwordHelp.textContent =
+
+            'Leave both password fields blank to keep the current password.';
+
+        passwordRequired.classList.add('hidden');
+
+        confirmPasswordRequired.classList.add('hidden');
+
+        newPassword.required = false;
+
+        confirmPassword.required = false;
+
+        setFieldValue(
+
+            'firstname',
+
+            user.firstname
+
+        );
+
+        setFieldValue(
+
+            'middlename',
+
+            user.middlename
+
+        );
+
+        setFieldValue(
+
+            'lastname',
+
+            user.lastname
+
+        );
+
+        setFieldValue(
+
+            'email',
+
+            user.email
+
+        );
+
+        setFieldValue(
+
+            'agency_id',
+
+            user.agency_id
+
+        );
+
+        updateAgencyFields();
+
+        setFieldValue(
+
+            'staff_id',
+
+            user.staff_id
+
+        );
+
+        filterDivisions(
+
+            user.division_id === null ||
+
+            user.division_id === undefined
+
+                ? ''
+
+                : String(user.division_id)
+
+        );
+
+        setFieldValue(
+
+            'position_id',
+
+            user.position_id
+
+        );
+
+        setFieldValue(
+
+            'role_id',
+
+            user.role_id
+
+        );
+
+        openModal();
+
+    };
+
+    function escapeHtml(value) {
+
+        return String(value ?? '')
+
+            .replace(/&/g, '&amp;')
+
+            .replace(/</g, '&lt;')
+
+            .replace(/>/g, '&gt;')
+
+            .replace(/"/g, '&quot;')
+
+            .replace(/'/g, '&#039;');
+
+    }
+
+    function userInitials(name) {
+
+        const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+
+        if (!parts.length) return 'U';
+
+        return ((parts[0][0] || '') + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase();
+
+    }
+
+    function roleBadge(data) {
+
+        const wrapper = document.createElement('div');
+
+        wrapper.innerHTML = data || '';
+
+        const text = (wrapper.textContent || '').trim();
+
+        const normalized = text.toLowerCase();
+
+        let modifier = '';
+
+        if (normalized === 'super admin') modifier = ' is-admin';
+
+        else if (normalized === 'director') modifier = ' is-director';
+
+        else if (normalized === 'planning and finance staff') modifier = ' is-staff';
+
+        return '<span class="direk-role-badge' + modifier + '">' + escapeHtml(text || '—') + '</span>';
+
+    }
+
+    // DIREK User Management DataTable.
+
+    const table = $('#usersTable').DataTable({
+
+        processing: true,
+
+        serverSide: true,
+
+        responsive: true,
+
+        autoWidth: false,
+
+        ajax: {
+
+            url: getUsersUrl,
+
+            type: 'POST',
+
+            headers: {
+
+                'X-CSRF-TOKEN': csrfToken
+
+            }
+
+        },
+
+        order: [
+
+            [1, 'asc']
+
+        ],
+
+        columns: [
+
+            {
+
+                data: 'fullname',
+
+                name: 'fullname',
+
+                orderable: false
+
+            },
+
+            {
+
+                data: 'email',
+
+                name: 'email'
+
+            },
+
+            {
+
+                data: 'staff',
+
+                name: 'staff.name',
+
+                defaultContent: ''
+
+            },
+
+            {
+
+                data: 'division',
+
+                name: 'division.name',
+
+                defaultContent: ''
+
+            },
+
+            {
+
+                data: 'designation',
+
+                name: 'position.name',
+
+                defaultContent: ''
+
+            },
+
+            {
+
+                data: 'role',
+
+                name: 'role.name',
+
+                defaultContent: ''
+
+            },
+
+            {
+
+                data: 'actions',
+
+                name: 'actions',
+
+                orderable: false,
+
+                searchable: false,
+
+                className: 'text-center'
+
+            }
+
+        ]
+
+    });
+
+    table.on('draw', function () {
+
+        const info = table.page.info();
+
+        const badge = document.getElementById('userCountBadge');
+
+        if (badge) {
+
+            badge.textContent = info.recordsDisplay + (info.recordsDisplay === 1 ? ' User' : ' Users');
+
+        }
+
+    });
+
+    table.draw(false);
+
+    // Re-open the correct modal after validation failure.
+    @if ($errors->any())
+        @php
+            $editingUserId = old('_editing_user_id');
+        @endphp
+
+        @if ($editingUserId)
+            form.reset();
+            form.action = @json(url('/administrator/users')) + '/' + @json($editingUserId);
+            formMethod.value = 'PUT';
+            editingUserId.value = @json($editingUserId);
+
+            modalTitle.textContent = 'Edit User';
+            modalSubtitle.textContent =
+                'Update the DIREK account and organizational assignment.';
+            document.getElementById('btnSaveUserText').textContent =
+                'Save Changes';
+
+            passwordHelp.textContent =
+                'Leave both password fields blank to keep the current password.';
+            passwordRequired.classList.add('hidden');
+            confirmPasswordRequired.classList.add('hidden');
+            newPassword.required = false;
+            confirmPassword.required = false;
+        @else
+            resetForm();
+        @endif
+
+        setFieldValue('firstname', @json(old('firstname')));
+        setFieldValue('middlename', @json(old('middlename')));
+        setFieldValue('lastname', @json(old('lastname')));
+        setFieldValue('email', @json(old('email')));
+        setFieldValue('agency_id', @json(old('agency_id')));
+
+        updateAgencyFields();
+
+        setFieldValue('staff_id', @json(old('staff_id')));
+
+        filterDivisions(
+            @json(old('division_id'))
+                ? String(@json(old('division_id')))
+                : ''
+        );
+
+        setFieldValue('position_id', @json(old('position_id')));
+        setFieldValue('role_id', @json(old('role_id')));
+
+        openModal();
+    @endif
+
+});
+
+</script>
+
 @endpush

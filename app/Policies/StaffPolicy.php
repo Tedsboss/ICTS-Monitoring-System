@@ -4,67 +4,62 @@ namespace App\Policies;
 
 use App\Models\Staff;
 use App\Models\User;
-use Illuminate\Auth\Access\Response;
 
 class StaffPolicy
 {
-  /**
-   * Determine whether the user can view any models.
-   */
-  public function viewAny(User $user): bool
-  {
-    return $user->isSuperAdmin() || $user->role->permissions->whereIn('id', [35, 36, 37])->count() > 0;
-  }
+    /**
+     * Determine whether the user can view any staff records.
+     */
+    public function viewAny(User $user): bool
+    {
+        return $user->isSuperAdmin();
+    }
 
-  /**
-   * Determine whether the user can view the model.
-   */
-  public function view(User $user, Staff $staff): bool
-  {
-    //
-    return $user->isSuperAdmin() || $user->role->permissions->whereIn('id', [35, 36, 37])->count() > 0;
-  }
+    /**
+     * Determine whether the user can view a staff record.
+     */
+    public function view(User $user, Staff $staff): bool
+    {
+        return $user->isSuperAdmin();
+    }
 
-  /**
-   * Determine whether the user can create models.
-   */
-  public function create(User $user): bool
-  {
-    //
-    return $user->isSuperAdmin() || $user->role->permissions->whereIn('id', [35, 36, 37])->count() > 0;
-  }
+    /**
+     * Determine whether the user can create staff records.
+     */
+    public function create(User $user): bool
+    {
+        return $user->isSuperAdmin();
+    }
 
-  /**
-   * Determine whether the user can update the model.
-   */
-  public function update(User $user, Staff $staff): bool
-  {
-    //
-    return $user->isSuperAdmin() || $user->role->permissions->whereIn('id', [35, 36, 37])->count() > 0;
-  }
+    /**
+     * Determine whether the user can update a staff record.
+     */
+    public function update(User $user, Staff $staff): bool
+    {
+        return $user->isSuperAdmin();
+    }
 
-  /**
-   * Determine whether the user can delete the model.
-   */
-  public function delete(User $user, Staff $staff): bool
-  {
-    //
-    return $user->isSuperAdmin() || $user->role->permissions->whereIn('id', [35, 36, 37])->count() > 0;
-  }
+    /**
+     * Determine whether the user can delete a staff record.
+     */
+    public function delete(User $user, Staff $staff): bool
+    {
+        return $user->isSuperAdmin();
+    }
 
-  /**
-   * Determine whether the user can restore the model.
-   */
-  public function restore(User $user, Staff $staff): bool
-  {
-    //
-  }
+    /**
+     * Determine whether the user can restore a staff record.
+     */
+    public function restore(User $user, Staff $staff): bool
+    {
+        return false;
+    }
 
-  /**
-   * Determine whether the user can permanently delete the model.
-   */
-  public function forceDelete(User $user, Staff $staff): bool
-  {
-    //
-  }
+    /**
+     * Determine whether the user can permanently delete a staff record.
+     */
+    public function forceDelete(User $user, Staff $staff): bool
+    {
+        return false;
+    }
 }

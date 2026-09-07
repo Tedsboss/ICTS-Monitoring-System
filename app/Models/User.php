@@ -53,13 +53,13 @@ class User extends Authenticatable
         'role_id' => 'integer',
     ];
 
-    // Always encrypt the password when it is updated
+    // Always hash the password when it is updated.
     public function setPasswordAttribute($value): void
     {
         $this->attributes['password'] = bcrypt($value);
     }
 
-    // Avatar URL
+    // Avatar URL.
     public function avatarUrl(): string
     {
         if (
@@ -77,14 +77,16 @@ class User extends Authenticatable
         return $this->avatarUrl();
     }
 
-    // Full display name
+    // Full display name.
     public function getFullNameAttribute(): string
     {
         $parts = [
             trim((string) $this->firstname),
+
             $this->middlename
                 ? mb_substr(trim((string) $this->middlename), 0, 1) . '.'
                 : null,
+
             trim((string) $this->lastname),
         ];
 
@@ -93,6 +95,7 @@ class User extends Authenticatable
             ->implode(' ');
     }
 
+    // DIREK access role.
     public function role()
     {
         return $this->belongsTo(Role::class);
@@ -103,22 +106,26 @@ class User extends Authenticatable
         return (int) $this->role_id === 1;
     }
 
+    // User belongs to a DepDev Staff/Office.
     public function isDepDevStaff(): bool
     {
         return Agency::isDepDevId($this->agency_id)
             && ! empty($this->staff_id);
     }
 
+    // DIREK Staff/Office access scope.
     public function staff()
     {
         return $this->belongsTo(Staff::class);
     }
 
+    // Organizational metadata.
     public function division()
     {
         return $this->belongsTo(Division::class);
     }
 
+    // Organizational position/designation.
     public function position()
     {
         return $this->belongsTo(Position::class);
@@ -134,6 +141,13 @@ class User extends Authenticatable
         return optional($this->staff)->name;
     }
 
+    // User agency.
+    public function agency()
+    {
+        return $this->belongsTo(Agency::class, 'agency_id');
+    }
+
+    // Existing legacy/application relationships.
     public function histories()
     {
         return $this->morphMany(History::class, 'model');
@@ -147,11 +161,6 @@ class User extends Authenticatable
     public function inquiries()
     {
         return $this->hasMany(Inquiry::class);
-    }
-
-    public function agency()
-    {
-        return $this->belongsTo(Agency::class, 'agency_id');
     }
 
     public function formSubmissions()
