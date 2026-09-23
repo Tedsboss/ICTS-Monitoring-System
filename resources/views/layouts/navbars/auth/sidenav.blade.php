@@ -431,6 +431,16 @@
                         </a>
                     </li>
                 @endif
+                @if ($canViewWorkPlan)
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('work-plans.*') ? 'active' : '' }}" href="{{ route('work-plans.plans') }}">
+                            <div class="icon icon-shape icon-sm text-center d-flex align-items-center justify-content-center">
+                                <i class="fa fa-tasks" aria-hidden="true"></i>
+                            </div>
+                            <span class="nav-link-text ms-1">Work Plans</span>
+                        </a>
+                    </li>
+                @endif
                 @if ($canManageFinancialPlanAllocationTypes)
                     <li class="nav-item">
                         <a
@@ -441,16 +451,6 @@
                                 <i class="fa fa-tags" aria-hidden="true"></i>
                             </div>
                             <span class="nav-link-text ms-1">Allocation Types</span>
-                        </a>
-                    </li>
-                @endif
-                                @if ($canViewWorkPlan)
-                    <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('work-plans.*') ? 'active' : '' }}" href="{{ route('work-plans.plans') }}">
-                            <div class="icon icon-shape icon-sm text-center d-flex align-items-center justify-content-center">
-                                <i class="fa fa-tasks" aria-hidden="true"></i>
-                            </div>
-                            <span class="nav-link-text ms-1">Work Plans</span>
                         </a>
                     </li>
                 @endif

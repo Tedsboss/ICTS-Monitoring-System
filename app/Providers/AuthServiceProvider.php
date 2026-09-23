@@ -9,6 +9,7 @@ use App\Models\Form;
 use App\Models\FormSubmission;
 use App\Models\Holiday;
 use App\Models\Inquiry;
+use App\Models\WorkPlan;
 use App\Models\UpliftPillar;
 use App\Models\UpliftSubmission;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
@@ -38,6 +39,7 @@ use App\Policies\ProcurementPolicy;
 use App\Policies\SaebPolicy;
 use App\Policies\StaffPolicy;
 use App\Policies\TrustedDevicePolicy;
+use App\Policies\WorkPlanPolicy;
 
 class AuthServiceProvider extends ServiceProvider
 {
@@ -46,26 +48,26 @@ class AuthServiceProvider extends ServiceProvider
    *
    * @var array<class-string, class-string>
    */
-protected $policies = [
-    User::class => UserPolicy::class,
-    Agency::class => AgencyPolicy::class,
-    Form::class => FormPolicy::class,
-    FormSubmission::class => FormSubmissionPolicy::class,
-    Role::class => RolePolicy::class,
-    RestrictedIp::class => RestrictedIpPolicy::class,
-    Parameter::class => ParameterPolicy::class,
-    Inquiry::class => InquiryPolicy::class,
-    Holiday::class => HolidayPolicy::class,
-    Staff::class => StaffPolicy::class,
-    Division::class => DivisionPolicy::class,
-    TrustedDevice::class => TrustedDevicePolicy::class,
-    UpliftPillar::class => UpliftPillarPolicy::class,
-    UpliftSubmission::class => UpliftSubmissionPolicy::class,
-
-    Saeb::class => SaebPolicy::class,
-    Procurement::class => ProcurementPolicy::class,
-    FinancialPlan::class => FinancialPlanPolicy::class,
-];
+    protected $policies = [
+        User::class => UserPolicy::class,
+        Agency::class => AgencyPolicy::class,
+        Form::class => FormPolicy::class,
+        FormSubmission::class => FormSubmissionPolicy::class,
+        Role::class => RolePolicy::class,
+        RestrictedIp::class => RestrictedIpPolicy::class,
+        Parameter::class => ParameterPolicy::class,
+        Inquiry::class => InquiryPolicy::class,
+        Holiday::class => HolidayPolicy::class,
+        Staff::class => StaffPolicy::class,
+        Division::class => DivisionPolicy::class,
+        TrustedDevice::class => TrustedDevicePolicy::class,
+        UpliftPillar::class => UpliftPillarPolicy::class,
+        UpliftSubmission::class => UpliftSubmissionPolicy::class,
+        Saeb::class => SaebPolicy::class,
+        Procurement::class => ProcurementPolicy::class,
+        FinancialPlan::class => FinancialPlanPolicy::class,
+        WorkPlan::class => WorkPlanPolicy::class,
+    ];
 
   /**
    * Register any authentication / authorization services.

@@ -9,6 +9,8 @@ use App\Models\Position;
 use App\Models\Role;
 use App\Models\Staff;
 use App\Models\User;
+use Illuminate\Database\Query\Builder;
+use Illuminate\Validation\Rule;
 use App\Traits\TracksHistoryTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -28,11 +30,7 @@ class UserController extends Controller
         // DIREK roles only.
         // Legacy roles remain in the database until existing users are reassigned.
         $roles = Role::query()
-            ->whereIn('name', [
-                'Super Admin',
-                'Director',
-                'Planning and Finance Staff',
-            ])
+            ->where('name', '!=', 'Super Admin')
             ->orderBy('name')
             ->get();
 

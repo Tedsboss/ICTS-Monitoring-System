@@ -37,6 +37,7 @@ class RoleController extends Controller
 
         // Financial Management
         'Financial Plan',
+        'Work Plan',
         'Allocation Type Management',
         'Procurement',
         'SAEB',
@@ -277,13 +278,27 @@ class RoleController extends Controller
     {
         $this->authorize('delete', [Role::class, $role]);
 
-        $role->permissions()->detach();
+        $usersCount = DB::table('users')
+            ->where('role_id', $role->id)
+            ->count();
 
-        $role->delete();
+        if ($usersCount > 0) {
+            return redirect()
+                ->route('roles.index')
+                ->with(
+                    'error',
+                    "Cannot delete role '{$role->name}'. It is currently assigned to {$usersCount} user(s). Reassign those users to another role first."
+                );
+        }
+
+        DB::transaction(function () use ($role) {
+            $role->permissions()->detach();
+            $role->delete();
+        });
 
         return redirect()
             ->route('roles.index')
-            ->with('succes', 'Role succesfully updated');
+            ->with('succes', 'Role successfully deleted');
     }
 
     /**

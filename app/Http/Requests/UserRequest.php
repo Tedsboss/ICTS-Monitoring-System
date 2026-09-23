@@ -10,12 +10,6 @@ use Illuminate\Validation\Rule;
 
 class UserRequest extends FormRequest
 {
-    // Roles that can be assigned through DIREK User Management.
-    private const DIREK_ROLES = [
-        'Super Admin',
-        'Director',
-        'Planning and Finance Staff',
-    ];
 
     /**
      * Determine if the user is authorized to make this request.
@@ -100,10 +94,7 @@ class UserRequest extends FormRequest
                 'integer',
                 Rule::exists((new Role())->getTable(), 'id')
                     ->where(function (Builder $query) {
-                        $query->whereIn(
-                            'name',
-                            self::DIREK_ROLES
-                        );
+                        $query->where('name', '!=', 'Super Admin');
                     }),
             ],
 

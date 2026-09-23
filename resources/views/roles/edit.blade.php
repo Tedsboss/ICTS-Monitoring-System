@@ -20,6 +20,7 @@
     // DIREK Financial Management modules
     $financialManagementModuleNames = [
         'Financial Plan',
+        'Work Plan',
         'Allocation Type Management',
         'Procurement',
         'SAEB',
@@ -54,7 +55,7 @@
         [
             'name' => 'Financial Management',
             'key' => 'financial-management',
-            'description' => 'Manage access to Financial Plan, Allocation Type Management, Procurement, and SAEB functions.',
+            'description' => 'Manage access to Financial Plan, Work Plan, Allocation Type Management, Procurement, and SAEB functions.',
             'icon' => 'fa fa-money',
             'modules' => $financialManagementModules,
         ],

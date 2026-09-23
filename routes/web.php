@@ -9,6 +9,7 @@ use App\Http\Controllers\AgencyController;
 use App\Http\Controllers\ApiClientController;
 use App\Http\Controllers\DivisionController;
 use App\Http\Controllers\FinancialPlanController;
+use App\Http\Controllers\WorkPlanController;
 use App\Http\Controllers\FinancialPlanAllocationTypeController;
 use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\HolidayController;
@@ -458,6 +459,32 @@ Route::group(['middleware' => 'check.restricted.ips'], function () {
 
             Route::get('financial-plans/status', [FinancialPlanController::class, 'status'])
                 ->name('financial-plans.status');
+
+            // Work Plan
+            Route::get('work-plans/all', [WorkPlanController::class, 'plans'])
+                ->name('work-plans.plans');
+            Route::get('work-plans', [WorkPlanController::class, 'index'])
+                ->name('work-plans.index');
+            Route::get('work-plans/data', [WorkPlanController::class, 'data'])
+                ->name('work-plans.data');
+            Route::get('work-plans/builder', [WorkPlanController::class, 'builder'])
+                ->name('work-plans.builder');
+            Route::post('work-plans/save', [WorkPlanController::class, 'save'])
+                ->name('work-plans.save');
+            Route::get('work-plans/{workPlan}/export-pdf', [WorkPlanController::class, 'exportPdf'])
+                ->name('work-plans.export-pdf');
+            Route::delete('work-plans/{workPlan}', [WorkPlanController::class, 'destroy'])
+                ->name('work-plans.destroy');
+            Route::post('work-plans/{workPlan}/submit', [WorkPlanController::class, 'submit'])
+                ->name('work-plans.submit');
+            Route::post('work-plans/{workPlan}/approve', [WorkPlanController::class, 'approve'])
+                ->name('work-plans.approve');
+            Route::post('work-plans/{workPlan}/return', [WorkPlanController::class, 'returnPlan'])
+                ->name('work-plans.return');
+            Route::post('work-plans/{workPlan}/finalize', [WorkPlanController::class, 'finalize'])
+                ->name('work-plans.finalize');
+            Route::post('work-plans/{workPlan}/reopen', [WorkPlanController::class, 'reopen'])
+                ->name('work-plans.reopen');
 
         });
       });
