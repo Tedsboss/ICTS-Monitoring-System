@@ -99,6 +99,11 @@
                     <div class="flex flex-wrap items-center gap-2">
                         <button type="button" class="builder-write-control add-row-button" data-row-type="header"><i class="fa fa-plus"></i> Section Header</button>
                         <button type="button" class="builder-write-control add-row-button" data-row-type="subheader"><i class="fa fa-plus"></i> Sub Header</button>
+                        @if($plan)
+                            <button type="button" id="btnSyncFinancialPlan" class="builder-write-control sync-button">
+                                <i class="fa fa-sync-alt"></i> Sync New FP Activities
+                            </button>
+                        @endif
                         <button type="button" id="btnSavePlan" class="builder-write-control save-button"><i class="fa fa-save"></i> Save Entire Plan</button>
                     </div>
                 </div>
@@ -124,7 +129,11 @@
                 <div class="mt-3 flex flex-wrap items-center gap-2">
                     <button type="button" class="builder-write-control add-row-button" data-row-type="header"><i class="fa fa-plus"></i> Section Header</button>
                     <button type="button" class="builder-write-control add-row-button" data-row-type="subheader"><i class="fa fa-plus"></i> Sub Header</button>
-                    <button type="button" class="builder-write-control add-row-button" data-row-type="item"><i class="fa fa-plus"></i> Budget Line</button>
+                    @if($plan)
+                        <button type="button" id="btnSyncFinancialPlanBottom" class="builder-write-control sync-button">
+                            <i class="fa fa-sync-alt"></i> Sync New FP Activities
+                        </button>
+                    @endif
                     <button type="button" id="btnSavePlanBottom" class="builder-write-control save-button ml-auto"><i class="fa fa-save"></i> Save Entire Plan</button>
                 </div>
             </section>
@@ -362,6 +371,29 @@
 .add-row-button:hover:not(:disabled) {
     background: #f8fafc;
 }
+
+.sync-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid #7dd3fc;
+    border-radius: 8px;
+    background: #f0f9ff;
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #0369a1;
+}
+
+.sync-button:hover:not(:disabled) {
+    background: #e0f2fe;
+}
+
+.sync-button:disabled {
+    cursor: not-allowed;
+    opacity: .5;
+}
+
 .save-button {
     display: inline-flex;
     align-items: center;
@@ -668,8 +700,15 @@ $(document).ready(function () {
 
     function addRow(type) {
         if (isLocked || isLoading) return;
-        if (type === 'item') $('#builderBody').append(itemRow({row_type:'item',targets:[]}));
-        else $('#builderBody').append(structuralRow({row_type:type,title:''}, type));
+        if (!['header', 'subheader'].includes(type)) return;
+
+        $('#builderBody').append(
+            structuralRow({
+                row_type: type,
+                title: ''
+            }, type)
+        );
+
         $('#emptyBuilderState').addClass('hidden');
         setDirty(true);
         $('#builderBody > tr').last().find('.builder-input').first().trigger('focus');
@@ -879,6 +918,51 @@ $(document).ready(function () {
             setLoading(false);
         });
     }
+
+    function syncFinancialPlan() {
+        if (isLocked || isLoading || !currentPlan?.id) return;
+
+        if (hasUnsavedChanges) {
+            showMessage('Save your current Work Plan changes before synchronizing with the Financial Plan.', 'warning');
+            return;
+        }
+
+        if (!window.confirm('Check the Financial Plan and add any new activities to this Work Plan? Existing Target Outputs and months will not be changed.')) {
+            return;
+        }
+
+        setLoading(true);
+
+        const syncUrl = '{{ $plan ? route("work-plans.sync-financial-plan", $plan) : "" }}';
+
+        $.ajax({
+            url: syncUrl,
+            method: 'POST',
+            data: {
+                _token: csrfToken
+            }
+        }).done(function (response) {
+            const addedCount = Number(response.added_count || 0);
+
+            if (addedCount > 0) {
+                hasUnsavedChanges = false;
+                window.location.reload();
+                return;
+            }
+
+            showMessage(
+                response.message || 'Work Plan is already synchronized with the Financial Plan.'
+            );
+        }).fail(function (xhr) {
+            showMessage(
+                getErrorMessage(xhr, 'Unable to synchronize the Financial Plan.'),
+                'danger'
+            );
+        }).always(function () {
+            setLoading(false);
+        });
+    }
+
     function loadPlan() 
     {
             const fiscalYear = Number($('#fiscalYear').val());
@@ -902,7 +986,11 @@ $(document).ready(function () {
     $('.add-row-button').on('click', function () {
         addRow(String($(this).data('row-type') || 'item'));
     });
+
     $('#btnSavePlan, #btnSavePlanBottom').on('click', savePlan);
+
+    $('#btnSyncFinancialPlan, #btnSyncFinancialPlanBottom').on('click', syncFinancialPlan);
+
     $('#btnLoadPlan').on('click', loadPlan);
     $('#builderBody').on('click', '.add-target', function () {
         if (isLocked) return;

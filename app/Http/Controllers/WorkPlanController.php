@@ -444,6 +444,143 @@ class WorkPlanController extends Controller
         ]);
     }
 
+    public function syncFinancialPlan(WorkPlan $workPlan): JsonResponse
+    {
+        $this->authorize('update', $workPlan);
+
+        if (! $workPlan->isEditable()) {
+            return $this->notEditableResponse();
+        }
+
+        $this->ensureStaffAccess((int) $workPlan->staff_id);
+
+        $financialPlanActivities = $this->financialPlanActivities(
+            (int) $workPlan->fiscal_year,
+            (int) $workPlan->staff_id,
+            $workPlan->division_id
+                ? (int) $workPlan->division_id
+                : null
+        );
+
+        if ($financialPlanActivities->isEmpty()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'No Financial Plan activities were found for this Work Plan.',
+                'added_count' => 0,
+            ]);
+        }
+
+        $existingItems = WorkPlanItem::query()
+            ->where('work_plan_id', $workPlan->id)
+            ->where('row_type', 'item')
+            ->get([
+                'financial_plan_id',
+                'program_classification',
+                'prexc_code',
+                'specific_activity',
+            ]);
+
+        $existingSourceIds = $existingItems
+            ->pluck('financial_plan_id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique();
+
+        $existingKeys = $existingItems
+            ->map(function ($item) {
+                return $this->financialPlanActivityKey(
+                    $item->program_classification,
+                    $item->prexc_code,
+                    $item->specific_activity
+                );
+            })
+            ->filter()
+            ->unique();
+
+        $missingActivities = $financialPlanActivities
+            ->filter(function ($activity) use (
+                $existingSourceIds,
+                $existingKeys
+            ) {
+                $financialPlanId = (int) (
+                    $activity['financial_plan_id'] ?? 0
+                );
+
+                if (
+                    $financialPlanId > 0
+                    && $existingSourceIds->contains($financialPlanId)
+                ) {
+                    return false;
+                }
+
+                $key = $this->financialPlanActivityKey(
+                    $activity['program_classification'] ?? null,
+                    $activity['prexc_code'] ?? null,
+                    $activity['specific_activity'] ?? null
+                );
+
+                return $key !== null
+                    && ! $existingKeys->contains($key);
+            })
+            ->values();
+
+        if ($missingActivities->isEmpty()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Work Plan is already synchronized with the Financial Plan.',
+                'added_count' => 0,
+            ]);
+        }
+
+        $addedCount = DB::transaction(function () use (
+            $workPlan,
+            $missingActivities
+        ) {
+            $maxSortOrder = (int) WorkPlanItem::query()
+                ->where('work_plan_id', $workPlan->id)
+                ->max('sort_order');
+
+            $addedCount = 0;
+
+            foreach ($missingActivities as $activity) {
+                $maxSortOrder += 10;
+
+                WorkPlanItem::create([
+                    'work_plan_id' => $workPlan->id,
+                    'financial_plan_id' => (int) $activity['financial_plan_id'],
+                    'parent_id' => null,
+                    'row_type' => 'item',
+                    'title' => null,
+                    'classification_id' => null,
+                    'program_classification' => $this->nullableTrim(
+                        $activity['program_classification'] ?? null
+                    ),
+                    'prexc_code' => $this->nullableTrim(
+                        $activity['prexc_code'] ?? null
+                    ),
+                    'specific_activity' => $this->nullableTrim(
+                        $activity['specific_activity'] ?? null
+                    ),
+                    'sort_order' => $maxSortOrder,
+                ]);
+
+                $addedCount++;
+            }
+
+            $workPlan->updated_by = auth()->id();
+            $workPlan->save();
+
+            return $addedCount;
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => $addedCount === 1
+                ? '1 new Financial Plan activity was added to the Work Plan.'
+                : $addedCount . ' new Financial Plan activities were added to the Work Plan.',
+            'added_count' => $addedCount,
+        ]);
+    }
     public function exportPdf(WorkPlan $workPlan)
     {
         $this->authorize('view', $workPlan);
@@ -1171,6 +1308,37 @@ class WorkPlanController extends Controller
             'success' => false,
             'message' => 'This Work Plan cannot be edited in its current status.',
         ], 403);
+    }
+
+    private function financialPlanActivityKey(
+        $programClassification,
+        $prexcCode,
+        $specificActivity
+    ): ?string {
+        $programClassification = mb_strtolower(
+            trim((string) $programClassification)
+        );
+
+        $prexcCode = mb_strtolower(
+            trim((string) $prexcCode)
+        );
+
+        $specificActivity = mb_strtolower(
+            trim((string) $specificActivity)
+        );
+
+        if (
+            $programClassification === ''
+            || $specificActivity === ''
+        ) {
+            return null;
+        }
+
+        return implode('|', [
+            $programClassification,
+            $prexcCode,
+            $specificActivity,
+        ]);
     }
 
     private function financialPlanActivities(
