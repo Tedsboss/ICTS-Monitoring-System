@@ -43,7 +43,7 @@
                     class="inline-flex items-center rounded-full border border-sky-200 bg-sky-50
                            px-3 py-1 text-xs font-semibold uppercase tracking-wide text-sky-700"
                 >
-                    Director's Integrated Reporting and Executive Kiosk
+                    DEPDev Integrated Reporting and Executive Kiosk
                 </span>
 
                 <p class="mt-6 text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">

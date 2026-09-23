@@ -1,17 +1,21 @@
 @php
     $isAdministratorRoute = request()->routeIs(
-        'users.*',
-        'roles.*',
-        'staffs.*',
-        'staff-personnel.*',
-        'divisions.*',
-        'parameters.*',
-        'systemlogs.*'
+        'users.\*',
+        'roles.\*',
+        'staffs.\*',
+        'staff-personnel.\*',
+        'divisions.\*',
+        'parameters.\*',
+        'systemlogs.\*'
     );
     $isProfileRoute = request()->routeIs('user-profile');
     $canViewFinancialPlan = auth()->user()->can(
         'viewAny',
         App\Models\FinancialPlan::class
+    );
+    $canViewWorkPlan = auth()->user()->can(
+        'viewAny',
+        App\Models\WorkPlan::class
     );
     $canManageFinancialPlanAllocationTypes =
         in_array((int) auth()->user()->role_id, [1, 29], true)
@@ -408,7 +412,7 @@
                     </span>
                 </a>
             </li>
-            @if ($canViewFinancialPlan || $canManageFinancialPlanAllocationTypes)
+            @if ($canViewFinancialPlan || $canViewWorkPlan || $canManageFinancialPlanAllocationTypes)
                 <li class="nav-item mt-4 mb-2">
                     <div class="direk-section-heading">
                         <span>Financial Management</span>
@@ -417,26 +421,36 @@
                 @if ($canViewFinancialPlan)
                     <li class="nav-item">
                         <a
-                            class="nav-link {{ request()->routeIs('financial-plans.*') ? 'active' : '' }}"
+                            class="nav-link {{ request()->routeIs('financial-plans.\*') ? 'active' : '' }}"
                             href="{{ route('financial-plans.plans') }}"
                         >
                             <div class="icon icon-shape icon-sm text-center d-flex align-items-center justify-content-center">
                                 <i class="fa fa-money" aria-hidden="true"></i>
                             </div>
-                            <span class="nav-link-text ms-1">Financial Plan</span>
+                            <span class="nav-link-text ms-1">Financial Plans</span>
                         </a>
                     </li>
                 @endif
                 @if ($canManageFinancialPlanAllocationTypes)
                     <li class="nav-item">
                         <a
-                            class="nav-link {{ request()->routeIs('financial-plan-allocation-types.*') ? 'active' : '' }}"
+                            class="nav-link {{ request()->routeIs('financial-plan-allocation-types.\*') ? 'active' : '' }}"
                             href="{{ route('financial-plan-allocation-types.index') }}"
                         >
                             <div class="icon icon-shape icon-sm text-center d-flex align-items-center justify-content-center">
                                 <i class="fa fa-tags" aria-hidden="true"></i>
                             </div>
                             <span class="nav-link-text ms-1">Allocation Types</span>
+                        </a>
+                    </li>
+                @endif
+                                @if ($canViewWorkPlan)
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('work-plans.*') ? 'active' : '' }}" href="{{ route('work-plans.plans') }}">
+                            <div class="icon icon-shape icon-sm text-center d-flex align-items-center justify-content-center">
+                                <i class="fa fa-tasks" aria-hidden="true"></i>
+                            </div>
+                            <span class="nav-link-text ms-1">Work Plans</span>
                         </a>
                     </li>
                 @endif
@@ -500,7 +514,7 @@
                                     <a
                                         class="nav-link
                                                {{ request()->routeIs(
-                                                    'users.*'
+                                                    'users.\*'
                                                )
                                                     ? 'active'
                                                     : '' }}"
@@ -528,7 +542,7 @@
                                     <a
                                         class="nav-link
                                                {{ request()->routeIs(
-                                                    'roles.*'
+                                                    'roles.\*'
                                                )
                                                     ? 'active'
                                                     : '' }}"
@@ -556,7 +570,7 @@
                                     <a
                                         class="nav-link
                                                {{ request()->routeIs(
-                                                    'staffs.*'
+                                                    'staffs.\*'
                                                )
                                                     ? 'active'
                                                     : '' }}"
@@ -576,8 +590,7 @@
                                     </a>
                                 </li>
                             @endcan
-                            {{-- Preserve legacy administrator***
-**                                 access until role 29 cleanup. --}}
+                            {{-- Preserve legacy administrator access until role 29 cleanup. --}}
                             @if (
                                 in_array(
                                     (int) auth()->user()->role_id,
@@ -589,7 +602,7 @@
                                     <a
                                         class="nav-link
                                                {{ request()->routeIs(
-                                                    'staff-personnel.*'
+                                                    'staff-personnel.\*'
                                                )
                                                     ? 'active'
                                                     : '' }}"
@@ -617,7 +630,7 @@
                                     <a
                                         class="nav-link
                                                {{ request()->routeIs(
-                                                    'divisions.*'
+                                                    'divisions.\*'
                                                )
                                                     ? 'active'
                                                     : '' }}"
@@ -645,7 +658,7 @@
                                     <a
                                         class="nav-link
                                                {{ request()->routeIs(
-                                                    'parameters.*'
+                                                    'parameters.\*'
                                                )
                                                     ? 'active'
                                                     : '' }}"
@@ -673,7 +686,7 @@
                                     <a
                                         class="nav-link
                                                {{ request()->routeIs(
-                                                    'systemlogs.*'
+                                                    'systemlogs.\*'
                                                )
                                                     ? 'active'
                                                     : '' }}"
