@@ -78,10 +78,7 @@
         .target-cell {
             font-size: 7px;
             line-height: 1.25;
-        }        .target-cell {
-            font-size: 7px;
-            line-height: 1.25;
-        }
+        }   
         .target-range-cell {
             vertical-align: top;
             text-align: left;
@@ -180,19 +177,23 @@
                         $displayRows[] = ['type' => $planItem->row_type, 'item' => $planItem];
                         continue;
                     }
-                    $classificationKey = $planItem->classification_id
+                $classificationKey = $planItem->financial_plan_id
+                    ? 'fp-' . mb_strtolower(trim((string) $planItem->program_classification))
+                    : ($planItem->classification_id
                         ? 'classification-' . $planItem->classification_id
-                        : 'item-' . $planItem->id;
+                        : 'item-' . $planItem->id);
                     if (!$currentGroup || $currentGroup['key'] !== $classificationKey) {
                         if ($currentGroup) {
                             $displayRows[] = $currentGroup;
                         }
-                        $currentGroup = [
-                            'type' => 'classification',
-                            'key' => $classificationKey,
-                            'classification' => $planItem->classification,
-                            'items' => [],
-                        ];
+                    $currentGroup = [
+                        'type' => 'classification',
+                        'key' => $classificationKey,
+                        'classification' => $planItem->classification,
+                        'program_classification' => $planItem->program_classification,
+                        'prexc_code' => $planItem->prexc_code,
+                        'items' => [],
+                    ];
                     }
                     $lanes = [];
                     foreach ($planItem->targets->sortBy('sort_order')->values() as $target) {
@@ -280,14 +281,19 @@
                             <tr>
                                 @if(!$classificationPrinted)
                                     <td class="classification-cell" rowspan="{{ $classificationRowspan }}">
-                                        @if($displayRow['classification'])
-                                            @if($displayRow['classification']->code)
-                                                <strong>{{ $displayRow['classification']->code }}</strong><br>
-                                            @endif
-                                            {{ $displayRow['classification']->name }}
-                                        @else
-                                            —
+                                    @if($displayRow['program_classification'])
+                                        @if($displayRow['prexc_code'])
+                                            <strong>{{ $displayRow['prexc_code'] }}</strong><br>
                                         @endif
+                                        {{ $displayRow['program_classification'] }}
+                                    @elseif($displayRow['classification'])
+                                        @if($displayRow['classification']->code)
+                                            <strong>{{ $displayRow['classification']->code }}</strong><br>
+                                        @endif
+                                        {{ $displayRow['classification']->name }}
+                                    @else
+                                        —
+                                    @endif
                                     </td>
                                     @php
                                         $classificationPrinted = true;
@@ -316,13 +322,6 @@
             @endforelse
         </tbody>
     </table>
-    <div class="instructions">
-        <div class="instructions-title">Instructions:</div>
-        <div>(a) This column contains the Programs/Activities/Projects/(PAP) Structures following the Program of Expenditure Classification (PREXC).</div>
-        <div>(b) Under this column, the Staffs/Units should provide a short description of the activity to be undertaken.</div>
-        <div class="instruction-indent">Please refer to the Thrusts and Priorities for FY {{ $plan->fiscal_year }}.</div>
-        <div>(c) Under this column, the Staffs/Units should indicate the target outputs for the activity to be undertaken.</div>
-    </div>
     @php
         $signatory = $plan->signatory;
         $hasSignatories = $signatory && (

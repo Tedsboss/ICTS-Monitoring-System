@@ -10,16 +10,20 @@ class WorkPlanItem extends Model
 {
     protected $fillable = [
         'work_plan_id',
+        'financial_plan_id',
         'parent_id',
         'row_type',
         'title',
         'classification_id',
+        'program_classification',
+        'prexc_code',
         'specific_activity',
         'sort_order',
     ];
 
     protected $casts = [
         'work_plan_id' => 'integer',
+        'financial_plan_id' => 'integer',
         'parent_id' => 'integer',
         'classification_id' => 'integer',
         'sort_order' => 'integer',
@@ -92,4 +96,13 @@ class WorkPlanItem extends Model
     {
         return $this->row_type === 'item';
     }
+
+    public function financialPlan(): BelongsTo
+    {
+        return $this->belongsTo(
+            FinancialPlan::class,
+            'financial_plan_id'
+        );
+    }
+
 }

@@ -17,6 +17,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use App\Models\FinancialPlan;
 
 class WorkPlanController extends Controller
 {
@@ -151,12 +152,22 @@ class WorkPlanController extends Controller
             ->ordered()
             ->get();
 
+        $financialPlanActivities = collect();
+
+        if ($staffId !== null) {
+            $financialPlanActivities = $this->financialPlanActivities(
+                $fiscalYear,
+                $staffId
+            );
+        }
+
         return view('work-plans.builder', [
             'plan' => $plan,
             'fiscalYear' => $fiscalYear,
             'staffId' => $staffId,
             'staffs' => $this->availableStaffs(),
             'classifications' => $classifications,
+            'financialPlanActivities' => $financialPlanActivities,
             'months' => self::MONTHS,
         ]);
     }
@@ -232,7 +243,24 @@ class WorkPlanController extends Controller
                 'integer',
                 'exists:work_plan_classifications,id',
             ],
-            'items.*.specific_activity' => ['nullable', 'string'],
+            'items.*.financial_plan_id' => [
+                'nullable',
+                'integer',
+                'exists:financial_plans,id',
+            ],
+            'items.*.program_classification' => [
+                'nullable',
+                'string',
+            ],
+            'items.*.prexc_code' => [
+                'nullable',
+                'string',
+                'max:100',
+            ],
+            'items.*.specific_activity' => [
+                'nullable',
+                'string',
+            ],
             'items.*.sort_order' => ['nullable', 'integer', 'min:0'],
             'items.*.targets' => ['nullable', 'array'],
             'items.*.targets.*.id' => ['nullable', 'integer'],
@@ -345,6 +373,17 @@ class WorkPlanController extends Controller
                     )
                         ? (int) $itemData['classification_id']
                         : null;
+                    $item->financial_plan_id = ! empty(
+                        $itemData['financial_plan_id']
+                    )
+                        ? (int) $itemData['financial_plan_id']
+                        : null;
+                    $item->program_classification = $this->nullableTrim(
+                        $itemData['program_classification'] ?? null
+                    );
+                    $item->prexc_code = $this->nullableTrim(
+                        $itemData['prexc_code'] ?? null
+                    );
                     $item->specific_activity = $this->nullableTrim(
                         $itemData['specific_activity'] ?? null
                     );
@@ -353,6 +392,9 @@ class WorkPlanController extends Controller
                         $itemData['title'] ?? null
                     );
                     $item->classification_id = null;
+                    $item->financial_plan_id = null;
+                    $item->program_classification = null;
+                    $item->prexc_code = null;
                     $item->specific_activity = null;
                 }
 
@@ -906,9 +948,19 @@ class WorkPlanController extends Controller
                 continue;
             }
 
-            if (empty($item['classification_id'])) {
+            $hasLegacyClassification = ! empty(
+                $item['classification_id']
+            );
+
+            $hasFpClassification = ! empty(
+                $item['financial_plan_id']
+            ) && trim(
+                (string) ($item['program_classification'] ?? '')
+            ) !== '';
+
+            if (! $hasLegacyClassification && ! $hasFpClassification) {
                 throw ValidationException::withMessages([
-                    "items.$index.classification_id" => [
+                    "items.$index.program_classification" => [
                         'Program Classification is required for Budget Lines.',
                     ],
                 ]);
@@ -1038,7 +1090,17 @@ class WorkPlanController extends Controller
                 continue;
             }
 
-            if (! $item->classification_id) {
+            $hasLegacyClassification = ! empty(
+                $item->classification_id
+            );
+
+            $hasFpClassification = ! empty(
+                $item->financial_plan_id
+            ) && trim(
+                (string) $item->program_classification
+            ) !== '';
+
+            if (! $hasLegacyClassification && ! $hasFpClassification) {
                 throw ValidationException::withMessages([
                     'items' => [
                         'Every Budget Line must have a Program Classification.',
@@ -1110,4 +1172,58 @@ class WorkPlanController extends Controller
             'message' => 'This Work Plan cannot be edited in its current status.',
         ], 403);
     }
+
+    private function financialPlanActivities(
+        int $fiscalYear,
+        int $staffId,
+        ?int $divisionId = null
+    ) {
+        $query = FinancialPlan::query()
+            ->where('fiscal_year', $fiscalYear)
+            ->where('staff_id', $staffId)
+            ->where('row_type', 'item')
+            ->whereNotNull('program_classification')
+            ->whereNotNull('specific_activity')
+            ->where('program_classification', '!=', '')
+            ->where('specific_activity', '!=', '');
+
+        if ($divisionId !== null) {
+            $query->where('division_id', $divisionId);
+        }
+
+        return $query
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get([
+                'id',
+                'division_id',
+                'program_classification',
+                'prexc_code',
+                'specific_activity',
+                'sort_order',
+            ])
+            ->unique(function ($row) {
+                return implode('|', [
+                    mb_strtolower(trim((string) $row->program_classification)),
+                    mb_strtolower(trim((string) $row->prexc_code)),
+                    mb_strtolower(trim((string) $row->specific_activity)),
+                ]);
+            })
+            ->map(function ($row) {
+                return [
+                    'financial_plan_id' => (int) $row->id,
+                    'division_id' => $row->division_id
+                        ? (int) $row->division_id
+                        : null,
+                    'program_classification' =>
+                        trim((string) $row->program_classification),
+                    'prexc_code' =>
+                        trim((string) $row->prexc_code),
+                    'specific_activity' =>
+                        trim((string) $row->specific_activity),
+                ];
+            })
+            ->values();
+    }
+
 }

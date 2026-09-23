@@ -94,12 +94,11 @@
                             <h2 class="m-0 text-base font-bold text-slate-900">Work Plan Rows</h2>
                             <span id="unsavedBadge" class="hidden rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-800">Unsaved changes</span>
                         </div>
-                        <p class="mb-0 mt-1 text-xs text-slate-500">Use Section Header and Sub Header for structure. Use Budget Line for classifications, activities, and monthly Target Outputs.</p>
+                        <p class="mb-0 mt-1 text-xs text-slate-500">Program Classifications and Specific Activities are loaded from the Financial Plan. Add Target Outputs and select their applicable months.</p>
                     </div>
                     <div class="flex flex-wrap items-center gap-2">
                         <button type="button" class="builder-write-control add-row-button" data-row-type="header"><i class="fa fa-plus"></i> Section Header</button>
                         <button type="button" class="builder-write-control add-row-button" data-row-type="subheader"><i class="fa fa-plus"></i> Sub Header</button>
-                        <button type="button" class="builder-write-control add-row-button" data-row-type="item"><i class="fa fa-plus"></i> Budget Line</button>
                         <button type="button" id="btnSavePlan" class="builder-write-control save-button"><i class="fa fa-save"></i> Save Entire Plan</button>
                     </div>
                 </div>
@@ -119,8 +118,8 @@
                 </div>
                 <div id="emptyBuilderState" class="hidden border-x border-b border-slate-200 bg-slate-50 px-6 py-10 text-center">
                     <div class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-white text-slate-400 shadow-sm"><i class="fa fa-list"></i></div>
-                    <div class="mt-3 text-sm font-semibold text-slate-600">No Work Plan rows yet.</div>
-                    <div class="mt-1 text-xs text-slate-500">Add a Section Header, Sub Header, or Budget Line to begin.</div>
+                    <div class="mt-3 text-sm font-semibold text-slate-600">No Financial Plan activities found.</div>
+                    <div class="mt-1 text-xs text-slate-500">Make sure the selected Office/Staff has Financial Plan activities for this fiscal year.</div>
                 </div>
                 <div class="mt-3 flex flex-wrap items-center gap-2">
                     <button type="button" class="builder-write-control add-row-button" data-row-type="header"><i class="fa fa-plus"></i> Section Header</button>
@@ -414,6 +413,34 @@
     background: #e0f2fe;
     color: #0369a1;
 }
+
+.fp-readonly-value {
+    min-height: 36px;
+    border: 1px solid #e2e8f0;
+    border-radius: 7px;
+    background: #f8fafc;
+    padding: 7px 8px;
+    color: #334155;
+    font-size: 12px;
+    line-height: 1.4;
+    white-space: pre-wrap;
+}
+.fp-prexc-code {
+    margin-top: 5px;
+    color: #64748b;
+    font-size: 10px;
+}
+.fp-source-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: #e0f2fe;
+    padding: 3px 7px;
+    color: #0369a1;
+    font-size: 9px;
+    font-weight: 700;
+}
 </style>
 @endsection
 @push('js')
@@ -421,6 +448,7 @@
 $(document).ready(function () {
     const MONTHS = @json($months);
     const CLASSIFICATIONS = @json($classifications);
+    const FINANCIAL_PLAN_ACTIVITIES = @json($financialPlanActivities);
     const INITIAL_PLAN = @json($plan);
     const csrfToken = '{{ csrf_token() }}';
     let currentPlan = INITIAL_PLAN;
@@ -555,21 +583,40 @@ $(document).ready(function () {
     function itemRow(item = {}) {
         const rowKey = item.row_key || newRowKey();
         const targets = Array.isArray(item.targets)
-            ? item.targets.slice().sort((a,b) => Number(a.sort_order || 0) - Number(b.sort_order || 0) || Number(a.id || 0) - Number(b.id || 0))
+            ? item.targets.slice().sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0) || Number(a.id || 0) - Number(b.id || 0))
             : [];
+        const financialPlanId = item.financial_plan_id || '';
+        const programClassification = item.program_classification || '';
+        const prexcCode = item.prexc_code || '';
+        const specificActivity = item.specific_activity || '';
         return `
-            <tr class="work-plan-row item-row" data-item-id="${esc(item.id ?? '')}" data-row-key="${esc(rowKey)}" data-row-type="item">
+            <tr class="work-plan-row item-row"
+                data-item-id="${esc(item.id ?? '')}"
+                data-row-key="${esc(rowKey)}"
+                data-row-type="item"
+                data-financial-plan-id="${esc(financialPlanId)}"
+                data-program-classification="${esc(programClassification)}"
+                data-prexc-code="${esc(prexcCode)}"
+                data-specific-activity="${esc(specificActivity)}">
                 <td class="drag-handle align-middle" title="Row order"><i class="fa fa-grip-vertical"></i></td>
-                <td><select class="builder-input classification-input" ${isLocked ? 'disabled' : ''}>${classificationOptions(item.classification_id ?? '')}</select></td>
-                <td><textarea class="builder-input activity-input" rows="3" placeholder="Specific Activity/ies" ${isLocked ? 'disabled' : ''}>${esc(item.specific_activity ?? '')}</textarea></td>
+                <td>
+                    <div class="fp-readonly-value">${esc(programClassification)}</div>
+                    ${prexcCode ? `<div class="fp-prexc-code">${esc(prexcCode)}</div>` : ''}
+                </td>
+                <td>
+                    <div class="fp-readonly-value">${esc(specificActivity)}</div>
+                </td>
                 <td class="targets-column">
                     <div class="target-list">${targets.map(target => targetEntry(target)).join('')}</div>
                     <button type="button" class="add-target" ${isLocked ? 'disabled' : ''}><i class="fa fa-plus"></i> Add Target Output</button>
                 </td>
-                <td class="text-center align-middle"><button type="button" class="delete-row" title="Delete Budget Line" ${isLocked ? 'disabled' : ''}><i class="fa fa-trash"></i></button></td>
+                <td class="text-center align-middle">
+                    <span class="fp-source-badge" title="Source: Financial Plan">FP</span>
+                </td>
             </tr>
         `;
     }
+
     function structuralRow(item = {}, type = 'header') {
         const rowKey = item.row_key || newRowKey();
         const isHeader = type === 'header';
@@ -601,6 +648,24 @@ $(document).ready(function () {
         });
         applyLockState();
     }
+
+    function financialPlanRows() {
+        return FINANCIAL_PLAN_ACTIVITIES.map(function (activity, index) {
+            return {
+                id: null,
+                row_key: newRowKey(),
+                row_type: 'item',
+                financial_plan_id: activity.financial_plan_id || null,
+                classification_id: null,
+                program_classification: activity.program_classification || '',
+                prexc_code: activity.prexc_code || '',
+                specific_activity: activity.specific_activity || '',
+                sort_order: (index + 1) * 10,
+                targets: []
+            };
+        });
+    }
+
     function addRow(type) {
         if (isLocked || isLoading) return;
         if (type === 'item') $('#builderBody').append(itemRow({row_type:'item',targets:[]}));
@@ -706,14 +771,19 @@ $(document).ready(function () {
                 parent_key: parentKey,
                 row_type: rowType,
                 title: null,
+                financial_plan_id: null,
                 classification_id: null,
+                program_classification: null,
+                prexc_code: null,
                 specific_activity: null,
                 sort_order: (itemIndex + 1) * 10,
                 targets: []
             };
             if (rowType === 'item') {
-                data.classification_id = $row.find('.classification-input').val() || null;
-                data.specific_activity = String($row.find('.activity-input').val() || '').trim();
+                data.financial_plan_id = $row.attr('data-financial-plan-id') || null;
+                data.program_classification = String($row.attr('data-program-classification') || '').trim();
+                data.prexc_code = String($row.attr('data-prexc-code') || '').trim();
+                data.specific_activity = String($row.attr('data-specific-activity') || '').trim();
                 $row.find('.target-entry').each(function (targetIndex) {
                     const $target = $(this);
                     const output = String($target.find('.target-output-input').val() || '').trim();
@@ -751,10 +821,16 @@ $(document).ready(function () {
                 }
                 continue;
             }
-            if (!item.classification_id) {
-                showMessage(`Select a classification for Budget Line ${index + 1}.`, 'danger');
+            if (!item.financial_plan_id || !item.program_classification) {
+                showMessage(`Financial Plan source is missing for Budget Line ${index + 1}.`, 'danger');
                 return false;
             }
+
+            if (!item.specific_activity) {
+                showMessage(`Specific Activity is missing for Budget Line ${index + 1}.`, 'danger');
+                return false;
+            }
+
             if (!item.specific_activity) {
                 showMessage(`Enter the Specific Activity for Budget Line ${index + 1}.`, 'danger');
                 return false;
@@ -803,43 +879,26 @@ $(document).ready(function () {
             setLoading(false);
         });
     }
-    function loadPlan() {
-        const fiscalYear = Number($('#fiscalYear').val());
-        const staffId = Number($('#staffId').val());
-        if (!staffId) {
-            showMessage('Select an Office/Staff first.', 'danger');
-            return;
-        }
-        if (hasUnsavedChanges && !window.confirm('You have unsaved changes. Load another Work Plan anyway?')) return;
-        setLoading(true);
-        $.getJSON('{{ route("work-plans.data") }}', {fiscal_year:fiscalYear,staff_id:staffId})
-            .done(function (response) {
-                currentPlan = response.data || null;
-                if (currentPlan) {
-                    renderSignatory(currentPlan.signatory || null);
-                    renderRows(currentPlan.items || []);
-                    showMessage('Work Plan loaded successfully.');
-                } else {
-                    currentPlan = null;
-                    isLocked = false;
-                    renderSignatory(null);
-                    renderRows([]);
-                    applyLockState();
-                    showMessage('No existing Work Plan was found. You can create a new one.', 'info');
-                }
-                setDirty(false);
-                const url = new URL(window.location.href);
-                url.searchParams.set('fiscal_year', fiscalYear);
-                url.searchParams.set('staff_id', staffId);
-                window.history.replaceState({}, '', url.toString());
-            })
-            .fail(function (xhr) {
-                showMessage(getErrorMessage(xhr, 'Unable to load the Work Plan.'), 'danger');
-            })
-            .always(function () {
-                setLoading(false);
-            });
+    function loadPlan() 
+    {
+            const fiscalYear = Number($('#fiscalYear').val());
+            const staffId = Number($('#staffId').val());
+
+            if (!staffId) {
+                showMessage('Select an Office/Staff first.', 'danger');
+                return;
+            }
+
+            if (hasUnsavedChanges && !window.confirm('You have unsaved changes. Load another Work Plan anyway?')) {
+                return;
+            }
+
+            const url = new URL('{{ route("work-plans.builder") }}', window.location.origin);
+            url.searchParams.set('fiscal_year', fiscalYear);
+            url.searchParams.set('staff_id', staffId);
+            window.location.href = url.toString();
     }
+
     $('.add-row-button').on('click', function () {
         addRow(String($(this).data('row-type') || 'item'));
     });
@@ -898,7 +957,11 @@ $(document).ready(function () {
     });
     enableRowDragging();
     renderSignatory(currentPlan?.signatory || null);
-    renderRows(currentPlan?.items || []);
+    if (currentPlan?.items?.length) {
+        renderRows(currentPlan.items);
+    } else {
+        renderRows(financialPlanRows());
+    }
     applyLockState();
 });
 </script>

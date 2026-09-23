@@ -265,9 +265,11 @@
             $displayRows[] = ['type' => $planItem->row_type, 'item' => $planItem];
             continue;
         }
-        $classificationKey = $planItem->classification_id
+    $classificationKey = $planItem->financial_plan_id
+        ? 'fp-' . mb_strtolower(trim((string) $planItem->program_classification))
+        : ($planItem->classification_id
             ? 'classification-' . $planItem->classification_id
-            : 'item-' . $planItem->id;
+            : 'item-' . $planItem->id);
         if (!$currentGroup || $currentGroup['key'] !== $classificationKey) {
             if ($currentGroup) {
                 $displayRows[] = $currentGroup;
@@ -276,6 +278,8 @@
                 'type' => 'classification',
                 'key' => $classificationKey,
                 'classification' => $planItem->classification,
+                'program_classification' => $planItem->program_classification,
+                'prexc_code' => $planItem->prexc_code,
                 'items' => [],
             ];
         }
@@ -366,7 +370,12 @@
                 <tr class="budget-line-row">
                     @if(!$classificationPrinted)
                         <td class="classification-cell" rowspan="{{ $classificationRowspan }}">
-                            @if($displayRow['classification'])
+                            @if($displayRow['program_classification'])
+                                @if($displayRow['prexc_code'])
+                                    <div class="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">{{ $displayRow['prexc_code'] }}</div>
+                                @endif
+                                <div class="font-semibold text-slate-800">{{ $displayRow['program_classification'] }}</div>
+                            @elseif($displayRow['classification'])
                                 @if($displayRow['classification']->code)
                                     <div class="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">{{ $displayRow['classification']->code }}</div>
                                 @endif

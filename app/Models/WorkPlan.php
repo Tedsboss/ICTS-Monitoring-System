@@ -12,6 +12,7 @@ class WorkPlan extends Model
     protected $fillable = [
         'fiscal_year',
         'staff_id',
+        'division_id',
         'status',
         'finalized',
         'created_by',
@@ -26,6 +27,8 @@ class WorkPlan extends Model
 
     protected $casts = [
         'fiscal_year' => 'integer',
+        'staff_id' => 'integer',
+        'division_id' => 'integer',
         'submitted_at' => 'datetime',
         'approved_at' => 'datetime',
         'finalized_at' => 'datetime',
@@ -113,5 +116,13 @@ class WorkPlan extends Model
     {
         return in_array($this->status, ['draft', 'returned'], true)
             && $this->finalized !== 'yes';
+    }
+
+    public function division(): BelongsTo
+    {
+        return $this->belongsTo(
+            Division::class,
+            'division_id'
+        );
     }
 }
