@@ -12,6 +12,7 @@ class WorkPlan extends Model
     protected $fillable = [
         'fiscal_year',
         'staff_id',
+        'office_name',
         'division_id',
         'status',
         'finalized',

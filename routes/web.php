@@ -33,6 +33,8 @@ use App\Http\Controllers\TwoFactorController;
 use App\Http\Controllers\UpliftFormBuilderController;
 use App\Http\Controllers\UpliftSubmissionController;
 use App\Http\Controllers\StaffPersonnelController;
+use App\Http\Controllers\ExpenseItemController;
+
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -422,15 +424,43 @@ Route::group(['middleware' => 'check.restricted.ips'], function () {
             Route::get('procurements/data', [ProcurementController::class, 'data'])->name('procurements.data');
             Route::resource('procurements', ProcurementController::class);
 
-            Route::get('financial-plans/all', [FinancialPlanController::class, 'plans'])->name('financial-plans.plans');
-            Route::get('financial-plans', [FinancialPlanController::class, 'index'])->name('financial-plans.index');
-            Route::get('financial-plans/data', [FinancialPlanController::class, 'data'])->name('financial-plans.data');
-            Route::get('financial-plans/builder', [FinancialPlanController::class, 'builder'])->name('financial-plans.builder');
-            Route::post('financial-plans/save', [FinancialPlanController::class, 'save'])->name('financial-plans.save');
+Route::get('financial-plans/all', [FinancialPlanController::class, 'plans'])
+    ->name('financial-plans.plans');
+
+Route::get('financial-plans', [FinancialPlanController::class, 'index'])
+    ->name('financial-plans.index');
+
+Route::get('financial-plans/data', [FinancialPlanController::class, 'data'])
+    ->name('financial-plans.data');
+
+Route::get('financial-plans/builder', [FinancialPlanController::class, 'builder'])
+    ->name('financial-plans.builder');
+
+Route::prefix('expense-items')
+    ->name('expense-items.')
+    ->group(function () {
+        Route::get('/', [ExpenseItemController::class, 'index'])
+            ->name('index');
+
+        Route::post('/', [ExpenseItemController::class, 'store'])
+            ->name('store');
+
+            Route::put('/{expenseItem}', [ExpenseItemController::class, 'update'])
+                ->name('update');
+
+            Route::patch('/{expenseItem}/toggle', [ExpenseItemController::class, 'toggle'])
+                ->name('toggle');
+             });
+
+            Route::post('financial-plans/save', [FinancialPlanController::class, 'save'])
+                ->name('financial-plans.save');
+
             Route::delete('financial-plans/destroy-plan', [FinancialPlanController::class, 'destroyPlan'])
                 ->name('financial-plans.destroy-plan');
+
             Route::delete('financial-plans/{financial_plan}', [FinancialPlanController::class, 'destroy'])
                 ->name('financial-plans.destroy');
+
             Route::get('/financial-plans/export-pdf', [FinancialPlanController::class, 'exportPdf'])
                 ->name('financial-plans.export-pdf');
 

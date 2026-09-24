@@ -137,10 +137,18 @@
 </head>
 <body>
     <div class="document-header">
-        <div class="document-title">FY {{ $plan->fiscal_year }} WORK PLAN</div>
+        <div class="document-title">
+            FY {{ $plan->fiscal_year }} WORK PLAN
+        </div>
         <div class="office-line">
-            <strong>Staff/Office/Service/Regional Office/Operating Unit:</strong>
-            <span>{{ $plan->staff?->name ?? '—' }}</span>
+                <strong>
+                    {{ $plan->office_name ?: ($plan->staff?->name ?? '—') }}
+                </strong>
+
+                @if($plan->division)
+                    / {{ $plan->division->name }}
+                @endif
+            </span>
         </div>
     </div>
     <table>
@@ -273,39 +281,45 @@
                     </tr>
                 @else
                     @php
-                        $classificationRowspan = collect($displayRow['items'])->sum('rowspan');
                         $classificationPrinted = false;
                     @endphp
+
                     @foreach($displayRow['items'] as $activityData)
                         @foreach($activityData['lanes'] as $lane)
                             <tr>
-                                @if(!$classificationPrinted)
-                                    <td class="classification-cell" rowspan="{{ $classificationRowspan }}">
-                                    @if($displayRow['program_classification'])
-                                        @if($displayRow['prexc_code'])
-                                            <strong>{{ $displayRow['prexc_code'] }}</strong><br>
+                                <td class="classification-cell">
+                                    @if(!$classificationPrinted)
+                                        @if($displayRow['program_classification'])
+                                            @if($displayRow['prexc_code'])
+                                                <strong>{{ $displayRow['prexc_code'] }}</strong><br>
+                                            @endif
+                                            {{ $displayRow['program_classification'] }}
+                                        @elseif($displayRow['classification'])
+                                            @if($displayRow['classification']->code)
+                                                <strong>{{ $displayRow['classification']->code }}</strong><br>
+                                            @endif
+                                            {{ $displayRow['classification']->name }}
+                                        @else
+                                            —
                                         @endif
-                                        {{ $displayRow['program_classification'] }}
-                                    @elseif($displayRow['classification'])
-                                        @if($displayRow['classification']->code)
-                                            <strong>{{ $displayRow['classification']->code }}</strong><br>
-                                        @endif
-                                        {{ $displayRow['classification']->name }}
-                                    @else
-                                        —
+
+                                        @php
+                                            $classificationPrinted = true;
+                                        @endphp
                                     @endif
-                                    </td>
-                                    @php
-                                        $classificationPrinted = true;
-                                    @endphp
-                                @endif
-                                @if($loop->first)
-                                    <td class="activity-cell" rowspan="{{ $activityData['rowspan'] }}">
+                                </td>
+
+                                <td class="activity-cell">
+                                    @if($loop->first)
                                         {!! nl2br(e($activityData['item']->specific_activity ?: '—')) !!}
-                                    </td>
-                                @endif
+                                    @endif
+                                </td>
+
                                 @foreach($lane['segments'] as $segment)
-                                    <td colspan="{{ $segment['span'] }}" class="target-cell {{ !$segment['target'] ? 'target-empty-cell' : ($segment['span'] >= 9 ? 'target-full-range' : ($segment['span'] === 1 ? 'target-single-month' : 'target-range-cell')) }}">
+                                    <td
+                                        colspan="{{ $segment['span'] }}"
+                                        class="target-cell {{ !$segment['target'] ? 'target-empty-cell' : ($segment['span'] >= 9 ? 'target-full-range' : ($segment['span'] === 1 ? 'target-single-month' : 'target-range-cell')) }}"
+                                    >
                                         @if($segment['target'])
                                             {!! nl2br(e($segment['target']->target_output)) !!}
                                         @endif

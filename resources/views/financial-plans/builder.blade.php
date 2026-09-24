@@ -70,9 +70,50 @@
                                class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100">
                     </div>
                     <div>
-                        <label for="officeName" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Name of Office/Staff</label>
-                        <input type="text" id="officeName" value="{{ $officeName }}" maxlength="150" placeholder="Name of Office/Staff"
-                               class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100">
+                        <label for="officeName"
+                            class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Name of Office/Staff
+                        </label>
+
+                        @if($isAdmin ?? false)
+
+                            {{-- ADMIN: select which Staff/Office owns the Financial Plan --}}
+                            <select id="officeSelector"
+                                    class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100">
+
+                                <option value="">Select Office/Staff</option>
+
+                                @foreach(($staffOptions ?? []) as $staff)
+                                    <option value="{{ $staff->id }}"
+                                            data-office-name="{{ $staff->name }}"
+                                            {{ (int)($personnelStaffId ?? 0) === (int)$staff->id ? 'selected' : '' }}>
+                                        {{ $staff->name }}
+
+                                        @if(!empty($staff->abbreviation))
+                                            ({{ $staff->abbreviation }})
+                                        @endif
+                                    </option>
+                                @endforeach
+
+                            </select>
+
+                            {{-- Actual value used by the Financial Plan requests --}}
+                            <input type="hidden"
+                                id="officeName"
+                                value="{{ $officeName ?? '' }}">
+
+                        @else
+
+                            {{-- STAFF: allow Office/Staff name to be entered for a new plan --}}
+                            <input type="text"
+                                id="officeName"
+                                value="{{ $officeName ?? '' }}"
+                                maxlength="150"
+                                placeholder="Enter Name of Office/Staff"
+                                autocomplete="off"
+                                class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100">
+
+                        @endif
                     </div>
                 </div>
             </section>
@@ -325,6 +366,71 @@ $(document).ready(function () {
     // Allocation Types are configured for the current Staff/Office.
     // The Builder must not assume that every office uses MITHI/NINP.
     const ALLOCATION_TYPE_OPTIONS = @json($allocationTypeOptions ?? []);
+    let PLAN_STAFF_ID = @json($personnelStaffId);
+
+    function syncSelectedOffice() {
+        const $selector = $('#officeSelector');
+
+        // Staff accounts do not have an officeSelector.
+        if (!$selector.length) {
+            return;
+        }
+
+        const $selected = $selector.find('option:selected');
+
+        const staffId = parseInt($selected.val(), 10) || null;
+        const officeName = String(
+            $selected.data('office-name') || ''
+        ).trim();
+
+        PLAN_STAFF_ID = staffId;
+
+        $('#officeName').val(officeName);
+
+        console.log('Selected Office:', {
+            staff_id: PLAN_STAFF_ID,
+            office_name: officeName
+        });
+    }
+
+    $('#officeSelector').on('change', function () {
+
+        if (hasUnsavedChanges || allocationDirty) {
+            const proceed = confirm(
+                'You have unsaved changes. Changing Staff/Office will discard them. Continue?'
+            );
+
+            if (!proceed) {
+                return;
+            }
+        }
+
+        syncSelectedOffice();
+
+        EXPENSE_ITEM_OPTIONS = [];
+
+        $('#builderBody').empty();
+
+        if (!PLAN_STAFF_ID) {
+            return;
+        }
+
+        loadPlan(false);
+    });
+
+    @if(!($isAdmin ?? false))
+    $('#officeName').on('input', function () {
+
+        const officeName = String($(this).val() || '').trim();
+
+        if (officeName !== '') {
+            setDirty(true);
+        }
+
+    });
+
+    @endif
+
     function classificationOptions(selectedValue = '') {
         const selected = String(selectedValue ?? '').trim();
         const groups = new Map();
@@ -490,35 +596,80 @@ $(document).ready(function () {
             : '<span class="personnel-placeholder">Select personnel...</span>';
         $control.find('.personnel-selected').html(selectedHtml);
     }
-    // Expense Item dropdown options
-    const EXPENSE_ITEMS = [
-        'ICT Equipment',
-        'ICT Software Subscription',
-        'ICT Supplies',
-        'ICT Training Expense',
-        'Internet Subscription',
-        'Local Travel',
-        'Other Professional Services',
-        'Rent/Lease Expense',
-        'Repair and Maintenance of ICT Equipment',
-        'Representation Expenses',
-        'Training Expenses',
-    ];
+    // Expense Items are configured by Fiscal Year + Staff/Office.
+    let EXPENSE_ITEM_OPTIONS = @json($expenseItemOptions ?? []);
     // Build Expense Item options and preserve any existing legacy value
     function expenseItemOptions(selectedValue = '') {
         const selected = String(selectedValue ?? '').trim();
-        const options = [...EXPENSE_ITEMS];
-        if (selected && !options.includes(selected)) {
-            options.push(selected);
-            options.sort((a, b) => a.localeCompare(b));
+
+        const options = EXPENSE_ITEM_OPTIONS
+            .map(item => String(item.name ?? '').trim())
+            .filter(Boolean);
+
+        const selectedFound = options.includes(selected);
+
+        const html = [
+            '<option value="">Select Expense Item</option>'
+        ];
+
+        // Preserve an existing value from an older Financial Plan even when
+        // it is no longer active or configured for this FY + Staff.
+        if (selected && !selectedFound) {
+            html.push(
+                `<option value="${esc(selected)}" selected>${esc(selected)} (Legacy / Unavailable)</option>`
+            );
         }
-        return [
-            '<option value="">Select Expense Item</option>',
-            ...options.map(item => `
-                <option value="${esc(item)}" ${item === selected ? 'selected' : ''}>${esc(item)}</option>
-            `)
-        ].join('');
+
+        options.forEach(item => {
+            html.push(
+                `<option value="${esc(item)}" ${item === selected ? 'selected' : ''}>${esc(item)}</option>`
+            );
+        });
+
+        return html.join('');
     }
+
+    function loadExpenseItems() {
+        const fiscalYear = $('#fiscalYear').val();
+        const officeName = $('#officeName').val() || '';
+
+        if (!PLAN_STAFF_ID) {
+            EXPENSE_ITEM_OPTIONS = [];
+            console.warn('Cannot load Expense Items: no Staff ID resolved.');
+            return $.Deferred().resolve([]).promise();
+        }
+
+        return $.getJSON(
+            '{{ route("expense-items.index") }}',
+            {
+                fiscal_year: fiscalYear,
+                staff_id: PLAN_STAFF_ID,
+                office_name: officeName
+            }
+        ).done(function (items) {
+
+            EXPENSE_ITEM_OPTIONS = Array.isArray(items)
+                ? items
+                : [];
+
+            console.log('Expense Items loaded:', {
+                fiscal_year: fiscalYear,
+                staff_id: PLAN_STAFF_ID,
+                office_name: officeName,
+                items: EXPENSE_ITEM_OPTIONS
+            });
+
+        }).fail(function (xhr) {
+
+            EXPENSE_ITEM_OPTIONS = [];
+
+            console.error(
+                'Expense Items failed:',
+                xhr.responseJSON || xhr.responseText
+            );
+        });
+    }
+
     let activeLoadRequest = null;
     let hasUnsavedChanges = false;
     let allocationDirty = false;
@@ -1261,22 +1412,61 @@ $(document).ready(function () {
     }
     // Load the selected plan
     function loadPlan(manualReload = false) {
+
         if (manualReload && hasUnsavedChanges) {
-            if (!confirm('You have unsaved changes. Loading another plan will discard them. Continue?')) {
+            if (!confirm(
+                'You have unsaved changes. Loading another plan will discard them. Continue?'
+            )) {
                 return;
             }
         }
+
+        /*
+        * ADMIN:
+        * Synchronize selected Staff/Office FIRST.
+        *
+        * This updates:
+        *   PLAN_STAFF_ID
+        *   #officeName
+        */
+        if ($('#officeSelector').length) {
+            syncSelectedOffice();
+        }
+
         const fiscalYear = $('#fiscalYear').val();
-        const officeName = $('#officeName').val().trim();
+        const officeName = String(
+            $('#officeName').val() || ''
+        ).trim();
+
         if (!officeName) {
-            showMessage('Name of Office/Staff is required.', 'danger');
+            showMessage('Please select a Staff/Office.', 'danger');
             return;
         }
-        if (activeLoadRequest && activeLoadRequest.readyState !== 4) {
+
+        if (!PLAN_STAFF_ID) {
+            showMessage(
+                'Unable to determine the selected Staff/Office.',
+                'danger'
+            );
+            return;
+        }
+
+        if (
+            activeLoadRequest &&
+            activeLoadRequest.readyState !== 4
+        ) {
             activeLoadRequest.abort();
         }
+
         setLoading(true);
-        $.when(loadStatus(), loadSignatories(), loadAllocationAndBalance()).always(function () {
+
+        $.when(
+            loadStatus(),
+            loadSignatories(),
+            loadAllocationAndBalance(),
+            loadExpenseItems()
+        ).always(function () {
+
             activeLoadRequest = $.getJSON(
                 '{{ route("financial-plans.data") }}',
                 {
@@ -1284,18 +1474,36 @@ $(document).ready(function () {
                     office_name: officeName
                 }
             ).done(function (rows) {
+
                 renderRows(rows);
+
                 if (rows.length === 0 && !isLocked) {
                     addRow('header');
                     addRow('item');
                 }
+
                 setDirty(false);
                 recalcLiveBalance();
+
             }).fail(function (xhr) {
-                showMessage(getErrorMessage(xhr, 'Failed to load the financial plan.'), 'danger');
+
+                showMessage(
+                    getErrorMessage(
+                        xhr,
+                        'Failed to load the financial plan.'
+                    ),
+                    'danger'
+                );
+
             }).always(function () {
+
                 setLoading(false);
-                applyLockState(isLocked, currentWorkflowStatus, currentFinalized);
+
+                applyLockState(
+                    isLocked,
+                    currentWorkflowStatus,
+                    currentFinalized
+                );
             });
         });
     }

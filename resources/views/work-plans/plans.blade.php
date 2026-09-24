@@ -138,9 +138,13 @@
                                 default => 'bg-slate-100 text-slate-700',
                             };
 
-                            $officeName = $plan->staff
-                                ? ($plan->staff->abbreviation ?: $plan->staff->name)
-                                : '—';
+                            $officeName =
+                                $plan->office_name
+                                ?: (
+                                    $plan->staff
+                                        ? ($plan->staff->abbreviation ?: $plan->staff->name)
+                                        : '—'
+                                );
                         @endphp
 
                         <tr class="transition hover:bg-slate-50">
@@ -180,55 +184,117 @@
 
                             <td class="border-b border-slate-100 px-5 py-4">
                                 <div class="flex flex-wrap items-center justify-end gap-2">
-                                    @can('view', $plan)
-                                        <a href="{{ route('work-plans.index', [
-                                            'fiscal_year' => $plan->fiscal_year,
-                                            'staff_id' => $plan->staff_id,
-                                        ]) }}"
-                                           class="inline-flex items-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-700 transition hover:bg-sky-100"
-                                           title="View Work Plan">
-                                            <i class="fa fa-eye"></i>
-                                            <span>View</span>
-                                        </a>
-                                    @endcan
 
-                                    @can('update', $plan)
-                                        @if($plan->isEditable())
+                                    @php
+                                        /*
+                                        * If ID exists, this Work Plan has already been saved.
+                                        * If ID is null, this row came from a Financial Plan
+                                        * but its Work Plan has not been created yet.
+                                        */
+                                        $workPlanExists = ! empty($plan->id);
+                                    @endphp
+
+                                    @if($workPlanExists)
+
+                                        {{-- EXISTING WORK PLAN --}}
+
+                                        @can('view', $plan)
+                                            <a href="{{ route('work-plans.index', [
+                                                'fiscal_year' => $plan->fiscal_year,
+                                                'staff_id' => $plan->staff_id,
+                                                'office_name' => $plan->office_name,
+                                            ]) }}"
+                                            class="inline-flex items-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-700 transition hover:bg-sky-100"
+                                            title="View Work Plan">
+
+                                                <i class="fa fa-eye"></i>
+                                                <span>View</span>
+                                            </a>
+                                        @endcan
+
+
+                                        @can('update', $plan)
+
+                                            @if($plan->isEditable())
+
+                                                <a href="{{ route('work-plans.builder', [
+                                                    'fiscal_year' => $plan->fiscal_year,
+                                                    'staff_id' => $plan->staff_id,
+                                                    'office_name' => $plan->office_name,
+                                                ]) }}"
+                                                class="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                                                title="Edit Work Plan">
+
+                                                    <i class="fa fa-pencil"></i>
+                                                    <span>Edit</span>
+                                                </a>
+
+                                            @else
+
+                                                <button type="button"
+                                                        disabled
+                                                        class="inline-flex cursor-not-allowed items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-400"
+                                                        title="This Work Plan is currently read-only">
+
+                                                    <i class="fa fa-lock"></i>
+                                                    <span>Locked</span>
+                                                </button>
+
+                                            @endif
+
+                                        @endcan
+
+
+                                        @can('delete', $plan)
+
+                                            @if($plan->isEditable())
+
+                                                <form method="POST"
+                                                    action="{{ route('work-plans.destroy', $plan) }}"
+                                                    class="m-0"
+                                                    onsubmit="return confirm('Delete this Work Plan? This action cannot be undone.');">
+
+                                                    @csrf
+                                                    @method('DELETE')
+
+                                                    <button type="submit"
+                                                            class="inline-flex h-[30px] w-[34px] items-center justify-center rounded-lg border border-rose-200 bg-rose-50 text-xs text-rose-600 transition hover:bg-rose-100"
+                                                            title="Delete Work Plan">
+
+                                                        <i class="fa fa-trash"></i>
+
+                                                    </button>
+
+                                                </form>
+
+                                            @endif
+
+                                        @endcan
+
+                                    @else
+
+                                        {{-- WORK PLAN DOES NOT EXIST YET --}}
+                                        {{-- Financial Plan exists, so allow creation of its Work Plan --}}
+
+                                        @can('create', \App\Models\WorkPlan::class)
+
                                             <a href="{{ route('work-plans.builder', [
                                                 'fiscal_year' => $plan->fiscal_year,
                                                 'staff_id' => $plan->staff_id,
+                                                'office_name' => $plan->office_name,
                                             ]) }}"
-                                               class="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
-                                               title="Edit Work Plan">
-                                                <i class="fa fa-pencil"></i>
-                                                <span>Edit</span>
-                                            </a>
-                                        @else
-                                            <button type="button" disabled
-                                                    class="inline-flex cursor-not-allowed items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-400"
-                                                    title="This Work Plan is currently read-only">
-                                                <i class="fa fa-lock"></i>
-                                                <span>Locked</span>
-                                            </button>
-                                        @endif
-                                    @endcan
+                                            class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100"
+                                            title="Create Work Plan">
 
-                                    @can('delete', $plan)
-                                        @if($plan->isEditable())
-                                            <form method="POST"
-                                                  action="{{ route('work-plans.destroy', $plan) }}"
-                                                  class="m-0"
-                                                  onsubmit="return confirm('Delete this Work Plan? This action cannot be undone.');">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="submit"
-                                                        class="inline-flex h-[30px] w-[34px] items-center justify-center rounded-lg border border-rose-200 bg-rose-50 text-xs text-rose-600 transition hover:bg-rose-100"
-                                                        title="Delete Work Plan">
-                                                    <i class="fa fa-trash"></i>
-                                                </button>
-                                            </form>
-                                        @endif
-                                    @endcan
+                                                <i class="fa fa-plus"></i>
+                                                <span>Create Work Plan</span>
+
+                                            </a>
+
+                                        @endcan
+
+                                    @endif
+
                                 </div>
                             </td>
                         </tr>

@@ -40,29 +40,172 @@ class WorkPlanController extends Controller
     {
         $this->authorize('viewAny', WorkPlan::class);
 
-        $fiscalYear = (int) $request->input('fiscal_year', now()->year);
+        $fiscalYear = (int) $request->input(
+            'fiscal_year',
+            now()->year
+        );
+
         $staffId = $request->filled('staff_id')
             ? (int) $request->input('staff_id')
             : null;
 
-        $query = WorkPlan::query()
+        if ($staffId !== null) {
+            $this->ensureStaffAccess($staffId);
+        }
+
+        $financialPlanQuery = FinancialPlan::query()
+            ->where('fiscal_year', $fiscalYear)
+            ->whereNotNull('staff_id')
+            ->whereNotNull('office_name')
+            ->where('office_name', '!=', '');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Staff access
+        |--------------------------------------------------------------------------
+        */
+
+        if (! $this->isAdministrator()) {
+            $financialPlanQuery->where(
+                'staff_id',
+                (int) auth()->user()->staff_id
+            );
+        }
+
+        if ($staffId !== null) {
+            $financialPlanQuery->where(
+                'staff_id',
+                $staffId
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Get unique Financial Plan scopes
+        |--------------------------------------------------------------------------
+        */
+
+        $financialPlanScopes = $financialPlanQuery
+            ->select([
+                'fiscal_year',
+                'staff_id',
+                'office_name',
+            ])
+            ->distinct()
+            ->orderBy('staff_id')
+            ->orderBy('office_name')
+            ->get();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Load existing Work Plans for those scopes
+        |--------------------------------------------------------------------------
+        */
+
+        $workPlanQuery = WorkPlan::query()
             ->with('staff')
             ->withCount('items')
             ->where('fiscal_year', $fiscalYear);
 
-        $this->applyStaffScope($query);
+        $this->applyStaffScope($workPlanQuery);
 
         if ($staffId !== null) {
-            $this->ensureStaffAccess($staffId);
-            $query->where('staff_id', $staffId);
+            $workPlanQuery->where(
+                'staff_id',
+                $staffId
+            );
         }
 
-        $plans = $query
-            ->orderBy('staff_id')
-            ->get();
+        $existingWorkPlans = $workPlanQuery
+            ->get()
+            ->keyBy(function (WorkPlan $plan) {
+                return implode('|', [
+                    (int) $plan->fiscal_year,
+                    (int) $plan->staff_id,
+                    trim((string) $plan->office_name),
+                ]);
+            });
 
-        $fiscalYearsQuery = WorkPlan::query();
-        $this->applyStaffScope($fiscalYearsQuery);
+        /*
+        |--------------------------------------------------------------------------
+        | Build Work Plan list
+        |--------------------------------------------------------------------------
+        */
+
+        $plans = $financialPlanScopes
+            ->map(function ($scope) use ($existingWorkPlans) {
+
+                $key = implode('|', [
+                    (int) $scope->fiscal_year,
+                    (int) $scope->staff_id,
+                    trim((string) $scope->office_name),
+                ]);
+
+                $existing = $existingWorkPlans->get($key);
+
+                if ($existing) {
+                    return $existing;
+                }
+
+                /*
+                * Unsaved Work Plan placeholder.
+                *
+                * This allows the Plans page to display the Financial Plan
+                * scope before the user has created/saved its Work Plan.
+                */
+
+                $plan = new WorkPlan();
+
+                $plan->fiscal_year =
+                    (int) $scope->fiscal_year;
+
+                $plan->staff_id =
+                    (int) $scope->staff_id;
+
+                $plan->office_name =
+                    trim((string) $scope->office_name);
+
+                $plan->status = 'draft';
+                $plan->finalized = 'no';
+
+                /*
+                * Important:
+                * id remains NULL because the Work Plan has not been saved yet.
+                */
+
+                $plan->setRelation(
+                    'staff',
+                    Staff::query()->find(
+                        (int) $scope->staff_id
+                    )
+                );
+
+                $plan->setAttribute(
+                    'items_count',
+                    0
+                );
+
+                return $plan;
+            })
+            ->values();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Fiscal Year filter
+        |--------------------------------------------------------------------------
+        */
+
+        $fiscalYearsQuery = FinancialPlan::query()
+            ->whereNotNull('staff_id')
+            ->whereNotNull('office_name')
+            ->where('office_name', '!=', '');
+
+        if (! $this->isAdministrator()) {
+            $fiscalYearsQuery->where(
+                'staff_id',
+                (int) auth()->user()->staff_id
+            );
+        }
 
         $fiscalYears = $fiscalYearsQuery
             ->distinct()
@@ -82,13 +225,25 @@ class WorkPlanController extends Controller
     {
         $this->authorize('viewAny', WorkPlan::class);
 
-        $fiscalYear = (int) $request->input('fiscal_year', now()->year);
+        $fiscalYear = (int) $request->input(
+            'fiscal_year',
+            now()->year
+        );
+
         $staffId = $this->resolveRequestedStaffId($request);
+
+        $officeName = trim(
+            (string) $request->input('office_name', '')
+        );
 
         $plan = null;
 
-        if ($staffId !== null) {
-            $plan = $this->findPlanForAccess($fiscalYear, $staffId);
+        if ($staffId !== null && $officeName !== '') {
+            $plan = $this->findPlanForAccess(
+                $fiscalYear,
+                $staffId,
+                $officeName
+            );
 
             if ($plan) {
                 $this->authorize('view', $plan);
@@ -109,6 +264,7 @@ class WorkPlanController extends Controller
             'plan' => $plan,
             'fiscalYear' => $fiscalYear,
             'staffId' => $staffId,
+            'officeName' => $officeName,
             'staffs' => $this->availableStaffs(),
             'months' => self::MONTHS,
         ]);
@@ -118,15 +274,29 @@ class WorkPlanController extends Controller
     {
         $this->authorize('viewAny', WorkPlan::class);
 
-        $fiscalYear = (int) $request->input('fiscal_year', now()->year);
+        $fiscalYear = (int) $request->input(
+            'fiscal_year',
+            now()->year
+        );
+
         $staffId = $this->resolveRequestedStaffId($request);
+
+        $officeName = trim(
+            (string) $request->input('office_name', '')
+        );
 
         $plan = null;
 
-        if ($staffId !== null) {
-            $plan = $this->findPlanForAccess($fiscalYear, $staffId);
+        if ($staffId !== null && $officeName !== '') {
+
+            $plan = $this->findPlanForAccess(
+                $fiscalYear,
+                $staffId,
+                $officeName
+            );
 
             if ($plan) {
+
                 $this->authorize('view', $plan);
 
                 $plan->load([
@@ -138,12 +308,32 @@ class WorkPlanController extends Controller
                     'items.targets.months',
                     'submissions.actor',
                 ]);
+
             } else {
-                $this->authorize('create', WorkPlan::class);
+
+                $this->authorize(
+                    'create',
+                    WorkPlan::class
+                );
+
                 $this->ensureStaffAccess($staffId);
             }
+
+        } elseif ($staffId !== null) {
+
+            $this->authorize(
+                'create',
+                WorkPlan::class
+            );
+
+            $this->ensureStaffAccess($staffId);
+
         } else {
-            $this->authorize('create', WorkPlan::class);
+
+            $this->authorize(
+                'create',
+                WorkPlan::class
+            );
         }
 
         $classifications = WorkPlanClassification::query()
@@ -157,15 +347,40 @@ class WorkPlanController extends Controller
         if ($staffId !== null) {
             $financialPlanActivities = $this->financialPlanActivities(
                 $fiscalYear,
-                $staffId
+                $staffId,
+                $officeName
             );
         }
 
+        $financialPlanScopesQuery = FinancialPlan::query()
+                ->where('fiscal_year', $fiscalYear)
+                ->whereNotNull('staff_id')
+                ->whereNotNull('office_name')
+                ->where('office_name', '!=', '');
+
+            if (! $this->isAdministrator()) {
+                $financialPlanScopesQuery->where(
+                    'staff_id',
+                    (int) auth()->user()->staff_id
+                );
+            }
+
+            $financialPlanScopes = $financialPlanScopesQuery
+                ->select([
+                    'staff_id',
+                    'office_name',
+                ])
+                ->distinct()
+                ->orderBy('office_name')
+                ->get();
+                
         return view('work-plans.builder', [
             'plan' => $plan,
             'fiscalYear' => $fiscalYear,
             'staffId' => $staffId,
+            'officeName' => $officeName,
             'staffs' => $this->availableStaffs(),
+            'financialPlanScopes' => $financialPlanScopes,
             'classifications' => $classifications,
             'financialPlanActivities' => $financialPlanActivities,
             'months' => self::MONTHS,
@@ -177,13 +392,34 @@ class WorkPlanController extends Controller
         $this->authorize('viewAny', WorkPlan::class);
 
         $validated = $request->validate([
-            'fiscal_year' => ['required', 'integer', 'min:2000', 'max:2100'],
-            'staff_id' => ['required', 'integer', 'exists:staffs,id'],
+            'fiscal_year' => [
+                'required',
+                'integer',
+                'min:2000',
+                'max:2100',
+            ],
+            'staff_id' => [
+                'required',
+                'integer',
+                'exists:staffs,id',
+            ],
+            'office_name' => [
+                'required',
+                'string',
+                'max:150',
+            ],
         ]);
 
+        $fiscalYear = (int) $validated['fiscal_year'];
+        $staffId = (int) $validated['staff_id'];
+        $officeName = trim($validated['office_name']);
+
+        $this->ensureStaffAccess($staffId);
+
         $plan = $this->findPlanForAccess(
-            (int) $validated['fiscal_year'],
-            (int) $validated['staff_id']
+            $fiscalYear,
+            $staffId,
+            $officeName
         );
 
         if (! $plan) {
@@ -216,7 +452,8 @@ class WorkPlanController extends Controller
         $validated = $request->validate([
             'fiscal_year' => ['required', 'integer', 'min:2000', 'max:2100'],
             'staff_id' => ['required', 'integer', 'exists:staffs,id'],
-
+            'office_name' => ['required','string','max:150',],
+            
             'signatory' => ['nullable', 'array'],
             'signatory.prepared_by' => ['nullable', 'string', 'max:150'],
             'signatory.prepared_by_position' => ['nullable', 'string', 'max:150'],
@@ -288,11 +525,19 @@ class WorkPlanController extends Controller
 
         $year = (int) $validated['fiscal_year'];
         $staffId = (int) $validated['staff_id'];
+        $officeName = trim(
+            $validated['office_name']
+        );
+
         $items = $validated['items'] ?? [];
 
         $this->ensureStaffAccess($staffId);
 
-        $plan = $this->findPlanForAccess($year, $staffId);
+        $plan = $this->findPlanForAccess(
+            $year,
+            $staffId,
+            $officeName
+        );
 
         if ($plan) {
             $this->authorize('update', $plan);
@@ -312,6 +557,7 @@ class WorkPlanController extends Controller
             $validated,
             $year,
             $staffId,
+            $officeName,
             $items,
             $plan
         ) {
@@ -319,6 +565,7 @@ class WorkPlanController extends Controller
                 $plan = WorkPlan::create([
                     'fiscal_year' => $year,
                     'staff_id' => $staffId,
+                    'office_name' => $officeName,
                     'status' => 'draft',
                     'finalized' => 'no',
                     'created_by' => auth()->id(),
@@ -454,13 +701,15 @@ class WorkPlanController extends Controller
 
         $this->ensureStaffAccess((int) $workPlan->staff_id);
 
-        $financialPlanActivities = $this->financialPlanActivities(
-            (int) $workPlan->fiscal_year,
-            (int) $workPlan->staff_id,
-            $workPlan->division_id
-                ? (int) $workPlan->division_id
-                : null
-        );
+        $financialPlanActivities =
+            $this->financialPlanActivities(
+                (int) $workPlan->fiscal_year,
+                (int) $workPlan->staff_id,
+                $workPlan->office_name,
+                $workPlan->division_id
+                    ? (int) $workPlan->division_id
+                    : null
+            );
 
         if ($financialPlanActivities->isEmpty()) {
             return response()->json([
@@ -616,7 +865,7 @@ class WorkPlanController extends Controller
 
         return redirect()
             ->route('work-plans.plans')
-            ->with('succes', 'Work Plan deleted successfully.');
+            ->with('success', 'Work Plan deleted successfully.');
     }
 
     public function submit(WorkPlan $workPlan): JsonResponse
@@ -976,11 +1225,19 @@ class WorkPlanController extends Controller
 
     private function findPlanForAccess(
         int $fiscalYear,
-        int $staffId
+        int $staffId,
+        string $officeName
     ): ?WorkPlan {
+        $officeName = trim($officeName);
+
+        if ($officeName === '') {
+            return null;
+        }
+
         $query = WorkPlan::query()
             ->where('fiscal_year', $fiscalYear)
-            ->where('staff_id', $staffId);
+            ->where('staff_id', $staffId)
+            ->where('office_name', $officeName);
 
         $this->applyStaffScope($query);
 
@@ -1344,6 +1601,7 @@ class WorkPlanController extends Controller
     private function financialPlanActivities(
         int $fiscalYear,
         int $staffId,
+        ?string $officeName = null,
         ?int $divisionId = null
     ) {
         $query = FinancialPlan::query()
@@ -1355,8 +1613,18 @@ class WorkPlanController extends Controller
             ->where('program_classification', '!=', '')
             ->where('specific_activity', '!=', '');
 
+        if ($officeName !== null && trim($officeName) !== '') {
+            $query->where(
+                'office_name',
+                trim($officeName)
+            );
+        }
+
         if ($divisionId !== null) {
-            $query->where('division_id', $divisionId);
+            $query->where(
+                'division_id',
+                $divisionId
+            );
         }
 
         return $query
@@ -1365,6 +1633,7 @@ class WorkPlanController extends Controller
             ->get([
                 'id',
                 'division_id',
+                'office_name',
                 'program_classification',
                 'prexc_code',
                 'specific_activity',
@@ -1372,21 +1641,34 @@ class WorkPlanController extends Controller
             ])
             ->unique(function ($row) {
                 return implode('|', [
-                    mb_strtolower(trim((string) $row->program_classification)),
-                    mb_strtolower(trim((string) $row->prexc_code)),
-                    mb_strtolower(trim((string) $row->specific_activity)),
+                    mb_strtolower(
+                        trim((string) $row->program_classification)
+                    ),
+                    mb_strtolower(
+                        trim((string) $row->prexc_code)
+                    ),
+                    mb_strtolower(
+                        trim((string) $row->specific_activity)
+                    ),
                 ]);
             })
             ->map(function ($row) {
                 return [
                     'financial_plan_id' => (int) $row->id,
+
                     'division_id' => $row->division_id
                         ? (int) $row->division_id
                         : null,
+
+                    'office_name' =>
+                        trim((string) $row->office_name),
+
                     'program_classification' =>
                         trim((string) $row->program_classification),
+
                     'prexc_code' =>
                         trim((string) $row->prexc_code),
+
                     'specific_activity' =>
                         trim((string) $row->specific_activity),
                 ];

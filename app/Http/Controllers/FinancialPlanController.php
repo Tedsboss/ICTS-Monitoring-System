@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Models\ExpenseItem;
 class FinancialPlanController extends Controller
 {
     use GenerateLogs;
@@ -696,15 +697,50 @@ class FinancialPlanController extends Controller
                     'allows_capital_outlay',
                 ]);
         }
+        $expenseItemOptions = collect();
+        if ($personnelStaffId !== null) {
+            $expenseItemOptions = ExpenseItem::query()
+                ->where('fiscal_year', $fiscalYear)
+                ->where('staff_id', (int) $personnelStaffId)
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get([
+                    'id',
+                    'name',
+                ]);
+        }
+        $isAdmin = in_array(
+            (int) auth()->user()->role_id,
+            [1, 29],
+            true
+        );
+
+        $staffOptions = collect();
+
+        if ($isAdmin) {
+            $staffOptions = DB::table('staffs')
+                ->orderBy('name')
+                ->get([
+                    'id',
+                    'name',
+                    'abbreviation',
+                ]);
+        }
+
         return view('financial-plans.builder', [
             'fiscalYear'            => $fiscalYear,
             'officeName'            => $officeName,
             'months'                => self::MONTHS,
+            'isAdmin'               => $isAdmin,
+            'staffOptions'          => $staffOptions,
+            'personnelStaffId'      => $personnelStaffId,
             'personnelOptions'      => $personnelOptions,
             'prexcClassifications'  => $prexcClassifications,
             'allocationTypeOptions' => $allocationTypeOptions,
+            'expenseItemOptions'    => $expenseItemOptions,
         ]);
     }
+
     // Data
     public function data(Request $request): JsonResponse
     {

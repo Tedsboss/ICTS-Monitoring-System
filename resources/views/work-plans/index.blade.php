@@ -14,10 +14,14 @@
         'finalized' => 'bg-emerald-100 text-emerald-700',
         default => 'bg-slate-100 text-slate-700',
     };
-    $selectedStaff = $plan?->staff ?? $staffs->firstWhere('id', $staffId);
-    $officeName = $selectedStaff
-        ? ($selectedStaff->abbreviation ?: $selectedStaff->name)
-        : '';
+    $selectedStaff = $plan?->staff
+        ?? $staffs->firstWhere('id', $staffId);
+
+    $officeName =
+        $plan?->office_name
+        ?? request('office_name')
+        ?? ($selectedStaff?->abbreviation ?: $selectedStaff?->name)
+        ?? '';
 @endphp
 <nav class="navbar navbar-main navbar-expand-lg px-0 mx-4 shadow-none border-radius-xl z-index-sticky" id="navbarBlur" data-scroll="false">
     <div class="container-fluid py-2 px-3">
@@ -99,8 +103,10 @@
                                     <a href="{{ route('work-plans.builder', [
                                         'fiscal_year' => $plan->fiscal_year,
                                         'staff_id' => $plan->staff_id,
+                                        'office_name' => $plan->office_name,
                                     ]) }}"
-                                       class="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">
+                                    class="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">
+
                                         <i class="fa fa-pencil"></i>
                                         Edit
                                     </a>
@@ -173,8 +179,10 @@
                                     <a href="{{ route('work-plans.builder', [
                                         'fiscal_year' => $fiscalYear,
                                         'staff_id' => $staffId,
+                                        'office_name' => $officeName,
                                     ]) }}"
-                                       class="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-sky-700">
+                                    class="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-sky-700">
+
                                         <i class="fa fa-plus"></i>
                                         Create Work Plan
                                     </a>
@@ -217,15 +225,21 @@
             </section>
         @else
             <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <div class="border-b border-slate-200 px-5 py-4 text-center">
-                    <h1 class="m-0 text-lg font-bold uppercase text-slate-900">
-                        Work Plan
-                    </h1>
-                    <div class="mt-1 text-sm font-semibold text-slate-700">
-                        FY {{ $plan->fiscal_year }}
+                <div class="border-b border-slate-200 px-5 py-4 text-left">
+                    <div class="text-sm font-bold uppercase text-slate-900">
+                        FY {{ $plan->fiscal_year }} WORK PLAN
                     </div>
-                    <div class="mt-1 text-sm text-slate-600">
-                        {{ $plan->staff?->name ?? '—' }}
+                    <div class="mt-2 text-xs text-slate-700">
+                        <span class="font-semibold">
+                            Staff/Office/Service/Regional Office/Operating Unit:
+                        </span>
+                        <span class="ml-2">
+                            <strong>{{ $plan->office_name ?: ($plan->staff?->name ?? '—') }}</strong>
+
+                            @if($plan->division)
+                                / {{ $plan->division->name }}
+                            @endif
+                        </span>
                     </div>
                 </div>
                 <div class="work-plan-table-wrap overflow-x-auto">
