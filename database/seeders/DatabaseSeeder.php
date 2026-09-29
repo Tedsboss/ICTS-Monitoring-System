@@ -16,5 +16,6 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([RoleSeeder::class, UserSeeder::class]);
         $this->call([TagSeeder::class, CategorySeeder::class, ItemSeeder::class]);
+        $this->call([AllocationManagementSeeder::class]);
     }
 }
