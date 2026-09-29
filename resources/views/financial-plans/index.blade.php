@@ -269,38 +269,14 @@
             {{-- Allocation Summary --}}
             <div class="mb-6">
                 <div class="mb-3">
-                    <h2 class="text-sm font-bold text-slate-900">
-                        Allocation Summary
-                    </h2>
-                    <p class="mt-1 text-xs text-slate-500">
-                        Allocation, programmed amount and remaining balance.
-                    </p>
+                    <h2 class="text-sm font-bold text-slate-900">Allocation Summary</h2>
+                    <p class="mt-1 text-xs text-slate-500">Allocation Management budget configured for this Financial Plan.</p>
                 </div>
-                <div class="max-w-3xl overflow-hidden rounded-xl border border-slate-200">
+                <div class="max-w-4xl overflow-hidden rounded-xl border border-slate-200">
                     <table class="allocation-summary-table w-full">
-                        <thead>
-                            <tr>
-                                <th></th>
-                                <th>Allocation</th>
-                                <th>Programmed</th>
-                                <th>Balance</th>
-                            </tr>
-                        </thead>
-                        <tbody id="allocationSummaryBody">
-                            <tr>
-                                <td colspan="4" class="allocation-label text-slate-400">
-                                    Loading allocation summary...
-                                </td>
-                            </tr>
-                        </tbody>
-                        <tfoot>
-                            <tr class="allocation-total-row">
-                                <td class="allocation-label">TOTAL</td>
-                                <td id="sumTotalAlloc">0.00</td>
-                                <td id="sumTotalProg">0.00</td>
-                                <td id="sumTotalBalance">0.00</td>
-                            </tr>
-                        </tfoot>
+                        <thead><tr><th>Type</th><th>Expense Description</th><th>Configured Allocation</th><th>Programmed</th><th>Balance</th></tr></thead>
+                        <tbody id="allocationSummaryBody"><tr><td colspan="5" class="allocation-label text-slate-400">Loading allocation summary...</td></tr></tbody>
+                        <tfoot><tr class="allocation-total-row"><td colspan="2" class="allocation-label">TOTAL</td><td id="sumTotalAlloc">0.00</td><td id="sumTotalProg">0.00</td><td id="sumTotalBalance">0.00</td></tr></tfoot>
                     </table>
                 </div>
             </div>
@@ -1070,82 +1046,70 @@ $(document).ready(function () {
         return activeDataRequest;
     }
     // Load allocation summary
+    // Load Allocation Management summary from the financial-plan data response.
     function loadAllocationSummary() {
         if (!validateSelection()) {
             return $.Deferred().reject().promise();
         }
         const { fiscalYear, officeName } = selectedPlan();
         const $body = $('#allocationSummaryBody');
-        $body.html(`
-            <tr>
-                <td colspan="4" class="allocation-label text-slate-400">
-                    Loading allocation summary...
-                </td>
-            </tr>
-        `);
-        return $.getJSON(
-            '{{ route("financial-plans.totals") }}',
-            {
-                fiscal_year: fiscalYear,
-                office_name: officeName
-            }
-        ).done(function (response) {
-            const rows = Array.isArray(response.allocation_totals)
-                ? response.allocation_totals
-                : [];
-            let totalAllocation = 0;
+        $body.html(`<tr><td colspan="5" class="allocation-label text-slate-400">Loading allocation summary...</td></tr>`);
+        return $.getJSON('{{ route("financial-plans.data") }}', {
+            fiscal_year: fiscalYear,
+            office_name: officeName
+        }).done(function (response) {
+            const rows = Array.isArray(response) ? response : [];
+            const allocation = rows.find(row => row && row.allocation)?.allocation || null;
+            const expenses = Array.isArray(allocation?.expenses) ? allocation.expenses : [];
             let totalProgrammed = 0;
-            let totalBalance = 0;
-            if (!rows.length) {
-                $body.html(`
-                    <tr>
-                        <td colspan="4" class="allocation-label text-slate-400">
-                            No allocation types are configured for this Staff/Office.
-                        </td>
-                    </tr>
-                `);
+            rows.forEach(row => {
+                if (row?.row_type !== 'item') return;
+                totalProgrammed += Number(row.effective_mooe ?? row.mooe) || 0;
+                totalProgrammed += Number(row.effective_capital_outlay ?? row.capital_outlay) || 0;
+            });
+            if (!allocation) {
+                $body.html(`<tr><td colspan="5" class="allocation-label text-slate-400">No Allocation Management allocation is linked to this Financial Plan.</td></tr>`);
+                $('#sumTotalAlloc').text('0.00');
+                $('#sumTotalProg').text(money(totalProgrammed));
+                setBalance('#sumTotalBalance', -totalProgrammed);
+                return;
+            }
+            const totalAllocation = Number(allocation.total) || 0;
+            const allocationLabel = [
+                allocation.fiscal_year ? `FY ${allocation.fiscal_year}` : '',
+                allocation.level?.code || allocation.level?.level_code || ''
+            ].filter(Boolean).join(' — ');
+            if (!expenses.length) {
+                $body.html(`<tr><td colspan="5" class="allocation-label text-slate-400">${esc(allocationLabel || 'Allocation')} has no configured expenses.</td></tr>`);
             } else {
-                $body.html(rows.map(function (row) {
-                    const allocation = Number(row.allocation) || 0;
-                    const programmed = Number(row.programmed) || 0;
-                    const balance = Number(row.balance) || 0;
-                    const category = row.expense_category === 'capital_outlay'
-                        ? 'Capital Outlay'
-                        : 'MOOE';
-                    const allocationName = String(row.name || row.code || 'Allocation').trim();
-                    totalAllocation += allocation;
-                    totalProgrammed += programmed;
-                    totalBalance += balance;
-                    return `
-                        <tr>
-                            <td class="allocation-label">
-                                ${esc(category)} (${esc(allocationName)})
-                            </td>
-                            <td>${money(allocation)}</td>
-                            <td>${money(programmed)}</td>
-                            <td class="allocation-balance font-bold ${balance < 0 ? 'wfp-negative' : ''}">
-                                ${money(balance)}
-                            </td>
-                        </tr>
-                    `;
+                $body.html(expenses.map(function (expense) {
+                    const type = String(expense.type || '').trim();
+                    const description = String(expense.description || expense.expense_description || '').trim();
+                    const cost = Number(expense.cost) || 0;
+                    const normalizedDescription = description.toLowerCase();
+                    const programmed = rows.reduce((sum, row) => {
+                        if (row?.row_type !== 'item') return sum;
+                        const itemName = String(row.expense_item || '').trim().toLowerCase();
+                        if (!itemName || itemName !== normalizedDescription) return sum;
+                        const rowType = String(type).toUpperCase();
+                        const amount = rowType === 'CO'
+                            ? Number(row.effective_capital_outlay ?? row.capital_outlay) || 0
+                            : Number(row.effective_mooe ?? row.mooe) || 0;
+                        return sum + amount;
+                    }, 0);
+                    const balance = cost - programmed;
+                    return `<tr><td class="allocation-label">${esc(type || '—')}</td><td class="allocation-label">${esc(description || '—')}</td><td>${money(cost)}</td><td>${money(programmed)}</td><td class="allocation-balance font-bold ${balance < 0 ? 'wfp-negative' : ''}">${money(balance)}</td></tr>`;
                 }).join(''));
             }
+            const programmedFromExpenses = expenses.reduce((sum, expense) => sum + (Number(expense.programmed) || 0), 0);
+            const displayedProgrammed = programmedFromExpenses > 0 ? programmedFromExpenses : totalProgrammed;
             $('#sumTotalAlloc').text(money(totalAllocation));
-            $('#sumTotalProg').text(money(totalProgrammed));
-            setBalance('#sumTotalBalance', totalBalance);
+            $('#sumTotalProg').text(money(displayedProgrammed));
+            setBalance('#sumTotalBalance', totalAllocation - displayedProgrammed);
         }).fail(function (xhr) {
-            $body.html(`
-                <tr>
-                    <td colspan="4" class="allocation-label text-rose-600">
-                        Failed to load allocation summary.
-                    </td>
-                </tr>
-            `);
+            $body.html(`<tr><td colspan="5" class="allocation-label text-rose-600">Failed to load allocation summary.</td></tr>`);
             $('#sumTotalAlloc, #sumTotalProg, #sumTotalBalance').text('0.00');
-            showMessage(
-                getErrorMessage(xhr, 'Failed to load allocation summary.'),
-                'danger'
-            );
+            showMessage(getErrorMessage(xhr, 'Failed to load allocation summary.'), 'danger');
         });
     }
     // Apply workflow status

@@ -11,6 +11,7 @@ use App\Http\Controllers\DivisionController;
 use App\Http\Controllers\FinancialPlanController;
 use App\Http\Controllers\WorkPlanController;
 use App\Http\Controllers\FinancialPlanAllocationTypeController;
+use App\Http\Controllers\AllocationController;
 use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\HolidayController;
 use App\Http\Controllers\HomeController;
@@ -34,6 +35,10 @@ use App\Http\Controllers\UpliftFormBuilderController;
 use App\Http\Controllers\UpliftSubmissionController;
 use App\Http\Controllers\StaffPersonnelController;
 use App\Http\Controllers\ExpenseItemController;
+use App\Http\Controllers\FiscalYearController;
+use App\Http\Controllers\LevelController; 
+use App\Http\Controllers\ExpenseTypeController; 
+use App\Http\Controllers\ProgramClassificationController;
 
 /*
 |--------------------------------------------------------------------------
@@ -222,63 +227,7 @@ Route::group(['middleware' => 'check.restricted.ips'], function () {
         Route::delete('administrator/forms/{form}/fields/{form_field}', [FormController::class, 'destroyField'])
           ->name('forms.fields.destroy');
 
-        /*
-        |--------------------------------------------------------------------------
-        | UPLIFT Builder
-        |--------------------------------------------------------------------------
-        */
-
-        Route::get('administrator/uplift-builder', [UpliftFormBuilderController::class, 'index'])
-          ->name('uplift-builder.index');
-
-        Route::post('administrator/uplift-builder/pillars', [UpliftFormBuilderController::class, 'storePillar'])
-          ->name('uplift-builder.pillars.store');
-
-        Route::put('administrator/uplift-builder/pillars/{uplift_pillar}', [UpliftFormBuilderController::class, 'updatePillar'])
-          ->name('uplift-builder.pillars.update');
-
-        Route::post('administrator/uplift-builder/measures', [UpliftFormBuilderController::class, 'storeMeasure'])
-          ->name('uplift-builder.measures.store');
-
-        Route::get('administrator/uplift-builder/measures/{uplift_measure}', [UpliftFormBuilderController::class, 'edit'])
-          ->name('uplift-builder.edit');
-
-        Route::get('administrator/uplift-builder/measures/{uplift_measure}/preview', [UpliftFormBuilderController::class, 'preview'])
-          ->name('uplift-builder.preview');
-
-        Route::put('administrator/uplift-builder/measures/{uplift_measure}', [UpliftFormBuilderController::class, 'updateMeasure'])
-          ->name('uplift-builder.measures.update');
-
-        Route::post('administrator/uplift-builder/measures/{uplift_measure}/duplicate', [UpliftFormBuilderController::class, 'duplicateMeasure'])
-          ->name('uplift-builder.measures.duplicate');
-
-        Route::post('administrator/uplift-builder/measures/{uplift_measure}/supporting-agencies', [UpliftFormBuilderController::class, 'storeSupportingAgency'])
-          ->name('uplift-builder.supporting-agencies.store');
-
-        Route::delete('administrator/uplift-builder/measures/{uplift_measure}/supporting-agencies/{agency}', [UpliftFormBuilderController::class, 'destroySupportingAgency'])
-          ->name('uplift-builder.supporting-agencies.destroy');
-
-        Route::post('administrator/uplift-builder/measures/{uplift_measure}/fields', [UpliftFormBuilderController::class, 'storeField'])
-          ->name('uplift-builder.fields.store');
-
-        Route::put('administrator/uplift-builder/measures/{uplift_measure}/fields-order', [UpliftFormBuilderController::class, 'updateFieldsOrder'])
-          ->name('uplift-builder.fields.order');
-
-        Route::put('administrator/uplift-builder/measures/{uplift_measure}/fields/{uplift_pillar_field}', [UpliftFormBuilderController::class, 'updateField'])
-          ->name('uplift-builder.fields.update');
-
-        Route::delete('administrator/uplift-builder/measures/{uplift_measure}/fields/{uplift_pillar_field}', [UpliftFormBuilderController::class, 'destroyField'])
-          ->name('uplift-builder.fields.destroy');
-
-        Route::post('administrator/uplift-builder/measures/{uplift_measure}/fields/{uplift_pillar_field}/indicators', [UpliftFormBuilderController::class, 'storeIndicator'])
-          ->name('uplift-builder.indicators.store');
-
-        Route::put('administrator/uplift-builder/measures/{uplift_measure}/fields/{uplift_pillar_field}/indicators/{uplift_indicator}', [UpliftFormBuilderController::class, 'updateIndicator'])
-          ->name('uplift-builder.indicators.update');
-
-        Route::delete('administrator/uplift-builder/measures/{uplift_measure}/fields/{uplift_pillar_field}/indicators/{uplift_indicator}', [UpliftFormBuilderController::class, 'destroyIndicator'])
-          ->name('uplift-builder.indicators.destroy');
-
+        
         /*
         |--------------------------------------------------------------------------
         | Administrator Resources
@@ -417,6 +366,37 @@ Route::group(['middleware' => 'check.restricted.ips'], function () {
                     ],
                 ]
             );
+            
+
+            // Allocation Management
+            Route::resource(
+                'allocations',
+                AllocationController::class
+            )->except(['show']);
+            // Fiscal Year Management
+            Route::resource('fiscal-years', FiscalYearController::class)
+                ->except(['show']);
+            // Level Management
+            Route::resource('levels', LevelController::class)->except(['show']);
+            
+            // Program Classification
+            Route::prefix('program-classification')
+                ->name('program-classification.')
+                ->group(function () {
+                    Route::get('headers', [ProgramClassificationController::class, 'headers'])
+                        ->name('headers');
+
+                    Route::get('headers/{header}/sub-headers', [ProgramClassificationController::class, 'subHeaders'])
+                        ->name('sub-headers');
+
+                    Route::get('sub-headers/{subHeader}/programs', [ProgramClassificationController::class, 'programs'])
+                        ->name('programs');
+
+                    Route::get('programs/{program}/expenditures', [ProgramClassificationController::class, 'expenditures'])
+                        ->name('expenditures');
+                });
+                
+            Route::resource('expense-types', ExpenseTypeController::class)->except(['show']);
 
             Route::get('saebs/data', [SaebController::class, 'data'])->name('saebs.data');
             Route::resource('saebs', SaebController::class);
@@ -424,23 +404,23 @@ Route::group(['middleware' => 'check.restricted.ips'], function () {
             Route::get('procurements/data', [ProcurementController::class, 'data'])->name('procurements.data');
             Route::resource('procurements', ProcurementController::class);
 
-Route::get('financial-plans/all', [FinancialPlanController::class, 'plans'])
-    ->name('financial-plans.plans');
+            Route::get('financial-plans/all', [FinancialPlanController::class, 'plans'])
+                ->name('financial-plans.plans');
 
-Route::get('financial-plans', [FinancialPlanController::class, 'index'])
-    ->name('financial-plans.index');
+            Route::get('financial-plans', [FinancialPlanController::class, 'index'])
+                ->name('financial-plans.index');
 
-Route::get('financial-plans/data', [FinancialPlanController::class, 'data'])
-    ->name('financial-plans.data');
+            Route::get('financial-plans/data', [FinancialPlanController::class, 'data'])
+                ->name('financial-plans.data');
 
-Route::get('financial-plans/builder', [FinancialPlanController::class, 'builder'])
-    ->name('financial-plans.builder');
+            Route::get('financial-plans/builder', [FinancialPlanController::class, 'builder'])
+                ->name('financial-plans.builder');
 
-Route::prefix('expense-items')
-    ->name('expense-items.')
-    ->group(function () {
-        Route::get('/', [ExpenseItemController::class, 'index'])
-            ->name('index');
+        Route::prefix('expense-items')
+            ->name('expense-items.')
+            ->group(function () {
+                Route::get('/', [ExpenseItemController::class, 'index'])
+                    ->name('index');
 
         Route::post('/', [ExpenseItemController::class, 'store'])
             ->name('store');
@@ -464,12 +444,11 @@ Route::prefix('expense-items')
             Route::get('/financial-plans/export-pdf', [FinancialPlanController::class, 'exportPdf'])
                 ->name('financial-plans.export-pdf');
 
+                Route::get('financial-plans/totals', [FinancialPlanController::class, 'totals'])
+    ->name('financial-plans.totals');
+
             Route::get('/financial-plans/signatories', [FinancialPlanController::class, 'signatories'])->name('financial-plans.signatories');
             Route::post('/financial-plans/signatories', [FinancialPlanController::class, 'saveSignatories'])->name('financial-plans.signatories.save');
-
-            Route::get('financial-plans/allocation', [FinancialPlanController::class, 'allocation'])->name('financial-plans.allocation');
-            Route::post('financial-plans/allocation', [FinancialPlanController::class, 'saveAllocation'])->name('financial-plans.allocation.save');
-            Route::get('financial-plans/totals', [FinancialPlanController::class, 'totals'])->name('financial-plans.totals');
 
             // WFP workflow
             Route::post('financial-plans/submit', [FinancialPlanController::class, 'submitForApproval'])

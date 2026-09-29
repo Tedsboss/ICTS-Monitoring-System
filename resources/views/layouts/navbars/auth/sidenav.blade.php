@@ -1,12 +1,18 @@
 @php
     $isAdministratorRoute = request()->routeIs(
-        'users.\*',
-        'roles.\*',
-        'staffs.\*',
-        'staff-personnel.\*',
-        'divisions.\*',
-        'parameters.\*',
-        'systemlogs.\*'
+        'users.*',
+        'roles.*',
+        'staffs.*',
+        'staff-personnel.*',
+        'divisions.*',
+        'parameters.*',
+        'systemlogs.*'
+    );
+    $isAllocationManagementRoute = request()->routeIs(
+        'allocations.*',
+        'fiscal-years.*',
+        'levels.*',
+        'expense-types.*'
     );
     $isProfileRoute = request()->routeIs('user-profile');
     $canViewFinancialPlan = auth()->user()->can(
@@ -17,14 +23,35 @@
         'viewAny',
         App\Models\WorkPlan::class
     );
+    $canViewAllocationManagement =
+        auth()->user()->isSuperAdmin()
+        || (
+            auth()->user()->role
+            && auth()->user()->role->permissions->contains(function ($permission) {
+                return strcasecmp(
+                    (string) optional($permission->module)->name,
+                    'Allocation Management'
+                ) === 0
+                && strcasecmp(
+                    (string) $permission->name,
+                    'view'
+                ) === 0;
+            })
+        );
     $canManageFinancialPlanAllocationTypes =
         in_array((int) auth()->user()->role_id, [1, 29], true)
         || (
-            ! empty(auth()->user()->staff_id)
+            !empty(auth()->user()->staff_id)
             && auth()->user()->role
             && auth()->user()->role->permissions->contains(function ($permission) {
-                return strcasecmp((string) optional($permission->module)->name, 'Allocation Type Management') === 0
-                    && strcasecmp((string) $permission->name, 'view') === 0;
+                return strcasecmp(
+                    (string) optional($permission->module)->name,
+                    'Allocation Type Management'
+                ) === 0
+                    && strcasecmp(
+                        (string) $permission->name,
+                        'view'
+                    ) === 0;
             })
         );
     $administratorModuleIds = App\Models\Module::query()
@@ -304,14 +331,13 @@
         "
     >
         <ul class="navbar-nav">
+            {{-- Profile --}}
             <li class="nav-item direk-profile-item">
                 <button
                     type="button"
                     class="nav-link {{ $isProfileRoute ? 'active' : '' }}"
                     id="profile-menu-toggle"
-                    aria-expanded="{{ $isProfileRoute
-                        ? 'true'
-                        : 'false' }}"
+                    aria-expanded="{{ $isProfileRoute ? 'true' : 'false' }}"
                     aria-controls="profile-menu"
                 >
                     <div
@@ -319,10 +345,7 @@
                                d-flex align-items-center
                                justify-content-center"
                     >
-                        <i
-                            class="fa fa-user"
-                            aria-hidden="true"
-                        ></i>
+                        <i class="fa fa-user" aria-hidden="true"></i>
                     </div>
                     <span
                         class="nav-link-text ms-1 text-truncate"
@@ -331,8 +354,7 @@
                         {{ auth()->user()->full_name }}
                     </span>
                     <i
-                        class="fa fa-angle-down
-                               direk-menu-chevron"
+                        class="fa fa-angle-down direk-menu-chevron"
                         id="profile-menu-icon"
                         aria-hidden="true"
                     ></i>
@@ -345,17 +367,11 @@
                     <ul class="nav direk-submenu">
                         <li class="nav-item">
                             <a
-                                class="nav-link
-                                       {{ $isProfileRoute
-                                            ? 'active'
-                                            : '' }}"
+                                class="nav-link {{ $isProfileRoute ? 'active' : '' }}"
                                 href="{{ route('user-profile') }}"
                             >
                                 <span class="sidenav-mini-icon">
-                                    <i
-                                        class="fa fa-user"
-                                        aria-hidden="true"
-                                    ></i>
+                                    <i class="fa fa-user" aria-hidden="true"></i>
                                 </span>
                                 <span class="sidenav-normal">
                                     My Profile
@@ -374,10 +390,7 @@
                                     class="nav-link"
                                 >
                                     <span class="sidenav-mini-icon">
-                                        <i
-                                            class="fa fa-power-off"
-                                            aria-hidden="true"
-                                        ></i>
+                                        <i class="fa fa-power-off" aria-hidden="true"></i>
                                     </span>
                                     <span class="sidenav-normal">
                                         Log Out
@@ -389,12 +402,10 @@
                 </div>
             </li>
             <hr class="direk-sidebar-divider mt-2 mb-2">
+            {{-- Home --}}
             <li class="nav-item">
                 <a
-                    class="nav-link
-                           {{ request()->routeIs('home')
-                                ? 'active'
-                                : '' }}"
+                    class="nav-link {{ request()->routeIs('home') ? 'active' : '' }}"
                     href="{{ route('home') }}"
                 >
                     <div
@@ -402,60 +413,171 @@
                                d-flex align-items-center
                                justify-content-center"
                     >
-                        <i
-                            class="fa fa-home"
-                            aria-hidden="true"
-                        ></i>
+                        <i class="fa fa-home" aria-hidden="true"></i>
                     </div>
                     <span class="nav-link-text ms-1">
                         Home
                     </span>
                 </a>
             </li>
-            @if ($canViewFinancialPlan || $canViewWorkPlan || $canManageFinancialPlanAllocationTypes)
+            {{-- Financial Management --}}
+            @if (
+                $canViewFinancialPlan
+                || $canViewWorkPlan
+                || $canManageFinancialPlanAllocationTypes
+                || $canViewAllocationManagement
+                || $hasAdministratorAccess
+            )
                 <li class="nav-item mt-4 mb-2">
                     <div class="direk-section-heading">
                         <span>Financial Management</span>
                     </div>
                 </li>
+                {{-- Allocation Management --}}
+                @if ($canViewAllocationManagement || $canManageFinancialPlanAllocationTypes)
+                    <li class="nav-item">
+                        <button
+                            type="button"
+                            class="nav-link {{ $isAllocationManagementRoute ? 'active' : '' }}"
+                            id="allocation-management-menu-toggle"
+                            aria-expanded="{{ $isAllocationManagementRoute ? 'true' : 'false' }}"
+                            aria-controls="allocation-management-menu"
+                        >
+                            <div class="icon icon-shape icon-sm text-center d-flex align-items-center justify-content-center">
+                                <i class="fa fa-calculator" aria-hidden="true"></i>
+                            </div>
+                            <span class="nav-link-text ms-1">
+                                Allocation Management
+                            </span>
+                            <i
+                                class="fa fa-angle-down direk-menu-chevron"
+                                id="allocation-management-menu-icon"
+                                aria-hidden="true"
+                                style="{{ $isAllocationManagementRoute
+                                    ? 'transform: rotate(180deg);'
+                                    : 'transform: rotate(0deg);' }}"
+                            ></i>
+                        </button>
+                        <div
+                            id="allocation-management-menu"
+                            style="{{ $isAllocationManagementRoute
+                                ? 'display: block;'
+                                : 'display: none;' }}"
+                        >
+                            <ul class="nav direk-submenu">
+                                {{-- Allocations --}}
+                                <li class="nav-item">
+                                    <a
+                                        class="nav-link {{ request()->routeIs('allocations.*') ? 'active' : '' }}"
+                                        href="{{ route('allocations.index') }}"
+                                    >
+                                        <span class="sidenav-mini-icon">
+                                            <i class="fa fa-money" aria-hidden="true"></i>
+                                        </span>
+                                        <span class="sidenav-normal">
+                                            Allocations
+                                        </span>
+                                    </a>
+                                </li>
+                                {{-- Fiscal Years --}}
+                                <li class="nav-item">
+                                    <a
+                                        class="nav-link {{ request()->routeIs('fiscal-years.*') ? 'active' : '' }}"
+                                        href="{{ route('fiscal-years.index') }}"
+                                    >
+                                        <span class="sidenav-mini-icon">
+                                            <i class="fa fa-calendar" aria-hidden="true"></i>
+                                        </span>
+                                        <span class="sidenav-normal">
+                                            Fiscal Years
+                                        </span>
+                                    </a>
+                                </li>
+                                {{-- Levels --}}
+                                <li class="nav-item">
+                                    <a
+                                        class="nav-link {{ request()->routeIs('levels.*') ? 'active' : '' }}"
+                                        href="{{ route('levels.index') }}"
+                                    >
+                                        <span class="sidenav-mini-icon">
+                                            <i class="fa fa-sitemap" aria-hidden="true"></i>
+                                        </span>
+                                        <span class="sidenav-normal">
+                                            Levels
+                                        </span>
+                                    </a>
+                                </li>
+                                {{-- Allocation Types --}}
+                                @if ($canManageFinancialPlanAllocationTypes)
+                                    <li class="nav-item">
+                                        <a
+                                            class="nav-link {{ request()->routeIs('financial-plan-allocation-types.*') ? 'active' : '' }}"
+                                            href="{{ route('financial-plan-allocation-types.index') }}"
+                                        >
+                                            <span class="sidenav-mini-icon">
+                                                <i class="fa fa-tags" aria-hidden="true"></i>
+                                            </span>
+                                            <span class="sidenav-normal">
+                                                Allocation Types
+                                            </span>
+                                        </a>
+                                    </li>
+                                @endif
+                                {{-- Expense Types --}}
+                                <li class="nav-item">
+                                    <a
+                                        class="nav-link {{ request()->routeIs('expense-types.*') ? 'active' : '' }}"
+                                        href="{{ route('expense-types.index') }}"
+                                    >
+                                        <span class="sidenav-mini-icon">
+                                            <i class="fa fa-tags" aria-hidden="true"></i>
+                                        </span>
+                                        <span class="sidenav-normal">
+                                            Expense Types
+                                        </span>
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+                    </li>
+                @endif
+            @endif
+            
+                {{-- Financial Plans --}}
                 @if ($canViewFinancialPlan)
                     <li class="nav-item">
                         <a
-                            class="nav-link {{ request()->routeIs('financial-plans.\*') ? 'active' : '' }}"
+                            class="nav-link {{ request()->routeIs('financial-plans.*') ? 'active' : '' }}"
                             href="{{ route('financial-plans.plans') }}"
                         >
                             <div class="icon icon-shape icon-sm text-center d-flex align-items-center justify-content-center">
                                 <i class="fa fa-money" aria-hidden="true"></i>
                             </div>
-                            <span class="nav-link-text ms-1">Financial Plans</span>
+                            <span class="nav-link-text ms-1">
+                                Financial Plans
+                            </span>
                         </a>
                     </li>
                 @endif
+                {{-- Work Plans --}}
                 @if ($canViewWorkPlan)
                     <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('work-plans.*') ? 'active' : '' }}" href="{{ route('work-plans.plans') }}">
+                        <a
+                            class="nav-link {{ request()->routeIs('work-plans.*') ? 'active' : '' }}"
+                            href="{{ route('work-plans.plans') }}"
+                        >
                             <div class="icon icon-shape icon-sm text-center d-flex align-items-center justify-content-center">
                                 <i class="fa fa-tasks" aria-hidden="true"></i>
                             </div>
-                            <span class="nav-link-text ms-1">Work Plans</span>
+                            <span class="nav-link-text ms-1">
+                                Work Plans
+                            </span>
                         </a>
                     </li>
                 @endif
-                @if ($canManageFinancialPlanAllocationTypes)
-                    <li class="nav-item">
-                        <a
-                            class="nav-link {{ request()->routeIs('financial-plan-allocation-types.\*') ? 'active' : '' }}"
-                            href="{{ route('financial-plan-allocation-types.index') }}"
-                        >
-                            <div class="icon icon-shape icon-sm text-center d-flex align-items-center justify-content-center">
-                                <i class="fa fa-tags" aria-hidden="true"></i>
-                            </div>
-                            <span class="nav-link-text ms-1">Allocation Types</span>
-                        </a>
-                    </li>
-                @endif
-            @endif
-            @if ($hasAdministratorAccess)
+                
+            {{-- Administration --}}
+            @if (auth()->user()->isSuperAdmin())
                 <li class="nav-item mt-4 mb-2">
                     <div class="direk-section-heading">
                         <span>
@@ -464,69 +586,47 @@
                     </div>
                 </li>
                 <li class="nav-item">
-                <button
-                    type="button"
-                    class="nav-link
-                        {{ $isAdministratorRoute
-                                ? 'active'
-                                : '' }}"
-                    id="administrator-menu-toggle"
-                    aria-expanded="{{ $isAdministratorRoute
-                        ? 'true'
-                        : 'false' }}"
-                    aria-controls="administrator-menu"
-                >
-                    <div
-                        class="icon icon-shape icon-sm text-center
-                            d-flex align-items-center
-                            justify-content-center"
+                    <button
+                        type="button"
+                        class="nav-link {{ $isAdministratorRoute ? 'active' : '' }}"
+                        id="administrator-menu-toggle"
+                        aria-expanded="{{ $isAdministratorRoute ? 'true' : 'false' }}"
+                        aria-controls="administrator-menu"
                     >
-                        <i
-                            class="fa fa-cog"
-                            aria-hidden="true"
-                        ></i>
-                    </div>
-                    <span class="nav-link-text ms-1">
-                        Administration
-                    </span>
-                    <i
-                        class="fa fa-angle-down
-                            direk-menu-chevron"
-                        id="administrator-menu-icon"
-                        aria-hidden="true"
-                        style="{{ $isAdministratorRoute
-                            ? 'transform: rotate(180deg);'
-                            : 'transform: rotate(0deg);' }}"
-                    ></i>
-                </button>
                         <div
-                            id="administrator-menu"
-                            style="{{ $isAdministratorRoute
-                                ? 'display: block;'
-                                : 'display: none;' }}"
+                            class="icon icon-shape icon-sm text-center
+                                   d-flex align-items-center
+                                   justify-content-center"
                         >
+                            <i class="fa fa-cog" aria-hidden="true"></i>
+                        </div>
+                        <span class="nav-link-text ms-1">
+                            Administration
+                        </span>
+                        <i
+                            class="fa fa-angle-down direk-menu-chevron"
+                            id="administrator-menu-icon"
+                            aria-hidden="true"
+                            style="{{ $isAdministratorRoute
+                                ? 'transform: rotate(180deg);'
+                                : 'transform: rotate(0deg);' }}"
+                        ></i>
+                    </button>
+                    <div
+                        id="administrator-menu"
+                        style="{{ $isAdministratorRoute
+                            ? 'display: block;'
+                            : 'display: none;' }}"
+                    >
                         <ul class="nav direk-submenu">
-                            @can(
-                                'viewAny',
-                                App\Models\User::class
-                            )
+                            @can('viewAny', App\Models\User::class)
                                 <li class="nav-item">
                                     <a
-                                        class="nav-link
-                                               {{ request()->routeIs(
-                                                    'users.\*'
-                                               )
-                                                    ? 'active'
-                                                    : '' }}"
-                                        href="{{ route(
-                                            'users.index'
-                                        ) }}"
+                                        class="nav-link {{ request()->routeIs('users.*') ? 'active' : '' }}"
+                                        href="{{ route('users.index') }}"
                                     >
                                         <span class="sidenav-mini-icon">
-                                            <i
-                                                class="fa fa-users"
-                                                aria-hidden="true"
-                                            ></i>
+                                            <i class="fa fa-users" aria-hidden="true"></i>
                                         </span>
                                         <span class="sidenav-normal">
                                             User Management
@@ -534,27 +634,14 @@
                                     </a>
                                 </li>
                             @endcan
-                            @can(
-                                'viewAny',
-                                App\Models\Role::class
-                            )
+                            @can('viewAny', App\Models\Role::class)
                                 <li class="nav-item">
                                     <a
-                                        class="nav-link
-                                               {{ request()->routeIs(
-                                                    'roles.\*'
-                                               )
-                                                    ? 'active'
-                                                    : '' }}"
-                                        href="{{ route(
-                                            'roles.index'
-                                        ) }}"
+                                        class="nav-link {{ request()->routeIs('roles.*') ? 'active' : '' }}"
+                                        href="{{ route('roles.index') }}"
                                     >
                                         <span class="sidenav-mini-icon">
-                                            <i
-                                                class="fa fa-user-secret"
-                                                aria-hidden="true"
-                                            ></i>
+                                            <i class="fa fa-user-secret" aria-hidden="true"></i>
                                         </span>
                                         <span class="sidenav-normal">
                                             Roles & Permissions
@@ -562,27 +649,14 @@
                                     </a>
                                 </li>
                             @endcan
-                            @can(
-                                'viewAny',
-                                App\Models\Staff::class
-                            )
+                            @can('viewAny', App\Models\Staff::class)
                                 <li class="nav-item">
                                     <a
-                                        class="nav-link
-                                               {{ request()->routeIs(
-                                                    'staffs.\*'
-                                               )
-                                                    ? 'active'
-                                                    : '' }}"
-                                        href="{{ route(
-                                            'staffs.index'
-                                        ) }}"
+                                        class="nav-link {{ request()->routeIs('staffs.*') ? 'active' : '' }}"
+                                        href="{{ route('staffs.index') }}"
                                     >
                                         <span class="sidenav-mini-icon">
-                                            <i
-                                                class="fa fa-building"
-                                                aria-hidden="true"
-                                            ></i>
+                                            <i class="fa fa-building" aria-hidden="true"></i>
                                         </span>
                                         <span class="sidenav-normal">
                                             Staff Management
@@ -600,21 +674,11 @@
                             )
                                 <li class="nav-item">
                                     <a
-                                        class="nav-link
-                                               {{ request()->routeIs(
-                                                    'staff-personnel.\*'
-                                               )
-                                                    ? 'active'
-                                                    : '' }}"
-                                        href="{{ route(
-                                            'staff-personnel.index'
-                                        ) }}"
+                                        class="nav-link {{ request()->routeIs('staff-personnel.*') ? 'active' : '' }}"
+                                        href="{{ route('staff-personnel.index') }}"
                                     >
                                         <span class="sidenav-mini-icon">
-                                            <i
-                                                class="fa fa-address-book"
-                                                aria-hidden="true"
-                                            ></i>
+                                            <i class="fa fa-address-book" aria-hidden="true"></i>
                                         </span>
                                         <span class="sidenav-normal">
                                             Staff Personnel
@@ -622,27 +686,14 @@
                                     </a>
                                 </li>
                             @endif
-                            @can(
-                                'viewAny',
-                                App\Models\Division::class
-                            )
+                            @can('viewAny', App\Models\Division::class)
                                 <li class="nav-item">
                                     <a
-                                        class="nav-link
-                                               {{ request()->routeIs(
-                                                    'divisions.\*'
-                                               )
-                                                    ? 'active'
-                                                    : '' }}"
-                                        href="{{ route(
-                                            'divisions.index'
-                                        ) }}"
+                                        class="nav-link {{ request()->routeIs('divisions.*') ? 'active' : '' }}"
+                                        href="{{ route('divisions.index') }}"
                                     >
                                         <span class="sidenav-mini-icon">
-                                            <i
-                                                class="fa fa-sitemap"
-                                                aria-hidden="true"
-                                            ></i>
+                                            <i class="fa fa-sitemap" aria-hidden="true"></i>
                                         </span>
                                         <span class="sidenav-normal">
                                             Division Management
@@ -650,27 +701,14 @@
                                     </a>
                                 </li>
                             @endcan
-                            @can(
-                                'viewAny',
-                                App\Models\Parameter::class
-                            )
+                            @can('viewAny', App\Models\Parameter::class)
                                 <li class="nav-item">
                                     <a
-                                        class="nav-link
-                                               {{ request()->routeIs(
-                                                    'parameters.\*'
-                                               )
-                                                    ? 'active'
-                                                    : '' }}"
-                                        href="{{ route(
-                                            'parameters.index'
-                                        ) }}"
+                                        class="nav-link {{ request()->routeIs('parameters.*') ? 'active' : '' }}"
+                                        href="{{ route('parameters.index') }}"
                                     >
                                         <span class="sidenav-mini-icon">
-                                            <i
-                                                class="fa fa-sliders"
-                                                aria-hidden="true"
-                                            ></i>
+                                            <i class="fa fa-sliders" aria-hidden="true"></i>
                                         </span>
                                         <span class="sidenav-normal">
                                             System Parameters
@@ -678,27 +716,14 @@
                                     </a>
                                 </li>
                             @endcan
-                            @can(
-                                'viewAny',
-                                App\Models\SystemLog::class
-                            )
+                            @can('viewAny', App\Models\SystemLog::class)
                                 <li class="nav-item">
                                     <a
-                                        class="nav-link
-                                               {{ request()->routeIs(
-                                                    'systemlogs.\*'
-                                               )
-                                                    ? 'active'
-                                                    : '' }}"
-                                        href="{{ route(
-                                            'systemlogs.index'
-                                        ) }}"
+                                        class="nav-link {{ request()->routeIs('systemlogs.*') ? 'active' : '' }}"
+                                        href="{{ route('systemlogs.index') }}"
                                     >
                                         <span class="sidenav-mini-icon">
-                                            <i
-                                                class="fa fa-list-alt"
-                                                aria-hidden="true"
-                                            ></i>
+                                            <i class="fa fa-list-alt" aria-hidden="true"></i>
                                         </span>
                                         <span class="sidenav-normal">
                                             System Logs
@@ -720,25 +745,57 @@
         const menu = document.getElementById(menuId);
         const icon = document.getElementById(iconId);
         if (!toggle || !menu) return;
-        const isOpen = () => window.getComputedStyle(menu).display !== 'none';
+        const isOpen = () =>
+            window.getComputedStyle(menu).display !== 'none';
         const sync = open => {
-            toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-            if (icon) icon.style.transform = open ? 'rotate(180deg)' : 'rotate(0deg)';
+            toggle.setAttribute(
+                'aria-expanded',
+                open ? 'true' : 'false'
+            );
+            if (icon) {
+                icon.style.transform = open
+                    ? 'rotate(180deg)'
+                    : 'rotate(0deg)';
+            }
         };
         toggle.onclick = function (event) {
             event.preventDefault();
             event.stopPropagation();
             const nextOpen = !isOpen();
-            menu.style.display = nextOpen ? 'block' : 'none';
+            menu.style.display = nextOpen
+                ? 'block'
+                : 'none';
             sync(nextOpen);
         };
         sync(isOpen());
-        return { toggle, menu, icon, sync, isOpen };
+        return {
+            toggle,
+            menu,
+            icon,
+            sync,
+            isOpen
+        };
     }
-    const profile = setupSidenavMenu('profile-menu-toggle', 'profile-menu', 'profile-menu-icon');
-    setupSidenavMenu('administrator-menu-toggle', 'administrator-menu', 'administrator-menu-icon');
+    const profile = setupSidenavMenu(
+        'profile-menu-toggle',
+        'profile-menu',
+        'profile-menu-icon'
+    );
+    setupSidenavMenu(
+        'administrator-menu-toggle',
+        'administrator-menu',
+        'administrator-menu-icon'
+    );
+    setupSidenavMenu(
+        'allocation-management-menu-toggle',
+        'allocation-management-menu',
+        'allocation-management-menu-icon'
+    );
     if (profile) {
-        profile.menu.addEventListener('click', event => event.stopPropagation());
+        profile.menu.addEventListener(
+            'click',
+            event => event.stopPropagation()
+        );
         document.addEventListener('click', () => {
             if (!profile.isOpen()) return;
             profile.menu.style.display = 'none';
