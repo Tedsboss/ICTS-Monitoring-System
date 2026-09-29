@@ -1,5 +1,4 @@
 @extends('layouts.app')
-
 @section('content')
 <div class="px-4 pb-8 pt-4">
     <nav class="navbar navbar-main navbar-expand-lg px-0 mx-0 shadow-none border-radius-xl z-index-sticky"
@@ -10,9 +9,7 @@
             @include('layouts.navbars.auth.topnav-withdatetime')
         </div>
     </nav>
-
     <div id="pageMessage"></div>
-
     {{-- Page Header --}}
     <section class="mb-5 rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div class="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between">
@@ -20,12 +17,10 @@
                 <h4 class="mb-1 text-lg font-bold text-slate-800">
                     Edit Allocation
                 </h4>
-
                 <p class="mb-0 text-sm text-slate-500">
-                    Update the Fiscal Year, Level, and allocation expenses.
+                    Update the Staff / Office, Fiscal Year, Level, and allocation expenses.
                 </p>
             </div>
-
             <a href="{{ route('allocations.index') }}"
                class="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300
                       bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm
@@ -35,7 +30,6 @@
             </a>
         </div>
     </section>
-
     {{-- Validation Errors --}}
     @if($errors->any())
         <div class="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -43,7 +37,6 @@
                 <i class="fa fa-exclamation-circle mr-1"></i>
                 Please correct the following:
             </div>
-
             <ul class="mb-0 list-disc pl-5">
                 @foreach($errors->all() as $error)
                     <li>{{ $error }}</li>
@@ -51,28 +44,54 @@
             </ul>
         </div>
     @endif
-
     <form method="POST"
           action="{{ route('allocations.update', $allocation) }}"
           id="allocationForm">
         @csrf
         @method('PUT')
-
         {{-- Allocation Information --}}
         <section class="mb-5 rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div class="border-b border-slate-200 px-5 py-4">
                 <h5 class="mb-0 text-base font-bold text-slate-800">
                     Allocation Information
                 </h5>
-
                 <p class="mb-0 mt-1 text-xs text-slate-500">
-                    Update the Fiscal Year and Level for this allocation.
+                    Update the Staff / Office, Fiscal Year, and Level for this allocation.
                 </p>
             </div>
-
             <div class="p-5">
-                <div class="grid gap-5 md:grid-cols-2">
-
+                <div class="grid gap-5 md:grid-cols-3">
+                    {{-- Staff / Office --}}
+                    <div>
+                        <label for="staff_id"
+                               class="mb-2 block text-sm font-semibold text-slate-700">
+                            Staff / Office
+                            <span class="text-red-500">*</span>
+                        </label>
+                        <div class="flex overflow-hidden rounded-xl border border-slate-300 bg-white
+                                    transition focus-within:border-sky-500 focus-within:ring-2 focus-within:ring-sky-100">
+                            <div class="flex w-11 shrink-0 items-center justify-center border-r border-slate-200
+                                        bg-slate-50 text-slate-400">
+                                <i class="fa fa-user"></i>
+                            </div>
+                            <select name="staff_id"
+                                    id="staff_id"
+                                    class="min-w-0 flex-1 border-0 bg-transparent px-3 py-2.5
+                                           text-sm text-slate-700 outline-none focus:ring-0"
+                                    required>
+                                <option value="">Select Staff / Office</option>
+                                @foreach($staffOptions as $staff)
+                                    <option value="{{ $staff->id }}"
+                                        @selected(old('staff_id', $allocation->staff_id) == $staff->id)>
+                                        {{ $staff->name }}{{ $staff->abbreviation ? ' - ' . $staff->abbreviation : '' }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <p class="mb-0 mt-1.5 text-xs text-slate-500">
+                            Select the Staff / Office that owns this allocation.
+                        </p>
+                    </div>
                     {{-- Fiscal Year --}}
                     <div>
                         <label for="year_id"
@@ -80,21 +99,18 @@
                             Fiscal Year
                             <span class="text-red-500">*</span>
                         </label>
-
                         <div class="flex overflow-hidden rounded-xl border border-slate-300 bg-white
                                     transition focus-within:border-sky-500 focus-within:ring-2 focus-within:ring-sky-100">
                             <div class="flex w-11 shrink-0 items-center justify-center border-r border-slate-200
                                         bg-slate-50 text-slate-400">
                                 <i class="fa fa-calendar"></i>
                             </div>
-
                             <select name="year_id"
                                     id="year_id"
                                     class="min-w-0 flex-1 border-0 bg-transparent px-3 py-2.5
                                            text-sm text-slate-700 outline-none focus:ring-0"
                                     required>
                                 <option value="">Select Fiscal Year</option>
-
                                 @foreach($fiscalYears as $fiscalYear)
                                     <option value="{{ $fiscalYear->id }}"
                                         @selected(old('year_id', $allocation->year_id) == $fiscalYear->id)>
@@ -103,12 +119,10 @@
                                 @endforeach
                             </select>
                         </div>
-
                         <p class="mb-0 mt-1.5 text-xs text-slate-500">
                             Select the fiscal year covered by this allocation.
                         </p>
                     </div>
-
                     {{-- Level --}}
                     <div>
                         <label for="level_id"
@@ -116,21 +130,18 @@
                             Level
                             <span class="text-red-500">*</span>
                         </label>
-
                         <div class="flex overflow-hidden rounded-xl border border-slate-300 bg-white
                                     transition focus-within:border-sky-500 focus-within:ring-2 focus-within:ring-sky-100">
                             <div class="flex w-11 shrink-0 items-center justify-center border-r border-slate-200
                                         bg-slate-50 text-slate-400">
                                 <i class="fa fa-layer-group"></i>
                             </div>
-
                             <select name="level_id"
                                     id="level_id"
                                     class="min-w-0 flex-1 border-0 bg-transparent px-3 py-2.5
                                            text-sm text-slate-700 outline-none focus:ring-0"
                                     required>
                                 <option value="">Select Level</option>
-
                                 @foreach($levels as $level)
                                     <option value="{{ $level->id }}"
                                         @selected(old('level_id', $allocation->level_id) == $level->id)>
@@ -139,16 +150,13 @@
                                 @endforeach
                             </select>
                         </div>
-
                         <p class="mb-0 mt-1.5 text-xs text-slate-500">
                             Select the allocation level such as Tier1, Tier2, NEP, GAA, or Continuing.
                         </p>
                     </div>
-
                 </div>
             </div>
         </section>
-
         {{-- Allocation Expenses --}}
         <section class="rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div class="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
@@ -156,12 +164,10 @@
                     <h5 class="mb-0 text-base font-bold text-slate-800">
                         Allocation Expenses
                     </h5>
-
                     <p class="mb-0 mt-1 text-xs text-slate-500">
                         Update the expense categories and corresponding allocation amounts.
                     </p>
                 </div>
-
                 <button type="button"
                         id="addExpense"
                         class="inline-flex items-center justify-center gap-2 rounded-lg
@@ -171,7 +177,6 @@
                     <span>Add Expense</span>
                 </button>
             </div>
-
             <div class="overflow-x-auto">
                 <table class="w-full min-w-[900px] text-sm">
                     <thead>
@@ -179,30 +184,24 @@
                             <th class="w-16 px-5 py-3 text-center font-semibold text-slate-600">
                                 #
                             </th>
-
                             <th class="px-5 py-3 font-semibold text-slate-600">
                                 Expense Type
                             </th>
-
                             <th class="px-5 py-3 font-semibold text-slate-600">
                                 Cost
                             </th>
-
                             <th class="px-5 py-3 text-right font-semibold text-slate-600">
                                 Action
                             </th>
                         </tr>
                     </thead>
-
                     <tbody id="expenseRows"></tbody>
-
                     <tfoot>
                         <tr class="border-t border-slate-200 bg-slate-50">
                             <th colspan="3"
                                 class="px-5 py-4 text-right font-bold text-slate-700">
                                 Total
                             </th>
-
                             <th id="totalCost"
                                 class="px-5 py-4 text-right font-bold text-slate-800">
                                 0.00
@@ -211,29 +210,23 @@
                     </tfoot>
                 </table>
             </div>
-
             {{-- Empty State --}}
             <div id="noExpenses"
                  class="px-5 py-12 text-center text-sm text-slate-500">
                 <i class="fa fa-folder-open-o mb-2 block text-2xl text-slate-300"></i>
-
                 No expenses are configured for this allocation yet.
-
                 Click <strong>Add Expense</strong> to begin.
             </div>
-
             {{-- Information --}}
             <div class="border-t border-slate-200 bg-slate-50 px-5 py-4">
                 <div class="flex items-start gap-3 rounded-xl border border-sky-100 bg-sky-50/60 p-4">
                     <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sky-600 text-white">
                         <i class="fa fa-info-circle"></i>
                     </div>
-
                     <div>
                         <h6 class="mb-1 text-sm font-bold text-sky-800">
                             About Allocation Expenses
                         </h6>
-
                         <p class="mb-0 text-xs leading-5 text-slate-600">
                             Each expense type can only be added once to an allocation.
                             The total allocation is calculated automatically.
@@ -241,7 +234,6 @@
                     </div>
                 </div>
             </div>
-
             {{-- Form Actions --}}
             <div class="flex items-center justify-end gap-3 border-t border-slate-200 px-5 py-4">
                 <a href="{{ route('allocations.index') }}"
@@ -251,7 +243,6 @@
                     <i class="fa fa-times text-slate-400"></i>
                     <span>Cancel</span>
                 </a>
-
                 <button type="submit"
                         class="inline-flex items-center justify-center gap-2 rounded-lg
                                bg-sky-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm
@@ -262,12 +253,10 @@
             </div>
         </section>
     </form>
-
     <div class="mt-6">
         @include('layouts.footers.auth.footer')
     </div>
 </div>
-
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const form = document.getElementById('allocationForm');
@@ -317,7 +306,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
         expenseRows.querySelectorAll('.cost-input').forEach(input => {
             const value = parseFloat(input.value);
-
             total += Number.isFinite(value) ? value : 0;
         });
 
@@ -326,7 +314,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function updateEmptyMessage() {
         const hasRows = expenseRows.children.length > 0;
-
         noExpenses.style.display = hasRows ? 'none' : 'block';
     }
 
@@ -338,8 +325,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
             select.querySelectorAll('option[data-expense-id]').forEach(option => {
                 option.disabled =
-                    selectedValues.includes(option.value)
-                    && option.value !== currentValue;
+                    selectedValues.includes(option.value) &&
+                    option.value !== currentValue;
             });
         });
     }
@@ -461,7 +448,6 @@ document.addEventListener('DOMContentLoaded', function () {
             '</td>';
 
         expenseRows.appendChild(row);
-
         rowIndex++;
 
         updateRowNumbers();
@@ -476,8 +462,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     expenseRows.addEventListener('click', function (event) {
-        const button =
-            event.target.closest('.remove-expense');
+        const button = event.target.closest('.remove-expense');
 
         if (!button) {
             return;
@@ -517,13 +502,8 @@ document.addEventListener('DOMContentLoaded', function () {
         if (expenseRows.children.length === 0) {
             event.preventDefault();
 
-            noExpenses.classList.remove(
-                'text-slate-500'
-            );
-
-            noExpenses.classList.add(
-                'text-red-600'
-            );
+            noExpenses.classList.remove('text-slate-500');
+            noExpenses.classList.add('text-red-600');
 
             noExpenses.innerHTML =
                 '<i class="fa fa-exclamation-circle ' +

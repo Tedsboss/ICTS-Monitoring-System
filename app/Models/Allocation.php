@@ -16,11 +16,13 @@ class Allocation extends Model
     protected $fillable = [
         'year_id',
         'level_id',
+        'staff_id',
     ];
 
     protected $casts = [
         'year_id' => 'integer',
         'level_id' => 'integer',
+        'staff_id' => 'integer',
     ];
 
     public function fiscalYear(): BelongsTo
@@ -31,6 +33,11 @@ class Allocation extends Model
     public function level(): BelongsTo
     {
         return $this->belongsTo(Level::class, 'level_id');
+    }
+
+    public function staff(): BelongsTo
+    {
+        return $this->belongsTo(Staff::class, 'staff_id');
     }
 
     public function expenses(): HasMany

@@ -11,9 +11,9 @@
     $isAllocationManagementRoute = request()->routeIs(
         'allocations.*',
         'fiscal-years.*',
-        'levels.*',
-        'expense-types.*'
+        'levels.*'
     );
+    $isExpenseManagementRoute = request()->routeIs('expense-types.*');
     $isProfileRoute = request()->routeIs('user-profile');
     $canViewFinancialPlan = auth()->user()->can(
         'viewAny',
@@ -23,7 +23,7 @@
         'viewAny',
         App\Models\WorkPlan::class
     );
-    $canViewAllocationManagement =
+    $canViewExpenseManagement =
         auth()->user()->isSuperAdmin()
         || (
             auth()->user()->role
@@ -38,20 +38,19 @@
                 ) === 0;
             })
         );
-    $canManageFinancialPlanAllocationTypes =
-        in_array((int) auth()->user()->role_id, [1, 29], true)
+    $canViewAllocationManagement =
+        auth()->user()->isSuperAdmin()
         || (
-            !empty(auth()->user()->staff_id)
-            && auth()->user()->role
+            auth()->user()->role
             && auth()->user()->role->permissions->contains(function ($permission) {
                 return strcasecmp(
                     (string) optional($permission->module)->name,
-                    'Allocation Type Management'
+                    'Allocation Management'
                 ) === 0
-                    && strcasecmp(
-                        (string) $permission->name,
-                        'view'
-                    ) === 0;
+                && strcasecmp(
+                    (string) $permission->name,
+                    'view'
+                ) === 0;
             })
         );
     $administratorModuleIds = App\Models\Module::query()
@@ -424,7 +423,6 @@
             @if (
                 $canViewFinancialPlan
                 || $canViewWorkPlan
-                || $canManageFinancialPlanAllocationTypes
                 || $canViewAllocationManagement
                 || $hasAdministratorAccess
             )
@@ -434,7 +432,7 @@
                     </div>
                 </li>
                 {{-- Allocation Management --}}
-                @if ($canViewAllocationManagement || $canManageFinancialPlanAllocationTypes)
+                @if ($canViewAllocationManagement)
                     <li class="nav-item">
                         <button
                             type="button"
@@ -507,23 +505,6 @@
                                         </span>
                                     </a>
                                 </li>
-                                {{-- Allocation Types --}}
-                                @if ($canManageFinancialPlanAllocationTypes)
-                                    <li class="nav-item">
-                                        <a
-                                            class="nav-link {{ request()->routeIs('financial-plan-allocation-types.*') ? 'active' : '' }}"
-                                            href="{{ route('financial-plan-allocation-types.index') }}"
-                                        >
-                                            <span class="sidenav-mini-icon">
-                                                <i class="fa fa-tags" aria-hidden="true"></i>
-                                            </span>
-                                            <span class="sidenav-normal">
-                                                Allocation Types
-                                            </span>
-                                        </a>
-                                    </li>
-                                @endif
-                                {{-- Expense Types --}}
                                 <li class="nav-item">
                                     <a
                                         class="nav-link {{ request()->routeIs('expense-types.*') ? 'active' : '' }}"
@@ -542,7 +523,6 @@
                     </li>
                 @endif
             @endif
-            
                 {{-- Financial Plans --}}
                 @if ($canViewFinancialPlan)
                     <li class="nav-item">
@@ -575,13 +555,11 @@
                         </a>
                     </li>
                 @endif
-                
-            {{-- Administration --}}
-            @if (auth()->user()->isSuperAdmin())
+            @if (auth()->user()->isSuperAdmin() || $canViewExpenseManagement)
                 <li class="nav-item mt-4 mb-2">
                     <div class="direk-section-heading">
                         <span>
-                            Administration
+                            System Administration
                         </span>
                     </div>
                 </li>
@@ -601,7 +579,7 @@
                             <i class="fa fa-cog" aria-hidden="true"></i>
                         </div>
                         <span class="nav-link-text ms-1">
-                            Administration
+                            System Administration
                         </span>
                         <i
                             class="fa fa-angle-down direk-menu-chevron"
@@ -716,6 +694,51 @@
                                     </a>
                                 </li>
                             @endcan
+                            {{-- Expense Management --}}
+                            @if ($canViewExpenseManagement)
+                                <li class="nav-item">
+                                    <button
+                                        type="button"
+                                        class="nav-link"
+                                        id="expense-management-menu-toggle"
+                                        aria-expanded="{{ $isExpenseManagementRoute ? 'true' : 'false' }}"
+                                        aria-controls="expense-management-menu"
+                                    >
+                                        <div class="icon icon-shape icon-sm text-center d-flex align-items-center justify-content-center">
+                                            <i class="fa fa-tags" aria-hidden="true"></i>
+                                        </div>
+                                        <span class="nav-link-text ms-1">
+                                            Expense Management
+                                        </span>
+                                        <i
+                                            class="fa fa-angle-down direk-menu-chevron"
+                                            id="expense-management-menu-icon"
+                                            aria-hidden="true"
+                                            style="{{ $isExpenseManagementRoute ? 'transform: rotate(180deg);' : 'transform: rotate(0deg);' }}"
+                                        ></i>
+                                    </button>
+                                    <div
+                                        id="expense-management-menu"
+                                        style="{{ $isExpenseManagementRoute ? 'display: block;' : 'display: none;' }}"
+                                    >
+                                        <ul class="nav direk-submenu">
+                                            <li class="nav-item">
+                                                <a
+                                                    class="nav-link {{ $isExpenseManagementRoute ? 'active' : '' }}"
+                                                    href="{{ route('expense-types.index') }}"
+                                                >
+                                                    <span class="sidenav-mini-icon">
+                                                        <i class="fa fa-tags" aria-hidden="true"></i>
+                                                    </span>
+                                                    <span class="sidenav-normal">
+                                                        Expense Types
+                                                    </span>
+                                                </a>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </li>
+                            @endif
                             @can('viewAny', App\Models\SystemLog::class)
                                 <li class="nav-item">
                                     <a
@@ -790,6 +813,11 @@
         'allocation-management-menu-toggle',
         'allocation-management-menu',
         'allocation-management-menu-icon'
+    );
+    setupSidenavMenu(
+        'expense-management-menu-toggle',
+        'expense-management-menu',
+        'expense-management-menu-icon'
     );
     if (profile) {
         profile.menu.addEventListener(
