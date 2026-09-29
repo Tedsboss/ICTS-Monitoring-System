@@ -1,5 +1,6 @@
 @php
     $class_theme = session('user_settings.class_theme', '');
+
     $selectedPermissions = collect(
         old('permissions', $role_permissions ?? [])
     )
@@ -8,6 +9,7 @@
         })
         ->values()
         ->toArray();
+
     // DIREK Administration modules
     $administrationModuleNames = [
         'User Management',
@@ -17,14 +19,17 @@
         'System Parameters',
         'System Logs',
     ];
+
     // DIREK Financial Management modules
     $financialManagementModuleNames = [
         'Financial Plan',
         'Work Plan',
+        'Allocation Management',
         'Allocation Type Management',
         'Procurement',
         'SAEB',
     ];
+
     // Match Administration modules
     $administrationModules = $modules->filter(function ($module) use ($administrationModuleNames) {
         return collect($administrationModuleNames)->contains(function ($name) use ($module) {
@@ -34,6 +39,7 @@
             ) === 0;
         });
     });
+
     // Match Financial Management modules
     $financialManagementModules = $modules->filter(function ($module) use ($financialManagementModuleNames) {
         return collect($financialManagementModuleNames)->contains(function ($name) use ($module) {
@@ -43,6 +49,7 @@
             ) === 0;
         });
     });
+
     // DIREK permission categories
     $direkCategories = collect([
         [
@@ -55,7 +62,7 @@
         [
             'name' => 'Financial Management',
             'key' => 'financial-management',
-            'description' => 'Manage access to Financial Plan, Work Plan, Allocation Type Management, Procurement, and SAEB functions.',
+            'description' => 'Manage access to Financial Plan, Work Plan, Allocation Management, Allocation Type Management, Procurement, and SAEB functions.',
             'icon' => 'fa fa-money',
             'modules' => $financialManagementModules,
         ],
@@ -63,6 +70,7 @@
         return $category['modules']->isNotEmpty();
     });
 @endphp
+
 @extends('layouts.app')
 @section('content')
     {{-- Navbar --}}
