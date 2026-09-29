@@ -1,8 +1,8 @@
 <?php
 namespace App\Http\Controllers;
+use App\Models\Allocation;
 use App\Models\FinancialPlan;
 use App\Models\FinancialPlanAllocation;
-use App\Models\FinancialPlanAllocationItem;
 use App\Models\FinancialPlanAllocationType;
 use App\Models\FinancialPlanSignatory;
 use App\Models\FinancialPlanSubmission;
@@ -19,6 +19,8 @@ use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Barryvdh\DomPDF\Facade\Pdf;
 use App\Models\ExpenseItem;
+use App\Models\ProgramHeader;
+
 class FinancialPlanController extends Controller
 {
     use GenerateLogs;
@@ -56,6 +58,69 @@ class FinancialPlanController extends Controller
             $contractAmount * ($capitalOutlay / $total),
         ];
     }
+    private function validateAllocationExpenseCeiling(array $rows, Allocation $allocation): void
+    {
+        $allocation->loadMissing('expenses.expenseType');
+        $allocationMooe = (float) $allocation->expenses
+            ->filter(fn ($expense) => strtoupper(trim((string) $expense->expenseType?->type)) === 'MOOE')
+            ->sum('cost');
+        $allocationCapitalOutlay = (float) $allocation->expenses
+            ->filter(fn ($expense) => strtoupper(trim((string) $expense->expenseType?->type)) === 'CO')
+            ->sum('cost');
+        $allocationTotal = $allocationMooe + $allocationCapitalOutlay;
+        $programmedMooe = 0.0;
+        $programmedCapitalOutlay = 0.0;
+        $contractTotal = 0.0;
+
+        foreach ($rows as $index => $row) {
+            if (($row['row_type'] ?? null) !== 'item') {
+                continue;
+            }
+            $mooe = (float) ($row['mooe'] ?? 0);
+            $capitalOutlay = (float) ($row['capital_outlay'] ?? 0);
+            $contractAmount = array_key_exists('contract_amount', $row)
+                && $row['contract_amount'] !== null
+                ? (float) $row['contract_amount']
+                : null;
+            [$effectiveMooe, $effectiveCapitalOutlay] = $this->effectiveAmounts(
+                $mooe,
+                $capitalOutlay,
+                $contractAmount
+            );
+            $programmedMooe += $effectiveMooe;
+            $programmedCapitalOutlay += $effectiveCapitalOutlay;
+            if ($contractAmount !== null) {
+                $contractTotal += $contractAmount;
+            }
+        }
+
+        $errors = [];
+        if ($programmedMooe > $allocationMooe + 0.01) {
+            $errors['financial_plan_allocation_mooe'] =
+                'Total programmed MOOE exceeds the selected Allocation Management MOOE by '
+                . number_format($programmedMooe - $allocationMooe, 2) . '.';
+        }
+        if ($programmedCapitalOutlay > $allocationCapitalOutlay + 0.01) {
+            $errors['financial_plan_allocation_capital_outlay'] =
+                'Total programmed Capital Outlay exceeds the selected Allocation Management Capital Outlay by '
+                . number_format($programmedCapitalOutlay - $allocationCapitalOutlay, 2) . '.';
+        }
+        if ($programmedMooe + $programmedCapitalOutlay > $allocationTotal + 0.01) {
+            $errors['financial_plan_allocation_total'] =
+                'Total Financial Plan budget exceeds the selected Allocation Expenses by '
+                . number_format(($programmedMooe + $programmedCapitalOutlay) - $allocationTotal, 2) . '.';
+        }
+        if ($contractTotal > $allocationTotal + 0.01) {
+            $errors['financial_plan_allocation_contract'] =
+                'Total Contract Amount exceeds the selected Allocation Expenses by '
+                . number_format($contractTotal - $allocationTotal, 2) . '.';
+        }
+
+        if (! empty($errors)) {
+            throw ValidationException::withMessages($errors);
+        }
+    }
+
     private function normalizeRows(array $rows): array
     {
         return collect($rows)->map(function ($row) {
@@ -256,6 +321,7 @@ class FinancialPlanController extends Controller
             ->orderBy('sort_order')
             ->get([
                 'id',
+                'allocation_id',
                 'program_classification',
                 'prexc_code',
                 'allocation_type',
@@ -308,7 +374,19 @@ class FinancialPlanController extends Controller
                 return [$classification . '|' . $prexcCode => true];
             });
         $errors = [];
-        $programmed = [];
+        $programmedMooe = 0.0;
+        $programmedCapitalOutlay = 0.0;
+        $allocationIds = $items->pluck('allocation_id')->filter()->map(fn ($id) => (int) $id)->unique()->values();
+        if ($allocationIds->count() !== 1) {
+            $errors['financial_plan_allocation'] = 'A Financial Plan must have one selected Allocation Management allocation before submission.';
+        }
+        $selectedAllocation = $allocationIds->count() === 1
+            ? Allocation::with('expenses.expenseType')->find($allocationIds->first())
+            : null;
+        if ($selectedAllocation && (int) $selectedAllocation->fiscalYear->year !== $fiscalYear) {
+            $errors['financial_plan_allocation'] = 'The selected Allocation Management allocation does not belong to the selected fiscal year.';
+            $selectedAllocation = null;
+        }
         foreach ($items as $item) {
             $rowLabel = trim((string) $item->specific_activity);
             if ($rowLabel === '') {
@@ -406,62 +484,17 @@ class FinancialPlanController extends Controller
                     . number_format($effectiveBudget, 2) . '. Current target total is '
                     . number_format($targetTotal, 2) . '.';
             }
-            if ($allocationMaster) {
-                if ($allocationMaster->allows_mooe && $effectiveMooe > 0) {
-                    $programmed[$allocationMaster->id]['mooe'] =
-                        ($programmed[$allocationMaster->id]['mooe'] ?? 0) + $effectiveMooe;
-                }
-                if ($allocationMaster->allows_capital_outlay && $effectiveCo > 0) {
-                    $programmed[$allocationMaster->id]['capital_outlay'] =
-                        ($programmed[$allocationMaster->id]['capital_outlay'] ?? 0) + $effectiveCo;
-                }
-            }
         }
-        $allocation = $this->findAllocationHeader(
-            $fiscalYear,
-            $officeName,
-            $staffId
-        );
-        $storedItems = $allocation
-            ? FinancialPlanAllocationItem::query()
-                ->where('financial_plan_allocation_id', $allocation->id)
-                ->get()
-                ->keyBy(
-                    fn ($item) =>
-                        $item->allocation_type_id . '|' . $item->expense_category
-                )
-            : collect();
-        foreach ($allocationTypes as $type) {
-            foreach (['mooe', 'capital_outlay'] as $category) {
-                $allowed = $category === 'mooe'
-                    ? (bool) $type->allows_mooe
-                    : (bool) $type->allows_capital_outlay;
-                if (! $allowed) {
-                    continue;
-                }
-                $programmedAmount = (float) (
-                    $programmed[$type->id][$category] ?? 0
-                );
-                if ($programmedAmount <= 0) {
-                    continue;
-                }
-                $allocationAmount = (float) (
-                    $storedItems->get(
-                        $type->id . '|' . $category
-                    )->amount ?? 0
-                );
-                $balance = $allocationAmount - $programmedAmount;
-                if ($balance < -0.01) {
-                    $categoryName = $category === 'mooe'
-                        ? 'MOOE'
-                        : 'Capital Outlay';
-                    $errorKey = 'financial_plan_allocation_'
-                        . $type->id . '_' . $category . '_balance';
-                    $errors[$errorKey] =
-                        "{$type->name} {$categoryName} programmed amount exceeds the available allocation by "
-                        . number_format(abs($balance), 2) . '.';
-                }
-            }
+        if ($selectedAllocation) {
+            $this->validateAllocationExpenseCeiling(
+                $items->map(fn ($item) => [
+                    'row_type' => 'item',
+                    'mooe' => $item->mooe,
+                    'capital_outlay' => $item->capital_outlay,
+                    'contract_amount' => $item->contract_amount,
+                ])->all(),
+                $selectedAllocation
+            );
         }
         if (! empty($errors)) {
             throw ValidationException::withMessages($errors);
@@ -635,6 +668,11 @@ class FinancialPlanController extends Controller
         $this->authorize('viewAny', FinancialPlan::class);
         $fiscalYear = (int) $request->input('fiscal_year', now()->year);
         $officeName = $request->string('office_name')->toString();
+        $isAdmin = in_array(
+            (int) auth()->user()->role_id,
+            [1, 29],
+            true
+        );
         $accessPlan = null;
         if ($officeName !== '') {
             $accessPlan = $this->findPlanForAccess($fiscalYear, $officeName);
@@ -657,7 +695,15 @@ class FinancialPlanController extends Controller
                 ->whereNotNull('staff_id')
                 ->value('staff_id');
         }
-        // For a brand-new plan with no existing owner rows yet, use the
+        // Administrators may open a brand-new plan for a Staff/Office that
+        // has no Financial Plan rows yet and may not have a staff_id.
+        // Resolve the selected Office/Staff directly from the staffs master.
+        if ($personnelStaffId === null && $isAdmin && $officeName !== '') {
+            $personnelStaffId = DB::table('staffs')
+                ->where('name', $officeName)
+                ->value('id');
+        }
+        // For a brand-new plan with no selected owner yet, use the
         // logged-in user's Staff/Office when available.
         if ($personnelStaffId === null) {
             $personnelStaffId = auth()->user()->staff_id;
@@ -670,17 +716,51 @@ class FinancialPlanController extends Controller
                 ->orderBy('name')
                 ->get(['id', 'name', 'position']);
         }
-        // Program Classification and PREXC come from the controlled master list.
-        $prexcClassifications = PrexcClassification::query()
-            ->active()
-            ->ordered()
-            ->get([
-                'id',
-                'classification_group',
-                'program_name',
-                'classification_name',
-                'prexc_code',
-            ]);
+        // Program Classification hierarchy comes from the new controlled master data.
+        $programClassificationTree = ProgramHeader::query()
+            ->with([
+                'subHeaders' => function ($query) {
+                    $query->orderBy('id');
+                },
+                'subHeaders.programs' => function ($query) {
+                    $query->orderBy('id');
+                },
+                'subHeaders.programs.expenditures' => function ($query) {
+                    $query->orderBy('id');
+                },
+            ])
+            ->orderBy('id')
+            ->get()
+            ->map(function ($header) {
+                return [
+                    'id' => (int) $header->id,
+                    'header' => $header->header,
+                    'sub_headers' => $header->subHeaders->map(function ($subHeader) {
+                        return [
+                            'id' => (int) $subHeader->id,
+                            'header_id' => (int) $subHeader->header_id,
+                            'sub_header' => $subHeader->sub_header,
+                            'sub_code' => $subHeader->sub_code,
+                            'programs' => $subHeader->programs->map(function ($program) {
+                                return [
+                                    'id' => (int) $program->id,
+                                    'sub_header_id' => (int) $program->sub_header_id,
+                                    'program' => $program->program,
+                                    'expenditures' => $program->expenditures->map(function ($expenditure) {
+                                        return [
+                                            'id' => (int) $expenditure->id,
+                                            'program_id' => (int) $expenditure->program_id,
+                                            'expenditure' => $expenditure->expenditure,
+                                            'prexc' => $expenditure->prexc,
+                                            'is_ops' => (bool) $expenditure->is_ops,
+                                        ];
+                                    })->values(),
+                                ];
+                            })->values(),
+                        ];
+                    })->values(),
+                ];
+            })->values();
         // Allocation Types are configured per Staff/Office.
         // Do not assume every office uses ICTS allocation types such as MITHI/NINP.
         $allocationTypeOptions = collect();
@@ -697,24 +777,56 @@ class FinancialPlanController extends Controller
                     'allows_capital_outlay',
                 ]);
         }
-        $expenseItemOptions = collect();
-        if ($personnelStaffId !== null) {
-            $expenseItemOptions = ExpenseItem::query()
-                ->where('fiscal_year', $fiscalYear)
-                ->where('staff_id', (int) $personnelStaffId)
-                ->where('is_active', true)
-                ->orderBy('name')
-                ->get([
-                    'id',
-                    'name',
-                ]);
-        }
-        $isAdmin = in_array(
-            (int) auth()->user()->role_id,
-            [1, 29],
-            true
-        );
+        // Load all Allocation Management records here. Expense Items in the
+        // Financial Plan Builder are derived from the selected Allocation's
+        // allocation_expenses -> expense_types, not from the legacy staff/year
+        // expense_items table. Existing saved expense_item text is still
+        // preserved by the Builder as Legacy / Unavailable when necessary.
+        $allocations = Allocation::with([
+            'fiscalYear',
+            'level',
+            'expenses.expenseType',
+        ])
+            ->orderByDesc('id')
+            ->get()
+            ->map(fn ($allocation) => (object) [
+                'id' => (int) $allocation->id,
+                'fiscalYear' => (object) [
+                    'year' => (int) $allocation->fiscalYear->year,
+                ],
+                'level' => (object) [
+                    'level_code' => $allocation->level->level_code,
+                    'level_description' => $allocation->level->level_description,
+                ],
+                'expenses' => $allocation->expenses->map(fn ($expense) => (object) [
+                    'id' => (int) $expense->id,
+                    'expense_id' => (int) $expense->expense_id,
+                    'cost' => (float) $expense->cost,
+                    'expense_type' => (object) [
+                        'id' => (int) $expense->expenseType->id,
+                        'type' => $expense->expenseType->type,
+                        'expense_description' => $expense->expenseType->expense_description,
+                    ],
+                ])->values(),
+            ])->values();
 
+        $allocationExpenseOptions = $allocations
+            ->map(fn ($allocation) => [
+                'allocation_id' => (int) $allocation->id,
+                'fiscal_year' => (int) $allocation->fiscalYear->year,
+                'items' => collect($allocation->expenses ?? [])
+                    ->map(fn ($expense) => [
+                        'allocation_expense_id' => (int) $expense->id,
+                        'expense_id' => (int) $expense->expense_id,
+                        'type' => (string) ($expense->expense_type->type ?? ''),
+                        'name' => (string) ($expense->expense_type->expense_description ?? ''),
+                    ])
+                    ->filter(fn ($item) => trim($item['name']) !== '')
+                    ->values(),
+            ])
+            ->values();
+
+        $expenseItemOptions = collect();
         $staffOptions = collect();
 
         if ($isAdmin) {
@@ -728,16 +840,18 @@ class FinancialPlanController extends Controller
         }
 
         return view('financial-plans.builder', [
-            'fiscalYear'            => $fiscalYear,
-            'officeName'            => $officeName,
-            'months'                => self::MONTHS,
-            'isAdmin'               => $isAdmin,
-            'staffOptions'          => $staffOptions,
-            'personnelStaffId'      => $personnelStaffId,
-            'personnelOptions'      => $personnelOptions,
-            'prexcClassifications'  => $prexcClassifications,
-            'allocationTypeOptions' => $allocationTypeOptions,
-            'expenseItemOptions'    => $expenseItemOptions,
+            'fiscalYear'                => $fiscalYear,
+            'officeName'                => $officeName,
+            'months'                    => self::MONTHS,
+            'isAdmin'                   => $isAdmin,
+            'staffOptions'              => $staffOptions,
+            'personnelStaffId'          => $personnelStaffId,
+            'personnelOptions'          => $personnelOptions,
+            'programClassificationTree' => $programClassificationTree,
+            'allocationTypeOptions'     => $allocationTypeOptions,
+            'expenseItemOptions'        => $expenseItemOptions,
+            'allocationExpenseOptions'  => $allocationExpenseOptions,
+            'allocations'               => $allocations,
         ]);
     }
 
@@ -748,7 +862,12 @@ class FinancialPlanController extends Controller
         $fiscalYear = (int) $request->input('fiscal_year', now()->year);
         $officeName = $request->string('office_name')->toString();
         $query = FinancialPlan::query()
-            ->with('targets')
+            ->with([
+                'targets',
+                'allocation.fiscalYear',
+                'allocation.level',
+                'allocation.expenses.expenseType',
+            ])
             ->where('fiscal_year', $fiscalYear);
         if ($officeName) {
             $this->authorizePlanRead($fiscalYear, $officeName);
@@ -761,6 +880,30 @@ class FinancialPlanController extends Controller
         $rows = $query
             ->orderBy('sort_order')
             ->get();
+
+        // Super Admin fallback: resolve the selected Staff/Office through the
+        // staffs master when the stored office_name does not exactly match
+        // the label submitted by the Builder.
+        if ($rows->isEmpty() && $officeName !== '' && in_array((int) auth()->user()->role_id, [1, 29], true)) {
+            $staffId = DB::table('staffs')
+                ->whereRaw('LOWER(TRIM(name)) = LOWER(TRIM(?))', [$officeName])
+                ->value('id');
+
+            if ($staffId !== null) {
+                $rows = FinancialPlan::query()
+                    ->with([
+                        'targets',
+                        'allocation.fiscalYear',
+                        'allocation.level',
+                        'allocation.expenses.expenseType',
+                    ])
+                    ->where('fiscal_year', $fiscalYear)
+                    ->where('staff_id', $staffId)
+                    ->orderBy('sort_order')
+                    ->get();
+            }
+        }
+
         return response()->json($rows->map(function (FinancialPlan $p) {
             [$effMooe, $effCapitalOutlay] = $this->effectiveAmounts(
                 (float) $p->mooe,
@@ -769,6 +912,23 @@ class FinancialPlanController extends Controller
             );
             return [
                 'id'                      => $p->id,
+                'allocation_id'            => $p->allocation_id,
+                'allocation'               => $p->allocation ? [
+                    'id' => (int) $p->allocation->id,
+                    'fiscal_year' => (int) ($p->allocation->fiscalYear?->year ?? $p->fiscal_year),
+                    'level' => [
+                        'code' => (string) ($p->allocation->level?->level_code ?? ''),
+                        'description' => (string) ($p->allocation->level?->level_description ?? ''),
+                    ],
+                    'expenses' => $p->allocation->expenses->map(fn ($expense) => [
+                        'id' => (int) $expense->id,
+                        'expense_id' => (int) $expense->expense_id,
+                        'type' => (string) ($expense->expenseType?->type ?? ''),
+                        'description' => (string) ($expense->expenseType?->expense_description ?? ''),
+                        'cost' => (float) $expense->cost,
+                    ])->values(),
+                    'total' => (float) $p->allocation->expenses->sum('cost'),
+                ] : null,
                 'row_type'                => $p->row_type,
                 'program_classification'  => $p->program_classification,
                 'prexc_code'              => $p->prexc_code,
@@ -805,6 +965,21 @@ class FinancialPlanController extends Controller
             $this->applyStaffScope($signatoryQuery);
         }
         $signatory = $signatoryQuery->first();
+
+        // Super Admin fallback: if the office label differs from the stored
+        // plan office name, resolve the signatory through the selected staff.
+        if (!$signatory && $officeName !== '' && in_array((int) auth()->user()->role_id, [1, 29], true)) {
+            $staffId = DB::table('staffs')
+                ->whereRaw('LOWER(TRIM(name)) = LOWER(TRIM(?))', [$officeName])
+                ->value('id');
+
+            if ($staffId !== null) {
+                $signatory = FinancialPlanSignatory::where('fiscal_year', $fiscalYear)
+                    ->where('staff_id', $staffId)
+                    ->first();
+            }
+        }
+
         return response()->json([
             'prepared_by'              => $signatory->prepared_by ?? '',
             'prepared_by_position'     => $signatory->prepared_by_position ?? '',
@@ -873,6 +1048,7 @@ class FinancialPlanController extends Controller
         ]);
         $validated = $request->validate([
             'fiscal_year' => ['required', 'integer', 'min:2000', 'max:2100'],
+            'allocation_id' => ['required', 'integer', 'exists:allocations,id'],
             'office_name' => ['required', 'string', 'max:150'],
             'rows'                          => ['present', 'array'],
             'rows.*.id'                     => ['nullable', 'integer', 'exists:financial_plans,id'],
@@ -894,6 +1070,16 @@ class FinancialPlanController extends Controller
         $year   = (int) $validated['fiscal_year'];
         $office = $validated['office_name'];
         $rows   = $validated['rows'] ?? [];
+        $allocation = Allocation::with('fiscalYear')
+            ->findOrFail((int) $validated['allocation_id']);
+
+        if ((int) $allocation->fiscalYear->year !== $year) {
+            return response()->json([
+                'success' => false,
+                'message' => 'The selected allocation does not belong to the selected fiscal year.',
+            ], 422);
+        }
+
         $accessPlan = $this->authorizePlanWrite($year, $office);
         // Enforce the controlled Program Classification/PREXC pairing on the server.
         $this->validatePrexcRows($rows, $year, $office);
@@ -906,6 +1092,8 @@ class FinancialPlanController extends Controller
             $office,
             $allocationStaffId
         );
+        // Allocation Management is the authoritative budget ceiling.
+        $this->validateAllocationExpenseCeiling($rows, $allocation);
         // Prevent changes after finalization
         if ($this->planIsLocked($year, $office)) {
             return $this->lockedResponse();
@@ -930,8 +1118,9 @@ class FinancialPlanController extends Controller
                 $isNew = ! $plan;
                 $plan  ??= new FinancialPlan();
                 $incoming = [
-                    'fiscal_year' => $year,
-                    'office_name' => $office,
+                    'fiscal_year'  => $year,
+                    'allocation_id' => $allocation->id,
+                    'office_name'  => $office,
                     'staff_id' => $plan->staff_id ?? $accessPlan?->staff_id ?? auth()->user()->staff_id,
                     'division_id' => $plan->division_id
                         ?? $accessPlan?->division_id
@@ -1260,335 +1449,6 @@ class FinancialPlanController extends Controller
         }
         return $grand;
     }
-    // Allocation and balance
-    public function allocation(Request $request): JsonResponse
-    {
-        $this->authorize('viewAny', FinancialPlan::class);
-        $fiscalYear = (int) $request->input('fiscal_year', now()->year);
-        $officeName = $request->string('office_name')->toString();
-        $accessPlan = $this->authorizePlanRead($fiscalYear, $officeName);
-        $staffId = $this->resolvePlanStaffId($fiscalYear, $officeName, $accessPlan);
-        $allocation = $this->findAllocationHeader($fiscalYear, $officeName, $staffId);
-        $allocationTypes = $this->allocationTypesForStaff($staffId);
-        $items = $allocation
-            ? FinancialPlanAllocationItem::query()
-                ->where('financial_plan_allocation_id', $allocation->id)
-                ->get()
-                ->keyBy(fn ($item) => $item->allocation_type_id . '|' . $item->expense_category)
-            : collect();
-        $allocationItems = $allocationTypes->map(function ($type) use ($items) {
-            $categories = [];
-            if ($type->allows_mooe) {
-                $categories['mooe'] = (float) ($items->get($type->id . '|mooe')->amount ?? 0);
-            }
-            if ($type->allows_capital_outlay) {
-                $categories['capital_outlay'] = (float) (
-                    $items->get($type->id . '|capital_outlay')->amount ?? 0
-                );
-            }
-            return [
-                'allocation_type_id' => (int) $type->id,
-                'code' => $type->code,
-                'name' => $type->name,
-                'allows_mooe' => (bool) $type->allows_mooe,
-                'allows_capital_outlay' => (bool) $type->allows_capital_outlay,
-                'categories' => $categories,
-            ];
-        })->values();
-        return response()->json([
-            'allocation_items' => $allocationItems,
-            // Temporary compatibility for the current ICTS Builder/Index.
-            'mooe_allocation' => $this->allocationItemAmount(
-                $allocation,
-                $allocationTypes,
-                'mithi',
-                'mooe'
-            ),
-            'capital_outlay_allocation' => $this->allocationItemAmount(
-                $allocation,
-                $allocationTypes,
-                'mithi',
-                'capital_outlay'
-            ),
-            'ninp_allocation' => $this->allocationItemAmount(
-                $allocation,
-                $allocationTypes,
-                'ninp',
-                'mooe'
-            ),
-        ]);
-    }
-    public function saveAllocation(Request $request): JsonResponse
-    {
-        $this->authorize('viewAny', FinancialPlan::class);
-        $validated = $request->validate([
-            'fiscal_year' => ['required', 'integer', 'min:2000', 'max:2100'],
-            'office_name' => ['required', 'string', 'max:150'],
-            'allocation_items' => ['nullable', 'array'],
-            'allocation_items.*.allocation_type_id' => [
-                'required_with:allocation_items',
-                'integer',
-                'exists:financial_plan_allocation_types,id',
-            ],
-            'allocation_items.*.expense_category' => [
-                'required_with:allocation_items',
-                'string',
-                'in:mooe,capital_outlay',
-            ],
-            'allocation_items.*.amount' => ['nullable', 'numeric', 'min:0'],
-            // Temporary compatibility for the current ICTS Builder.
-            'mooe_allocation' => ['nullable', 'numeric', 'min:0'],
-            'capital_outlay_allocation' => ['nullable', 'numeric', 'min:0'],
-            'ninp_allocation' => ['nullable', 'numeric', 'min:0'],
-        ]);
-        $year = (int) $validated['fiscal_year'];
-        $office = $validated['office_name'];
-        $accessPlan = $this->authorizePlanWrite($year, $office);
-        if ($this->planIsLocked($year, $office)) {
-            return $this->lockedResponse();
-        }
-        $staffId = $this->resolvePlanStaffId($year, $office, $accessPlan);
-        if ($staffId === null) {
-            throw ValidationException::withMessages([
-                'office_name' => 'The Staff/Office owner could not be determined.',
-            ]);
-        }
-        $allocationTypes = $this->allocationTypesForStaff($staffId);
-        if ($allocationTypes->isEmpty()) {
-            throw ValidationException::withMessages([
-                'allocation_items' => 'No active Allocation Types are configured for this Staff/Office.',
-            ]);
-        }
-        $incomingItems = collect($validated['allocation_items'] ?? []);
-        // Convert the current ICTS fields until the Builder sends generic items.
-        if ($incomingItems->isEmpty()) {
-            $legacyItems = [
-                ['code' => 'mithi', 'expense_category' => 'mooe', 'amount' => $validated['mooe_allocation'] ?? 0],
-                ['code' => 'mithi', 'expense_category' => 'capital_outlay', 'amount' => $validated['capital_outlay_allocation'] ?? 0],
-                ['code' => 'ninp', 'expense_category' => 'mooe', 'amount' => $validated['ninp_allocation'] ?? 0],
-            ];
-            $incomingItems = collect($legacyItems)
-                ->map(function ($item) use ($allocationTypes) {
-                    $type = $allocationTypes->first(
-                        fn ($type) => strtolower(trim((string) $type->code)) === $item['code']
-                    );
-                    if (! $type) {
-                        return null;
-                    }
-                    return [
-                        'allocation_type_id' => (int) $type->id,
-                        'expense_category' => $item['expense_category'],
-                        'amount' => (float) $item['amount'],
-                    ];
-                })
-                ->filter()
-                ->values();
-        }
-        $errors = [];
-        $seen = [];
-        foreach ($incomingItems as $index => $item) {
-            $type = $allocationTypes->firstWhere('id', (int) $item['allocation_type_id']);
-            if (! $type) {
-                $errors["allocation_items.{$index}.allocation_type_id"] =
-                    'The selected Allocation Type is not available for this Staff/Office.';
-                continue;
-            }
-            $category = $item['expense_category'];
-            if ($category === 'mooe' && ! $type->allows_mooe) {
-                $errors["allocation_items.{$index}.expense_category"] =
-                    "{$type->name} does not allow MOOE.";
-            }
-            if ($category === 'capital_outlay' && ! $type->allows_capital_outlay) {
-                $errors["allocation_items.{$index}.expense_category"] =
-                    "{$type->name} does not allow Capital Outlay.";
-            }
-            $key = $type->id . '|' . $category;
-            if (isset($seen[$key])) {
-                $errors["allocation_items.{$index}.expense_category"] =
-                    'Duplicate Allocation Type and expense category.';
-            }
-            $seen[$key] = true;
-        }
-        if (! empty($errors)) {
-            throw ValidationException::withMessages($errors);
-        }
-        $allocation = DB::transaction(function () use (
-            $year,
-            $office,
-            $staffId,
-            $accessPlan,
-            $allocationTypes,
-            $incomingItems
-        ) {
-            // The database has one allocation header per fiscal year and office.
-            // Reuse an existing legacy header even when staff_id was previously null
-            // or different, then synchronize its ownership.
-            $allocation = FinancialPlanAllocation::firstOrNew([
-                'fiscal_year' => $year,
-                'office_name' => $office,
-            ]);
-            $allocation->staff_id = $staffId;
-            $allocation->division_id = $accessPlan?->division_id
-                ?? $allocation->division_id
-                ?? auth()->user()->division_id;
-            $allocation->save();
-            $keepIds = [];
-            foreach ($incomingItems as $item) {
-                $allocationItem = FinancialPlanAllocationItem::updateOrCreate(
-                    [
-                        'financial_plan_allocation_id' => $allocation->id,
-                        'allocation_type_id' => (int) $item['allocation_type_id'],
-                        'expense_category' => $item['expense_category'],
-                    ],
-                    [
-                        'amount' => (float) ($item['amount'] ?? 0),
-                    ]
-                );
-                $keepIds[] = $allocationItem->id;
-            }
-            $deleteQuery = FinancialPlanAllocationItem::where(
-                'financial_plan_allocation_id',
-                $allocation->id
-            );
-            if (! empty($keepIds)) {
-                $deleteQuery->whereNotIn('id', $keepIds);
-            }
-            $deleteQuery->delete();
-            // Keep the old ICTS columns synchronized during the transition.
-            $allocation->update([
-                'mooe_allocation' => $this->allocationItemAmount(
-                    $allocation,
-                    $allocationTypes,
-                    'mithi',
-                    'mooe'
-                ),
-                'capital_outlay_allocation' => $this->allocationItemAmount(
-                    $allocation,
-                    $allocationTypes,
-                    'mithi',
-                    'capital_outlay'
-                ),
-                'ninp_allocation' => $this->allocationItemAmount(
-                    $allocation,
-                    $allocationTypes,
-                    'ninp',
-                    'mooe'
-                ),
-            ]);
-            return $allocation;
-        });
-        return response()->json([
-            'success' => true,
-            'message' => 'Allocation saved.',
-            'data' => $allocation,
-        ]);
-    }
-    // Calculate programmed amounts and remaining allocation
-    public function totals(Request $request): JsonResponse
-    {
-        $this->authorize('viewAny', FinancialPlan::class);
-        $fiscalYear = (int) $request->input('fiscal_year', now()->year);
-        $officeName = $request->string('office_name')->toString();
-        $accessPlan = $this->authorizePlanRead($fiscalYear, $officeName);
-        $staffId = $this->resolvePlanStaffId($fiscalYear, $officeName, $accessPlan);
-        $allocationTypes = $this->allocationTypesForStaff($staffId);
-        $allocationTypesByCode = $allocationTypes->keyBy(
-            fn ($type) => strtolower(trim((string) $type->code))
-        );
-        $itemsQuery = FinancialPlan::where('fiscal_year', $fiscalYear)
-            ->where('office_name', $officeName)
-            ->where('row_type', 'item');
-        if ($staffId !== null) {
-            $itemsQuery->where('staff_id', $staffId);
-        } else {
-            $this->applyStaffScope($itemsQuery);
-        }
-        $planItems = $itemsQuery->get([
-            'mooe',
-            'capital_outlay',
-            'contract_amount',
-            'allocation_type',
-        ]);
-        $programmed = [];
-        foreach ($planItems as $row) {
-            $code = strtolower(trim((string) ($row->allocation_type ?? '')));
-            $type = $allocationTypesByCode->get($code);
-            if (! $type) {
-                continue;
-            }
-            [$effectiveMooe, $effectiveCo] = $this->effectiveAmounts(
-                (float) $row->mooe,
-                (float) $row->capital_outlay,
-                $row->contract_amount
-            );
-            if ($type->allows_mooe) {
-                $programmed[$type->id]['mooe'] =
-                    ($programmed[$type->id]['mooe'] ?? 0) + $effectiveMooe;
-            }
-            if ($type->allows_capital_outlay) {
-                $programmed[$type->id]['capital_outlay'] =
-                    ($programmed[$type->id]['capital_outlay'] ?? 0) + $effectiveCo;
-            }
-        }
-        $allocation = $this->findAllocationHeader($fiscalYear, $officeName, $staffId);
-        $storedItems = $allocation
-            ? FinancialPlanAllocationItem::where(
-                'financial_plan_allocation_id',
-                $allocation->id
-            )
-                ->get()
-                ->keyBy(fn ($item) => $item->allocation_type_id . '|' . $item->expense_category)
-            : collect();
-        $totals = collect();
-        foreach ($allocationTypes as $type) {
-            foreach (['mooe', 'capital_outlay'] as $category) {
-                $allowed = $category === 'mooe'
-                    ? $type->allows_mooe
-                    : $type->allows_capital_outlay;
-                if (! $allowed) {
-                    continue;
-                }
-                $allocationAmount = (float) (
-                    $storedItems->get($type->id . '|' . $category)->amount ?? 0
-                );
-                $programmedAmount = (float) ($programmed[$type->id][$category] ?? 0);
-                $totals->push([
-                    'allocation_type_id' => (int) $type->id,
-                    'code' => $type->code,
-                    'name' => $type->name,
-                    'expense_category' => $category,
-                    'allocation' => $allocationAmount,
-                    'programmed' => $programmedAmount,
-                    'balance' => $allocationAmount - $programmedAmount,
-                ]);
-            }
-        }
-        // Temporary compatibility values for the current ICTS Index/Builder.
-        $mithiMooe = $totals->first(
-            fn ($row) => strtolower($row['code']) === 'mithi'
-                && $row['expense_category'] === 'mooe'
-        );
-        $mithiCo = $totals->first(
-            fn ($row) => strtolower($row['code']) === 'mithi'
-                && $row['expense_category'] === 'capital_outlay'
-        );
-        $ninpMooe = $totals->first(
-            fn ($row) => strtolower($row['code']) === 'ninp'
-                && $row['expense_category'] === 'mooe'
-        );
-        return response()->json([
-            'allocation_totals' => $totals->values(),
-            'mooe_allocation' => (float) ($mithiMooe['allocation'] ?? 0),
-            'capital_outlay_allocation' => (float) ($mithiCo['allocation'] ?? 0),
-            'ninp_allocation' => (float) ($ninpMooe['allocation'] ?? 0),
-            'mooe_sum' => (float) ($mithiMooe['programmed'] ?? 0),
-            'capital_outlay_sum' => (float) ($mithiCo['programmed'] ?? 0),
-            'ninp_sum' => (float) ($ninpMooe['programmed'] ?? 0),
-            'mooe_balance' => (float) ($mithiMooe['balance'] ?? 0),
-            'capital_outlay_balance' => (float) ($mithiCo['balance'] ?? 0),
-            'ninp_balance' => (float) ($ninpMooe['balance'] ?? 0),
-        ]);
-    }
     // Resolve Staff/Office ownership
     private function resolvePlanStaffId(
         int $fiscalYear,
@@ -1626,44 +1486,6 @@ class FinancialPlanController extends Controller
                 'allows_capital_outlay',
                 'sort_order',
             ]);
-    }
-    // Load the allocation header
-    private function findAllocationHeader(
-        int $fiscalYear,
-        string $officeName,
-        ?int $staffId
-    ): ?FinancialPlanAllocation {
-        $query = FinancialPlanAllocation::query()
-            ->where('fiscal_year', $fiscalYear)
-            ->where('office_name', $officeName);
-        // The database business key is fiscal year + office name.
-        // Staff ownership is synchronized when allocation is saved.
-        if ($staffId === null) {
-            $this->applyStaffScope($query);
-        }
-        return $query->first();
-    }
-    // Read one generic allocation amount
-    private function allocationItemAmount(
-        ?FinancialPlanAllocation $allocation,
-        $allocationTypes,
-        string $code,
-        string $expenseCategory
-    ): float {
-        if (! $allocation) {
-            return 0.0;
-        }
-        $type = $allocationTypes->first(
-            fn ($type) => strtolower(trim((string) $type->code)) === strtolower($code)
-        );
-        if (! $type) {
-            return 0.0;
-        }
-        return (float) FinancialPlanAllocationItem::query()
-            ->where('financial_plan_allocation_id', $allocation->id)
-            ->where('allocation_type_id', $type->id)
-            ->where('expense_category', $expenseCategory)
-            ->value('amount');
     }
     // Workflow
     public function submitForApproval(Request $request): JsonResponse

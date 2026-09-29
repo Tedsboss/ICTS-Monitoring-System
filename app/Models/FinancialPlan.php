@@ -16,6 +16,7 @@ class FinancialPlan extends Model
     protected $fillable = [
         'parent_id',
         'fiscal_year',
+        'allocation_id',
         'office_name',
         'staff_id',
         'division_id',
@@ -37,6 +38,7 @@ class FinancialPlan extends Model
     protected $casts = [
         'parent_id' => 'integer',
         'fiscal_year' => 'integer',
+        'allocation_id' => 'integer',
         'staff_id' => 'integer',
         'division_id' => 'integer',
         'allocation_type' => 'string',
@@ -46,6 +48,10 @@ class FinancialPlan extends Model
         'sort_order' => 'integer',
     ];
 
+    public function allocation(): BelongsTo
+    {
+        return $this->belongsTo(Allocation::class, 'allocation_id');
+    }
     // Parent row
     public function parent(): BelongsTo
     {

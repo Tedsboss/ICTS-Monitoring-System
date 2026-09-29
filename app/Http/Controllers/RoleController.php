@@ -36,9 +36,10 @@ class RoleController extends Controller
         'System Logs',
 
         // Financial Management
+        'Allocation Management',
+        'Allocation Type Management',
         'Financial Plan',
         'Work Plan',
-        'Allocation Type Management',
         'Procurement',
         'SAEB',
     ];
