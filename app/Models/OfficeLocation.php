@@ -4,14 +4,19 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class OfficeLocation extends Model
 {
-  use HasFactory;
-  public $table = 'office_locations';
+    use HasFactory;
 
-  public function office()
-  {
-    return $this->belongsTo(Office::class);
-  }
+    protected $table = 'office_locations';
+
+    public function office(): BelongsTo
+    {
+        return $this->belongsTo(
+            Office::class,
+            'office_id'
+        );
+    }
 }

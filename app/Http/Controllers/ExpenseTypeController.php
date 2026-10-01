@@ -6,23 +6,17 @@ use App\Models\ExpenseType;
 use App\Models\Staff;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class ExpenseTypeController extends Controller
 {
-    private function isAdmin(): bool
-    {
-        return in_array((int) auth()->user()->role_id, [1, 29], true);
-    }
-
     private function hasAllocationPermission(string $permission): bool
     {
-        if ($this->isAdmin()) {
+        $user = auth()->user();
+
+        if ($user->isAdministrator()) {
             return true;
         }
-
-        $user = auth()->user();
 
         return $user->role
             && $user->role->permissions->contains(function ($permissionModel) use ($permission) {
@@ -41,7 +35,7 @@ class ExpenseTypeController extends Controller
     {
         $query = ExpenseType::query();
 
-        if (! $this->isAdmin()) {
+        if (! auth()->user()->isAdministrator()) {
             $staffId = auth()->user()->staff_id;
 
             if ($staffId === null) {
@@ -63,22 +57,22 @@ class ExpenseTypeController extends Controller
             403
         );
 
-        if ($this->isAdmin()) {
+        if (auth()->user()->isAdministrator()) {
             return;
         }
 
         $staffId = auth()->user()->staff_id;
 
         abort_unless(
-            $staffId !== null &&
-            (int) $expenseType->staff_id === (int) $staffId,
+            $staffId !== null
+            && (int) $expenseType->staff_id === (int) $staffId,
             403
         );
     }
 
     private function staffOptions()
     {
-        return $this->isAdmin()
+        return auth()->user()->isAdministrator()
             ? Staff::query()
                 ->orderBy('name')
                 ->get(['id', 'name', 'abbreviation'])
@@ -147,7 +141,7 @@ class ExpenseTypeController extends Controller
             ],
         ]);
 
-        $staffId = $this->isAdmin()
+        $staffId = auth()->user()->isAdministrator()
             ? $validated['staff_id'] ?? null
             : auth()->user()->staff_id;
 
@@ -161,17 +155,26 @@ class ExpenseTypeController extends Controller
 
         $staffId = (int) $staffId;
 
-        if (! $this->isAdmin()) {
+        if (! auth()->user()->isAdministrator()) {
             abort_unless(
                 $staffId === (int) auth()->user()->staff_id,
                 403
             );
         }
 
+        $type = trim((string) $validated['type']);
+        $description = trim((string) $validated['expense_description']);
+
         $duplicateExists = ExpenseType::query()
-            ->where('type', $validated['type'])
-            ->where('expense_description', $validated['expense_description'])
             ->where('staff_id', $staffId)
+            ->whereRaw(
+                'LOWER(TRIM(type)) = ?',
+                [mb_strtolower($type)]
+            )
+            ->whereRaw(
+                'LOWER(TRIM(expense_description)) = ?',
+                [mb_strtolower($description)]
+            )
             ->exists();
 
         if ($duplicateExists) {
@@ -183,8 +186,8 @@ class ExpenseTypeController extends Controller
         }
 
         ExpenseType::create([
-            'type' => $validated['type'],
-            'expense_description' => $validated['expense_description'],
+            'type' => $type,
+            'expense_description' => $description,
             'staff_id' => $staffId,
         ]);
 
@@ -229,7 +232,7 @@ class ExpenseTypeController extends Controller
             ],
         ]);
 
-        $staffId = $this->isAdmin()
+        $staffId = auth()->user()->isAdministrator()
             ? $validated['staff_id'] ?? $expenseType->staff_id
             : auth()->user()->staff_id;
 
@@ -243,19 +246,28 @@ class ExpenseTypeController extends Controller
 
         $staffId = (int) $staffId;
 
-        if (! $this->isAdmin()) {
+        if (! auth()->user()->isAdministrator()) {
             abort_unless(
-                $staffId === (int) auth()->user()->staff_id &&
-                (int) $expenseType->staff_id === (int) auth()->user()->staff_id,
+                $staffId === (int) auth()->user()->staff_id
+                && (int) $expenseType->staff_id === (int) auth()->user()->staff_id,
                 403
             );
         }
 
+        $type = trim((string) $validated['type']);
+        $description = trim((string) $validated['expense_description']);
+
         $duplicateExists = ExpenseType::query()
-            ->where('type', $validated['type'])
-            ->where('expense_description', $validated['expense_description'])
             ->where('staff_id', $staffId)
             ->where('id', '!=', $expenseType->id)
+            ->whereRaw(
+                'LOWER(TRIM(type)) = ?',
+                [mb_strtolower($type)]
+            )
+            ->whereRaw(
+                'LOWER(TRIM(expense_description)) = ?',
+                [mb_strtolower($description)]
+            )
             ->exists();
 
         if ($duplicateExists) {
@@ -267,8 +279,8 @@ class ExpenseTypeController extends Controller
         }
 
         $expenseType->update([
-            'type' => $validated['type'],
-            'expense_description' => $validated['expense_description'],
+            'type' => $type,
+            'expense_description' => $description,
             'staff_id' => $staffId,
         ]);
 

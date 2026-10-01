@@ -1,5 +1,6 @@
 <?php
 namespace App\Http\Controllers;
+
 use App\Models\Allocation;
 use App\Models\ExpenseType;
 use App\Models\FiscalYear;
@@ -10,18 +11,15 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
+
 class AllocationController extends Controller
 {
-    private function isAdmin(): bool
-    {
-        return in_array((int) auth()->user()->role_id, [1, 29], true);
-    }
     private function hasAllocationPermission(string $permission): bool
     {
-        if ($this->isAdmin()) {
+        $user = auth()->user();
+        if ($user->isAdministrator()) {
             return true;
         }
-        $user = auth()->user();
         return $user->role
             && $user->role->permissions->contains(function ($permissionModel) use ($permission) {
                 return strcasecmp(
@@ -34,10 +32,11 @@ class AllocationController extends Controller
                 ) === 0;
             });
     }
+
     private function scopedAllocations()
     {
         $query = Allocation::query();
-        if (! $this->isAdmin()) {
+        if (! auth()->user()->isAdministrator()) {
             $staffId = auth()->user()->staff_id;
             if ($staffId === null) {
                 $query->whereRaw('1 = 0');
@@ -47,10 +46,11 @@ class AllocationController extends Controller
         }
         return $query;
     }
+
     private function scopedFiscalYears()
     {
         $query = FiscalYear::query();
-        if (! $this->isAdmin()) {
+        if (! auth()->user()->isAdministrator()) {
             $staffId = auth()->user()->staff_id;
             if ($staffId === null) {
                 $query->whereRaw('1 = 0');
@@ -60,10 +60,11 @@ class AllocationController extends Controller
         }
         return $query;
     }
+
     private function scopedLevels()
     {
         $query = Level::query();
-        if (! $this->isAdmin()) {
+        if (! auth()->user()->isAdministrator()) {
             $staffId = auth()->user()->staff_id;
             if ($staffId === null) {
                 $query->whereRaw('1 = 0');
@@ -73,10 +74,11 @@ class AllocationController extends Controller
         }
         return $query;
     }
+
     private function scopedExpenseTypes()
     {
         $query = ExpenseType::query();
-        if (! $this->isAdmin()) {
+        if (! auth()->user()->isAdministrator()) {
             $staffId = auth()->user()->staff_id;
             if ($staffId === null) {
                 $query->whereRaw('1 = 0');
@@ -86,30 +88,29 @@ class AllocationController extends Controller
         }
         return $query;
     }
+
     private function authorizeAllocation(
         Allocation $allocation,
         string $permission
     ): void {
-        abort_unless(
-            $this->hasAllocationPermission($permission),
-            403
-        );
-        if ($this->isAdmin()) {
+        abort_unless($this->hasAllocationPermission($permission), 403);
+        if (auth()->user()->isAdministrator()) {
             return;
         }
         $staffId = auth()->user()->staff_id;
         abort_unless(
-            $staffId !== null &&
-            (int) $allocation->staff_id === (int) $staffId,
+            $staffId !== null
+            && (int) $allocation->staff_id === (int) $staffId,
             403
         );
     }
+
     private function authorizeRelatedRecords(
         int $yearId,
         int $levelId,
         array $expenseIds
     ): void {
-        if ($this->isAdmin()) {
+        if (auth()->user()->isAdministrator()) {
             return;
         }
         $staffId = auth()->user()->staff_id;
@@ -137,13 +138,14 @@ class AllocationController extends Controller
             403
         );
     }
+
     private function validateExpenseBudgets(
         array $expenses,
         float $mooeBudget,
         float $coBudget
     ): array {
-        $mooeTotal = 0;
-        $coTotal = 0;
+        $mooeTotal = 0.0;
+        $coTotal = 0.0;
         $expenseIds = collect($expenses)
             ->pluck('expense_id')
             ->map(fn ($id) => (int) $id)
@@ -192,9 +194,10 @@ class AllocationController extends Controller
         }
         return $errors;
     }
+
     private function staffOptions()
     {
-        return $this->isAdmin()
+        return auth()->user()->isAdministrator()
             ? Staff::query()
                 ->orderBy('name')
                 ->get(['id', 'name', 'abbreviation'])
@@ -202,12 +205,10 @@ class AllocationController extends Controller
                 ->where('id', auth()->user()->staff_id)
                 ->get(['id', 'name', 'abbreviation']);
     }
+
     public function index(Request $request): View
     {
-        abort_unless(
-            $this->hasAllocationPermission('view'),
-            403
-        );
+        abort_unless($this->hasAllocationPermission('view'), 403);
         $allocations = $this->scopedAllocations()
             ->with([
                 'fiscalYear',
@@ -215,7 +216,9 @@ class AllocationController extends Controller
                 'program',
                 'staff',
                 'expenses.expenseType',
+                'financialPlans:id,allocation_id,mooe,capital_outlay,contract_amount',
             ])
+            ->withCount('financialPlans')
             ->when(
                 $request->filled('year_id'),
                 fn ($query) => $query->where(
@@ -238,7 +241,8 @@ class AllocationController extends Controller
                 )
             )
             ->when(
-                $request->filled('staff_id') && $this->isAdmin(),
+                $request->filled('staff_id')
+                && auth()->user()->isAdministrator(),
                 fn ($query) => $query->where(
                     'staff_id',
                     $request->integer('staff_id')
@@ -271,12 +275,10 @@ class AllocationController extends Controller
             )
         );
     }
+
     public function create(): View
     {
-        abort_unless(
-            $this->hasAllocationPermission('add'),
-            403
-        );
+        abort_unless($this->hasAllocationPermission('add'), 403);
         $fiscalYears = $this->scopedFiscalYears()
             ->orderByDesc('year')
             ->get();
@@ -300,12 +302,10 @@ class AllocationController extends Controller
             )
         );
     }
+
     public function store(Request $request): RedirectResponse
     {
-        abort_unless(
-            $this->hasAllocationPermission('add'),
-            403
-        );
+        abort_unless($this->hasAllocationPermission('add'), 403);
         $validated = $request->validate([
             'year_id' => [
                 'required',
@@ -342,22 +342,22 @@ class AllocationController extends Controller
                 'array',
                 'min:1',
             ],
-            'expenses.\*.expense_id' => [
+            'expenses.*.expense_id' => [
                 'required',
                 'integer',
                 'exists:expense_types,id',
                 'distinct',
             ],
-            'expenses.\*.cost' => [
+            'expenses.*.cost' => [
                 'required',
                 'numeric',
                 'min:0',
             ],
         ]);
-        if (! $this->isAdmin()) {
+        if (! auth()->user()->isAdministrator()) {
             abort_unless(
-                auth()->user()->staff_id !== null &&
-                (int) $validated['staff_id'] === (int) auth()->user()->staff_id,
+                auth()->user()->staff_id !== null
+                && (int) $validated['staff_id'] === (int) auth()->user()->staff_id,
                 403
             );
         }
@@ -411,6 +411,7 @@ class AllocationController extends Controller
             ->route('allocations.index')
             ->with('success', 'Allocation created successfully.');
     }
+
     public function edit(Allocation $allocation): View
     {
         $this->authorizeAllocation($allocation, 'edit');
@@ -445,6 +446,7 @@ class AllocationController extends Controller
             )
         );
     }
+
     public function update(
         Request $request,
         Allocation $allocation
@@ -486,22 +488,22 @@ class AllocationController extends Controller
                 'array',
                 'min:1',
             ],
-            'expenses.\*.expense_id' => [
+            'expenses.*.expense_id' => [
                 'required',
                 'integer',
                 'exists:expense_types,id',
                 'distinct',
             ],
-            'expenses.\*.cost' => [
+            'expenses.*.cost' => [
                 'required',
                 'numeric',
                 'min:0',
             ],
         ]);
-        if (! $this->isAdmin()) {
+        if (! auth()->user()->isAdministrator()) {
             abort_unless(
-                auth()->user()->staff_id !== null &&
-                (int) $validated['staff_id'] === (int) auth()->user()->staff_id,
+                auth()->user()->staff_id !== null
+                && (int) $validated['staff_id'] === (int) auth()->user()->staff_id,
                 403
             );
         }
@@ -557,9 +559,18 @@ class AllocationController extends Controller
             ->route('allocations.index')
             ->with('success', 'Allocation updated successfully.');
     }
+
     public function destroy(Allocation $allocation): RedirectResponse
     {
         $this->authorizeAllocation($allocation, 'delete');
+        if ($allocation->financialPlans()->exists()) {
+            return redirect()
+                ->route('allocations.index')
+                ->with(
+                    'error',
+                    'This allocation cannot be deleted because it is already used by a Financial Plan.'
+                );
+        }
         $allocation->delete();
         return redirect()
             ->route('allocations.index')

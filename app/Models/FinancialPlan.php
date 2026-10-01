@@ -48,57 +48,38 @@ class FinancialPlan extends Model
 
     public function allocation(): BelongsTo
     {
-        return $this->belongsTo(Allocation::class, 'allocation_id');
+        return $this->belongsTo(
+            Allocation::class,
+            'allocation_id'
+        );
     }
 
-    // Parent row
     public function parent(): BelongsTo
     {
-        return $this->belongsTo(self::class, 'parent_id');
+        return $this->belongsTo(
+            self::class,
+            'parent_id'
+        );
     }
 
-    // Child rows
     public function children(): HasMany
     {
-        return $this->hasMany(self::class, 'parent_id')
-            ->orderBy('sort_order');
+        return $this->hasMany(
+            self::class,
+            'parent_id'
+        )
+            ->orderBy('sort_order')
+            ->orderBy('id');
     }
 
-    // Monthly financial targets
     public function targets(): HasMany
     {
         return $this->hasMany(
             FinancialPlanTarget::class,
             'financial_plan_id'
-        );
+        )->orderBy('month');
     }
 
-    // Total original MOOE + Capital Outlay
-    public function getTotalBudgetAttribute(): float
-    {
-        return (float) $this->mooe
-            + (float) $this->capital_outlay;
-    }
-
-    // Total of all monthly targets
-    public function getTotalTargetAttribute(): float
-    {
-        return (float) $this->targets->sum('amount');
-    }
-
-    // Monthly amounts keyed from 1 to 12
-    public function getMonthlyAmountsAttribute(): array
-    {
-        $months = array_fill(1, 12, 0.00);
-
-        foreach ($this->targets as $target) {
-            $months[(int) $target->month] = (float) $target->amount;
-        }
-
-        return $months;
-    }
-
-    // Related SAEB entries
     public function saebEntries(): HasMany
     {
         return $this->hasMany(
@@ -107,7 +88,6 @@ class FinancialPlan extends Model
         );
     }
 
-    // Related procurement entries
     public function procurements(): HasMany
     {
         return $this->hasMany(
@@ -116,20 +96,6 @@ class FinancialPlan extends Model
         );
     }
 
-    // Total SAEB balance
-    public function getSaebBalanceAttribute(): float
-    {
-        return (float) $this->saebEntries->sum('balances');
-    }
-
-    // Check if at least one procurement record is OK
-    public function getIsProcuredAttribute(): bool
-    {
-        return $this->procurements
-            ->contains('procurement_status', 'OK');
-    }
-
-    // Assigned staff / office
     public function staff(): BelongsTo
     {
         return $this->belongsTo(
@@ -138,12 +104,63 @@ class FinancialPlan extends Model
         );
     }
 
-    // Assigned division
     public function division(): BelongsTo
     {
         return $this->belongsTo(
             Division::class,
             'division_id'
         );
+    }
+
+    public function getTotalBudgetAttribute(): float
+    {
+        return (float) $this->mooe
+            + (float) $this->capital_outlay;
+    }
+
+    public function getTotalTargetAttribute(): float
+    {
+        return (float) $this->targets->sum('amount');
+    }
+
+    public function getMonthlyAmountsAttribute(): array
+    {
+        $months = array_fill(1, 12, 0.0);
+
+        foreach ($this->targets as $target) {
+            $month = (int) $target->month;
+
+            if ($month >= 1 && $month <= 12) {
+                $months[$month] = (float) $target->amount;
+            }
+        }
+
+        return $months;
+    }
+
+    public function getSaebBalanceAttribute(): float
+    {
+        return (float) $this->saebEntries->sum('balances');
+    }
+
+    public function getIsProcuredAttribute(): bool
+    {
+        return $this->procurements
+            ->contains('procurement_status', 'OK');
+    }
+
+    public function isHeader(): bool
+    {
+        return $this->row_type === 'header';
+    }
+
+    public function isSubheader(): bool
+    {
+        return $this->row_type === 'subheader';
+    }
+
+    public function isItem(): bool
+    {
+        return $this->row_type === 'item';
     }
 }

@@ -167,11 +167,6 @@
                             <td class="border-b border-slate-100 px-5 py-4">
                                 <div class="flex flex-wrap items-center justify-end gap-2">
                                     @php
-                                        /*
-                                         * If ID exists, this Work Plan has already been saved.
-                                         * If ID is null, this row came from a Financial Plan
-                                         * but its Work Plan has not been created yet.
-                                         */
                                         $workPlanExists = ! empty($plan->id);
                                     @endphp
                                     @if($workPlanExists)

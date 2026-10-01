@@ -8,18 +8,20 @@ use Illuminate\Database\Eloquent\Model;
 
 class TrustedDevice extends Model
 {
-  use HasFactory;
-  protected $appends = ['status'];
-  public $timestamps = ['last_seen_at', 'expires_at'];
+    use HasFactory;
 
-  public function getStatusAttribute()
-  {
-    if ($this->revoked_at != null) {
-      return 'Revoked';
-    } else if (Carbon::parse($this->expires_at)->isPast()) {
-      return 'Expired';
-    } else {
-      return 'Active';
+    protected $appends = ['status'];
+
+    public function getStatusAttribute(): string
+    {
+        if ($this->revoked_at !== null) {
+            return 'Revoked';
+        }
+
+        if ($this->expires_at !== null && Carbon::parse($this->expires_at)->isPast()) {
+            return 'Expired';
+        }
+
+        return 'Active';
     }
-  }
 }

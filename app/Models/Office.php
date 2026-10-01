@@ -4,28 +4,48 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Office extends Model
 {
-  use HasFactory;
+    use HasFactory;
 
-  public function staffs()
-  {
-    return $this->hasMany(Staff::class);
-  }
+    protected $table = 'offices';
 
-  public function divisions()
-  {
-    return $this->hasMany(Division::class);
-  }
+    protected $fillable = [
+        'name',
+        'abbreviation',
+    ];
 
-  public function units()
-  {
-    return $this->hasMany(Unit::class);
-  }
+    public function staffs(): HasMany
+    {
+        return $this->hasMany(
+            Staff::class,
+            'office_id'
+        );
+    }
 
-  public function locations()
-  {
-    return $this->hasMany(OfficeLocation::class);
-  }
+    public function divisions(): HasMany
+    {
+        return $this->hasMany(
+            Division::class,
+            'office_id'
+        );
+    }
+
+    public function units(): HasMany
+    {
+        return $this->hasMany(
+            Unit::class,
+            'office_id'
+        );
+    }
+
+    public function locations(): HasMany
+    {
+        return $this->hasMany(
+            OfficeLocation::class,
+            'office_id'
+        );
+    }
 }

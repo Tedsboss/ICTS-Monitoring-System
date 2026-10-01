@@ -3,26 +3,20 @@
 namespace App\Http\Controllers;
 
 use App\Models\FiscalYear;
+use App\Models\Staff;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 use Illuminate\View\View;
-use App\Models\Staff;
 
 class FiscalYearController extends Controller
 {
-    private function isAdmin(): bool
-    {
-        return in_array((int) auth()->user()->role_id, [1, 29], true);
-    }
-
     private function hasAllocationPermission(string $permission): bool
     {
-        if ($this->isAdmin()) {
+        $user = auth()->user();
+
+        if ($user->isAdministrator()) {
             return true;
         }
-
-        $user = auth()->user();
 
         return $user->role
             && $user->role->permissions->contains(function ($permissionModel) use ($permission) {
@@ -41,7 +35,7 @@ class FiscalYearController extends Controller
     {
         $query = FiscalYear::query();
 
-        if (! $this->isAdmin()) {
+        if (! auth()->user()->isAdministrator()) {
             $staffId = auth()->user()->staff_id;
 
             if ($staffId === null) {
@@ -63,15 +57,15 @@ class FiscalYearController extends Controller
             403
         );
 
-        if ($this->isAdmin()) {
+        if (auth()->user()->isAdministrator()) {
             return;
         }
 
         $staffId = auth()->user()->staff_id;
 
         abort_unless(
-            $staffId !== null &&
-            (int) $fiscalYear->staff_id === (int) $staffId,
+            $staffId !== null
+            && (int) $fiscalYear->staff_id === (int) $staffId,
             403
         );
     }
@@ -101,7 +95,7 @@ class FiscalYearController extends Controller
             403
         );
 
-        $staffOptions = $this->isAdmin()
+        $staffOptions = auth()->user()->isAdministrator()
             ? Staff::query()
                 ->orderBy('name')
                 ->get(['id', 'name', 'abbreviation'])
@@ -131,18 +125,18 @@ class FiscalYearController extends Controller
             ],
         ]);
 
-        $staffId = $this->isAdmin()
+        $staffId = auth()->user()->isAdministrator()
             ? $request->input('staff_id')
             : auth()->user()->staff_id;
 
-        if (! $this->isAdmin()) {
+        if (! auth()->user()->isAdministrator()) {
             abort_unless(
                 $staffId !== null,
                 403
             );
         }
 
-        if ($this->isAdmin() && $staffId === null) {
+        if (auth()->user()->isAdministrator() && $staffId === null) {
             return back()
                 ->withInput()
                 ->withErrors([
@@ -179,7 +173,7 @@ class FiscalYearController extends Controller
     {
         $this->authorizeFiscalYear($fiscalYear, 'edit');
 
-        $staffOptions = $this->isAdmin()
+        $staffOptions = auth()->user()->isAdministrator()
             ? Staff::query()
                 ->orderBy('name')
                 ->get(['id', 'name', 'abbreviation'])
@@ -208,14 +202,14 @@ class FiscalYearController extends Controller
             ],
         ]);
 
-        $staffId = $this->isAdmin()
+        $staffId = auth()->user()->isAdministrator()
             ? $request->input('staff_id', $fiscalYear->staff_id)
             : auth()->user()->staff_id;
 
-        if (! $this->isAdmin()) {
+        if (! auth()->user()->isAdministrator()) {
             abort_unless(
-                $staffId !== null &&
-                (int) $fiscalYear->staff_id === (int) $staffId,
+                $staffId !== null
+                && (int) $fiscalYear->staff_id === (int) $staffId,
                 403
             );
         }

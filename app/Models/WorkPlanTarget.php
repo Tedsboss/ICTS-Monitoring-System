@@ -37,6 +37,41 @@ class WorkPlanTarget extends Model
         )->orderBy('month');
     }
 
+    public function applicableMonthNumbers(): array
+    {
+        $this->loadMissing('months');
+
+        if ($this->months->isNotEmpty()) {
+            return $this->months
+                ->pluck('month')
+                ->map(fn ($month) => (int) $month)
+                ->filter(fn ($month) => $month >= 1 && $month <= 12)
+                ->unique()
+                ->sort()
+                ->values()
+                ->all();
+        }
+
+        $month = (int) $this->month;
+
+        return $month >= 1 && $month <= 12
+            ? [$month]
+            : [];
+    }
+
+    public function appliesToMonth(int $month): bool
+    {
+        if ($month < 1 || $month > 12) {
+            return false;
+        }
+
+        return in_array(
+            $month,
+            $this->applicableMonthNumbers(),
+            true
+        );
+    }
+
     public function getMonthNameAttribute(): string
     {
         return match ($this->month) {

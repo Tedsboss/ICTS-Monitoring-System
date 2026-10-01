@@ -18,6 +18,9 @@ class ProgramHeader extends Model
 
     public function subHeaders(): HasMany
     {
-        return $this->hasMany(ProgramSubHeader::class, 'header_id');
+        return $this->hasMany(
+            ProgramSubHeader::class,
+            'header_id'
+        );
     }
 }

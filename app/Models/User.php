@@ -3,14 +3,21 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable;
+
+    public const SUPER_ADMIN_ROLE_ID = 1;
+    public const ADMIN_ROLE_IDS = [1, 29];
 
     protected $appends = [
         'avatar_url',
@@ -53,13 +60,15 @@ class User extends Authenticatable
         'role_id' => 'integer',
     ];
 
-    // Always hash the password when it is updated.
     public function setPasswordAttribute($value): void
     {
-        $this->attributes['password'] = bcrypt($value);
+        $value = (string) $value;
+
+        $this->attributes['password'] = Hash::needsRehash($value)
+            ? Hash::make($value)
+            : $value;
     }
 
-    // Avatar URL.
     public function avatarUrl(): string
     {
         if (
@@ -77,16 +86,13 @@ class User extends Authenticatable
         return $this->avatarUrl();
     }
 
-    // Full display name.
     public function getFullNameAttribute(): string
     {
         $parts = [
             trim((string) $this->firstname),
-
             $this->middlename
                 ? mb_substr(trim((string) $this->middlename), 0, 1) . '.'
                 : null,
-
             trim((string) $this->lastname),
         ];
 
@@ -95,75 +101,82 @@ class User extends Authenticatable
             ->implode(' ');
     }
 
-    // DIREK access role.
-    public function role()
+    public function getNameAttribute(): string
+    {
+        return $this->full_name;
+    }
+
+    public function role(): BelongsTo
     {
         return $this->belongsTo(Role::class);
     }
 
     public function isSuperAdmin(): bool
     {
-        return (int) $this->role_id === 1;
+        return (int) $this->role_id === self::SUPER_ADMIN_ROLE_ID;
     }
 
-    // User belongs to a DepDev Staff/Office.
+    public function isAdministrator(): bool
+    {
+        return in_array(
+            (int) $this->role_id,
+            self::ADMIN_ROLE_IDS,
+            true
+        );
+    }
+
     public function isDepDevStaff(): bool
     {
         return Agency::isDepDevId($this->agency_id)
             && ! empty($this->staff_id);
     }
 
-    // DIREK Staff/Office access scope.
-    public function staff()
+    public function staff(): BelongsTo
     {
         return $this->belongsTo(Staff::class);
     }
 
-    // Organizational metadata.
-    public function division()
+    public function division(): BelongsTo
     {
         return $this->belongsTo(Division::class);
     }
 
-    // Organizational position/designation.
-    public function position()
+    public function position(): BelongsTo
     {
         return $this->belongsTo(Position::class);
     }
 
-    public function position_name()
+    public function position_name(): ?string
     {
         return optional($this->position)->name;
     }
 
-    public function staff_name()
+    public function staff_name(): ?string
     {
         return optional($this->staff)->name;
     }
 
-    // User agency.
-    public function agency()
+    public function agency(): BelongsTo
     {
         return $this->belongsTo(Agency::class, 'agency_id');
     }
 
-    // Existing legacy/application relationships.
-    public function histories()
+    public function histories(): MorphMany
     {
         return $this->morphMany(History::class, 'model');
     }
 
-    public function trusted_devices()
+    public function trusted_devices(): HasMany
     {
         return $this->hasMany(TrustedDevice::class);
     }
 
-    public function inquiries()
+    public function inquiries(): HasMany
     {
         return $this->hasMany(Inquiry::class);
     }
 
-    public function formSubmissions()
+    public function formSubmissions(): HasMany
     {
         return $this->hasMany(FormSubmission::class);
     }

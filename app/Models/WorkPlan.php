@@ -41,6 +41,11 @@ class WorkPlan extends Model
         return $this->belongsTo(Staff::class, 'staff_id');
     }
 
+    public function division(): BelongsTo
+    {
+        return $this->belongsTo(Division::class, 'division_id');
+    }
+
     public function items(): HasMany
     {
         return $this->hasMany(WorkPlanItem::class, 'work_plan_id')
@@ -50,10 +55,7 @@ class WorkPlan extends Model
 
     public function signatory(): HasOne
     {
-        return $this->hasOne(
-            WorkPlanSignatory::class,
-            'work_plan_id'
-        );
+        return $this->hasOne(WorkPlanSignatory::class, 'work_plan_id');
     }
 
     public function submissions(): HasMany
@@ -88,14 +90,6 @@ class WorkPlan extends Model
         return $this->belongsTo(User::class, 'finalized_by');
     }
 
-    public function division(): BelongsTo
-    {
-        return $this->belongsTo(
-            Division::class,
-            'division_id'
-        );
-    }
-
     public function isDraft(): bool
     {
         return $this->status === 'draft';
@@ -125,6 +119,6 @@ class WorkPlan extends Model
     public function isEditable(): bool
     {
         return in_array($this->status, ['draft', 'returned'], true)
-            && $this->finalized !== 'yes';
+            && ! $this->isFinalized();
     }
 }

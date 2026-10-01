@@ -4,18 +4,25 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Unit extends Model
 {
-  use HasFactory;
+    use HasFactory;
 
-  public function office()
-  {
-    return $this->belongsTo(Office::class);
-  }
+    public function office(): BelongsTo
+    {
+        return $this->belongsTo(
+            Office::class,
+            'office_id'
+        );
+    }
 
-  public function division()
-  {
-    return $this->belongsTo(Division::class);
-  }
+    public function division(): BelongsTo
+    {
+        return $this->belongsTo(
+            Division::class,
+            'division_id'
+        );
+    }
 }

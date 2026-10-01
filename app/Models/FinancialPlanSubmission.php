@@ -29,18 +29,51 @@ class FinancialPlanSubmission extends Model
         'fiscal_year' => 'integer',
         'staff_id' => 'integer',
         'division_id' => 'integer',
+        'submitted_by' => 'integer',
+        'approved_by' => 'integer',
+        'finalized_by' => 'integer',
         'submitted_at' => 'datetime',
         'approved_at' => 'datetime',
         'finalized_at' => 'datetime',
     ];
 
-    // Check if the plan is locked
-    public function isLocked(): bool
+    public function isDraft(): bool
     {
-        return $this->finalized === 'yes';
+        return $this->status === 'draft';
     }
 
-    // User who submitted the plan
+    public function isSubmitted(): bool
+    {
+        return $this->status === 'submitted';
+    }
+
+    public function isReturned(): bool
+    {
+        return $this->status === 'returned';
+    }
+
+    public function isApproved(): bool
+    {
+        return $this->status === 'approved';
+    }
+
+    public function isFinalized(): bool
+    {
+        return $this->status === 'finalized'
+            || $this->finalized === 'yes';
+    }
+
+    public function isLocked(): bool
+    {
+        return $this->isFinalized();
+    }
+
+    public function isEditable(): bool
+    {
+        return in_array($this->status, ['draft', 'returned'], true)
+            && ! $this->isFinalized();
+    }
+
     public function submittedBy(): BelongsTo
     {
         return $this->belongsTo(
@@ -49,7 +82,6 @@ class FinancialPlanSubmission extends Model
         );
     }
 
-    // User who approved the plan
     public function approvedBy(): BelongsTo
     {
         return $this->belongsTo(
@@ -58,7 +90,6 @@ class FinancialPlanSubmission extends Model
         );
     }
 
-    // User who finalized the plan
     public function finalizedBy(): BelongsTo
     {
         return $this->belongsTo(
@@ -67,7 +98,6 @@ class FinancialPlanSubmission extends Model
         );
     }
 
-    // Assigned staff or office
     public function staff(): BelongsTo
     {
         return $this->belongsTo(
@@ -76,7 +106,6 @@ class FinancialPlanSubmission extends Model
         );
     }
 
-    // Assigned division
     public function division(): BelongsTo
     {
         return $this->belongsTo(

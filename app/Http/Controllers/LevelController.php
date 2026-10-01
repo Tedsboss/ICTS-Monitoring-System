@@ -6,23 +6,17 @@ use App\Models\Level;
 use App\Models\Staff;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class LevelController extends Controller
 {
-    private function isAdmin(): bool
-    {
-        return in_array((int) auth()->user()->role_id, [1, 29], true);
-    }
-
     private function hasAllocationPermission(string $permission): bool
     {
-        if ($this->isAdmin()) {
+        $user = auth()->user();
+
+        if ($user->isAdministrator()) {
             return true;
         }
-
-        $user = auth()->user();
 
         return $user->role
             && $user->role->permissions->contains(function ($permissionModel) use ($permission) {
@@ -41,7 +35,7 @@ class LevelController extends Controller
     {
         $query = Level::query();
 
-        if (! $this->isAdmin()) {
+        if (! auth()->user()->isAdministrator()) {
             $staffId = auth()->user()->staff_id;
 
             if ($staffId === null) {
@@ -63,22 +57,22 @@ class LevelController extends Controller
             403
         );
 
-        if ($this->isAdmin()) {
+        if (auth()->user()->isAdministrator()) {
             return;
         }
 
         $staffId = auth()->user()->staff_id;
 
         abort_unless(
-            $staffId !== null &&
-            (int) $level->staff_id === (int) $staffId,
+            $staffId !== null
+            && (int) $level->staff_id === (int) $staffId,
             403
         );
     }
 
     private function staffOptions()
     {
-        return $this->isAdmin()
+        return auth()->user()->isAdministrator()
             ? Staff::query()
                 ->orderBy('name')
                 ->get(['id', 'name', 'abbreviation'])
@@ -142,7 +136,7 @@ class LevelController extends Controller
             ],
         ]);
 
-        $staffId = $this->isAdmin()
+        $staffId = auth()->user()->isAdministrator()
             ? $validated['staff_id'] ?? null
             : auth()->user()->staff_id;
 
@@ -156,7 +150,7 @@ class LevelController extends Controller
 
         $staffId = (int) $staffId;
 
-        if (! $this->isAdmin()) {
+        if (! auth()->user()->isAdministrator()) {
             abort_unless(
                 $staffId === (int) auth()->user()->staff_id,
                 403
@@ -223,7 +217,7 @@ class LevelController extends Controller
             ],
         ]);
 
-        $staffId = $this->isAdmin()
+        $staffId = auth()->user()->isAdministrator()
             ? $validated['staff_id'] ?? $level->staff_id
             : auth()->user()->staff_id;
 
@@ -237,10 +231,10 @@ class LevelController extends Controller
 
         $staffId = (int) $staffId;
 
-        if (! $this->isAdmin()) {
+        if (! auth()->user()->isAdministrator()) {
             abort_unless(
-                $staffId === (int) auth()->user()->staff_id &&
-                (int) $level->staff_id === (int) auth()->user()->staff_id,
+                $staffId === (int) auth()->user()->staff_id
+                && (int) $level->staff_id === (int) auth()->user()->staff_id,
                 403
             );
         }

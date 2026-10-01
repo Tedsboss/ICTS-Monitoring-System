@@ -26,6 +26,9 @@ class Expenditure extends Model
 
     public function program(): BelongsTo
     {
-        return $this->belongsTo(Program::class, 'program_id');
+        return $this->belongsTo(
+            Program::class,
+            'program_id'
+        );
     }
 }

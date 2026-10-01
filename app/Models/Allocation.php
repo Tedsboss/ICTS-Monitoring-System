@@ -33,26 +33,55 @@ class Allocation extends Model
 
     public function fiscalYear(): BelongsTo
     {
-        return $this->belongsTo(FiscalYear::class, 'year_id');
+        return $this->belongsTo(
+            FiscalYear::class,
+            'year_id'
+        );
     }
 
     public function level(): BelongsTo
     {
-        return $this->belongsTo(Level::class, 'level_id');
+        return $this->belongsTo(
+            Level::class,
+            'level_id'
+        );
     }
 
     public function program(): BelongsTo
     {
-        return $this->belongsTo(Program::class, 'program_id');
+        return $this->belongsTo(
+            Program::class,
+            'program_id'
+        );
     }
 
     public function staff(): BelongsTo
     {
-        return $this->belongsTo(Staff::class, 'staff_id');
+        return $this->belongsTo(
+            Staff::class,
+            'staff_id'
+        );
     }
 
     public function expenses(): HasMany
     {
-        return $this->hasMany(AllocationExpense::class, 'allocation_id');
+        return $this->hasMany(
+            AllocationExpense::class,
+            'allocation_id'
+        );
+    }
+
+    public function financialPlans(): HasMany
+    {
+        return $this->hasMany(
+            FinancialPlan::class,
+            'allocation_id'
+        );
+    }
+
+    public function getTotalBudgetAttribute(): float
+    {
+        return (float) $this->mooe_budget
+            + (float) $this->co_budget;
     }
 }

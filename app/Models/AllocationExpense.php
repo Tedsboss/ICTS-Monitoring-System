@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use App\Models\Allocation;
 
 class AllocationExpense extends Model
 {
@@ -27,11 +26,17 @@ class AllocationExpense extends Model
 
     public function allocation(): BelongsTo
     {
-        return $this->belongsTo(Allocation::class, 'allocation_id');
+        return $this->belongsTo(
+            Allocation::class,
+            'allocation_id'
+        );
     }
 
     public function expenseType(): BelongsTo
     {
-        return $this->belongsTo(ExpenseType::class, 'expense_id');
+        return $this->belongsTo(
+            ExpenseType::class,
+            'expense_id'
+        );
     }
 }

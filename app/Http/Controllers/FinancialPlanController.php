@@ -21,6 +21,7 @@ use App\Models\ProgramHeader;
 class FinancialPlanController extends Controller
 {
     use GenerateLogs;
+
     // Config
     private const MONTHS = [
         1 => 'J', 2 => 'F', 3 => 'M', 4 => 'A', 5 => 'M', 6 => 'J',
@@ -369,7 +370,12 @@ class FinancialPlanController extends Controller
     }
     // Validate Program Classification and PREXC pairs for budget lines.
     // Existing legacy pairs are allowed while unchanged so old plans are not broken.
-    private function validatePrexcRows(array $rows, int $fiscalYear, string $officeName): void
+    private function validatePrexcRows(
+        array $rows,
+        int $fiscalYear,
+        string $officeName,
+        int $staffId
+    ): void
     {
         $rowIds = collect($rows)
             ->pluck('id')
@@ -379,11 +385,12 @@ class FinancialPlanController extends Controller
             ->values();
         $existingRows = collect();
         if ($rowIds->isNotEmpty()) {
-            $existingQuery = FinancialPlan::query()
-                ->where('fiscal_year', $fiscalYear)
-                ->where('office_name', $officeName)
-                ->whereIn('id', $rowIds);
-            $this->applyStaffScope($existingQuery);
+            $existingQuery = $this->applyPlanIdentityScope(
+                FinancialPlan::query(),
+                $fiscalYear,
+                $officeName,
+                $staffId
+            )->whereIn('id', $rowIds);
             $existingRows = $existingQuery
                 ->get(['id', 'program_classification', 'prexc_code'])
                 ->keyBy('id');
@@ -543,22 +550,133 @@ class FinancialPlanController extends Controller
             throw ValidationException::withMessages($errors);
         }
     }
+    private function normalizePlanOfficeName(string $officeName): string
+    {
+        return trim((string) preg_replace('/\\s+/u', ' ', $officeName));
+    }
+
+    private function resolvePlanStaffId(
+        int $fiscalYear,
+        string $officeName,
+        ?int $requestedStaffId = null,
+        bool $required = false
+    ): ?int {
+        $user = auth()->user();
+        $officeName = $this->normalizePlanOfficeName($officeName);
+
+        if (! $user->isAdministrator()) {
+            abort_unless($user->staff_id !== null, 403);
+
+            if ($requestedStaffId !== null) {
+                abort_unless(
+                    (int) $requestedStaffId === (int) $user->staff_id,
+                    403
+                );
+            }
+
+            return (int) $user->staff_id;
+        }
+
+        if ($requestedStaffId !== null) {
+            return (int) $requestedStaffId;
+        }
+
+        if ($officeName === '') {
+            if ($required) {
+                throw ValidationException::withMessages([
+                    'staff_id' => 'Please select a Staff/Office.',
+                ]);
+            }
+
+            return null;
+        }
+
+        $staffIds = FinancialPlan::query()
+            ->where('fiscal_year', $fiscalYear)
+            ->where('office_name', $officeName)
+            ->whereNotNull('staff_id')
+            ->distinct()
+            ->pluck('staff_id')
+            ->merge(
+                FinancialPlanSubmission::query()
+                    ->where('fiscal_year', $fiscalYear)
+                    ->where('office_name', $officeName)
+                    ->whereNotNull('staff_id')
+                    ->distinct()
+                    ->pluck('staff_id')
+            )
+            ->filter(fn ($id) => $id !== null)
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        if ($staffIds->count() === 1) {
+            return (int) $staffIds->first();
+        }
+
+        if ($staffIds->count() > 1) {
+            throw ValidationException::withMessages([
+                'staff_id' => 'This Office Name exists under more than one Staff/Office. Please select the exact Staff/Office.',
+            ]);
+        }
+
+        if ($required) {
+            throw ValidationException::withMessages([
+                'staff_id' => 'The Staff/Office could not be determined. Please select the exact Staff/Office.',
+            ]);
+        }
+
+        return null;
+    }
+
+    private function applyPlanIdentityScope(
+        $query,
+        int $fiscalYear,
+        string $officeName,
+        int $staffId
+    ) {
+        return $query
+            ->where('fiscal_year', $fiscalYear)
+            ->where('staff_id', $staffId)
+            ->where(
+                'office_name',
+                $this->normalizePlanOfficeName($officeName)
+            );
+    }
+
     // Get submission record
     private function getSubmission(int $fiscalYear, string $officeName, ?int $staffId = null): ?FinancialPlanSubmission
     {
-        $query = FinancialPlanSubmission::where('fiscal_year', $fiscalYear)
-            ->where('office_name', $officeName);
-        if ($staffId !== null) {
-            $query->where('staff_id', $staffId);
-        } else {
-            $this->applyStaffScope($query);
+        $officeName = $this->normalizePlanOfficeName($officeName);
+        $staffId = $this->resolvePlanStaffId(
+            $fiscalYear,
+            $officeName,
+            $staffId,
+            false
+        );
+
+        if ($staffId === null) {
+            return null;
         }
-        return $query->first();
+
+        return $this->applyPlanIdentityScope(
+            FinancialPlanSubmission::query(),
+            $fiscalYear,
+            $officeName,
+            $staffId
+        )->first();
     }
-    // Check if plan is finalized
-    private function planIsLocked(int $fiscalYear, string $officeName): bool
-    {
-        return $this->getSubmission($fiscalYear, $officeName)?->isLocked() ?? false;
+
+    private function planIsLocked(
+        int $fiscalYear,
+        string $officeName,
+        ?int $staffId = null
+    ): bool {
+        return $this->getSubmission(
+            $fiscalYear,
+            $officeName,
+            $staffId
+        )?->isLocked() ?? false;
     }
     // Return locked response
     private function lockedResponse(): JsonResponse
@@ -569,30 +687,67 @@ class FinancialPlanController extends Controller
         ], 403);
     }
     // Get the first row used to authorize a whole plan
-    private function findPlanForAccess(int $fiscalYear, string $officeName): ?FinancialPlan
-    {
-        $query = FinancialPlan::where('fiscal_year', $fiscalYear)
-            ->where('office_name', $officeName);
-        // Non-administrators must resolve the plan from their own staff.
-        // This prevents a row from another staff-level office from being selected.
-        $this->applyStaffScope($query);
-        return $query->first();
+    private function findPlanForAccess(
+        int $fiscalYear,
+        string $officeName,
+        ?int $staffId = null
+    ): ?FinancialPlan {
+        $officeName = $this->normalizePlanOfficeName($officeName);
+        $staffId = $this->resolvePlanStaffId(
+            $fiscalYear,
+            $officeName,
+            $staffId,
+            false
+        );
+
+        if ($staffId === null || $officeName === '') {
+            return null;
+        }
+
+        return $this->applyPlanIdentityScope(
+            FinancialPlan::query(),
+            $fiscalYear,
+            $officeName,
+            $staffId
+        )->first();
     }
-    // Authorize an existing plan, or creation when no plan exists yet
-    private function authorizePlanWrite(int $fiscalYear, string $officeName): ?FinancialPlan
-    {
-        $plan = $this->findPlanForAccess($fiscalYear, $officeName);
+
+    private function authorizePlanWrite(
+        int $fiscalYear,
+        string $officeName,
+        ?int $staffId = null
+    ): ?FinancialPlan {
+        $plan = $this->findPlanForAccess(
+            $fiscalYear,
+            $officeName,
+            $staffId
+        );
         if ($plan) {
             $this->authorize('update', $plan);
             return $plan;
         }
+
+        $this->resolvePlanStaffId(
+            $fiscalYear,
+            $officeName,
+            $staffId,
+            true
+        );
         $this->authorize('create', FinancialPlan::class);
+
         return null;
     }
     // Authorize reading an existing plan
-    private function authorizePlanRead(int $fiscalYear, string $officeName): ?FinancialPlan
-    {
-        $plan = $this->findPlanForAccess($fiscalYear, $officeName);
+    private function authorizePlanRead(
+        int $fiscalYear,
+        string $officeName,
+        ?int $staffId = null
+    ): ?FinancialPlan {
+        $plan = $this->findPlanForAccess(
+            $fiscalYear,
+            $officeName,
+            $staffId
+        );
         if ($plan) {
             $this->authorize('view', $plan);
         }
@@ -602,15 +757,23 @@ class FinancialPlanController extends Controller
     private function applyStaffScope($query)
     {
         $user = auth()->user();
-        if (! in_array((int) $user->role_id, [1], true)) {
-            $query->where('staff_id', $user->staff_id);
+
+        if ($user->isAdministrator()) {
+            return $query;
         }
-        return $query;
+
+        if ($user->staff_id === null) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->where(
+            'staff_id',
+            (int) $user->staff_id
+        );
     }
     private function authorizeAllocationAccess(Allocation $allocation): void
     {
-        $isAdmin = (int) auth()->user()->role_id === 1;
-        if ($isAdmin) {
+        if (auth()->user()->isAdministrator()) {
             return;
         }
         $staffId = auth()->user()->staff_id;
@@ -660,16 +823,38 @@ class FinancialPlanController extends Controller
         $rowsQuery = $this->applyStaffScope(FinancialPlan::query());
         $rows = $rowsQuery
             ->where('row_type', 'item')
-            ->get(['fiscal_year', 'office_name', 'mooe', 'capital_outlay', 'contract_amount']);
+            ->get([
+                'fiscal_year',
+                'staff_id',
+                'office_name',
+                'mooe',
+                'capital_outlay',
+                'contract_amount',
+            ]);
         $submissionsQuery = FinancialPlanSubmission::query();
-        if (! in_array((int) auth()->user()->role_id, [1], true)) {
+        if (! auth()->user()->isAdministrator()) {
             $submissionsQuery->where('staff_id', auth()->user()->staff_id);
         }
         $submissions = $submissionsQuery
-            ->get(['fiscal_year', 'office_name', 'status', 'finalized'])
-            ->keyBy(fn ($s) => $s->fiscal_year . '|' . $s->office_name);
+            ->get([
+                'fiscal_year',
+                'staff_id',
+                'office_name',
+                'status',
+                'finalized',
+            ])
+            ->keyBy(fn ($submission) => implode('|', [
+                $submission->fiscal_year,
+                $submission->staff_id,
+                $submission->office_name,
+            ]));
+
         $plans = $rows
-            ->groupBy(fn ($r) => $r->fiscal_year . '|' . $r->office_name)
+            ->groupBy(fn ($row) => implode('|', [
+                $row->fiscal_year,
+                $row->staff_id,
+                $row->office_name,
+            ]))
             ->map(function ($group, $key) use ($submissions) {
                 $budgetSum = $group->sum(function ($r) {
                     [$effMooe, $effCo] = $this->effectiveAmounts(
@@ -681,6 +866,7 @@ class FinancialPlanController extends Controller
                 });
                 return (object) [
                     'fiscal_year' => $group->first()->fiscal_year,
+                    'staff_id'    => $group->first()->staff_id,
                     'office_name' => $group->first()->office_name,
                     'row_count'   => $group->count(),
                     'budget_sum'  => $budgetSum,
@@ -721,7 +907,7 @@ class FinancialPlanController extends Controller
                 ->whereNotNull('staff_id')
                 ->value('staff_id');
         }
-        if ($staffId === null && in_array((int) auth()->user()->role_id, [1], true) && $officeName !== '') {
+        if ($staffId === null && auth()->user()->isAdministrator() && $officeName !== '') {
             $staffId = DB::table('staffs')
                 ->whereRaw('LOWER(TRIM(name)) = LOWER(TRIM(?))', [$officeName])
                 ->value('id');
@@ -782,10 +968,16 @@ class FinancialPlanController extends Controller
         $this->authorize('viewAny', FinancialPlan::class);
         $fiscalYear = (int) $request->input('fiscal_year', now()->year);
         $officeName = $request->string('office_name')->toString();
-        $isAdmin = in_array((int) auth()->user()->role_id, [1], true);
+        $isAdmin = auth()->user()->isAdministrator();
         $accessPlan = null;
         if ($officeName !== '') {
-            $accessPlan = $this->findPlanForAccess($fiscalYear, $officeName);
+            $accessPlan = $this->findPlanForAccess(
+                $fiscalYear,
+                $officeName,
+                $request->filled('staff_id')
+                    ? (int) $request->input('staff_id')
+                    : null
+            );
             if ($accessPlan) {
                 $this->authorize('view', $accessPlan);
             } else {
@@ -794,23 +986,15 @@ class FinancialPlanController extends Controller
         } else {
             $this->authorize('create', FinancialPlan::class);
         }
-        $personnelStaffId = $accessPlan?->staff_id;
-        if ($personnelStaffId === null && $isAdmin && $request->filled('staff_id')) {
-            $personnelStaffId = (int) $request->input('staff_id');
-        }
-        if ($personnelStaffId === null && $officeName !== '') {
-            $personnelStaffId = FinancialPlan::query()
-                ->where('fiscal_year', $fiscalYear)
-                ->where('office_name', $officeName)
-                ->whereNotNull('staff_id')
-                ->value('staff_id');
-        }
-        if ($personnelStaffId === null && $isAdmin && $officeName !== '') {
-            $personnelStaffId = DB::table('staffs')->where('name', $officeName)->value('id');
-        }
-        if ($personnelStaffId === null) {
-            $personnelStaffId = auth()->user()->staff_id;
-        }
+        $personnelStaffId = $accessPlan?->staff_id
+            ?? $this->resolvePlanStaffId(
+                $fiscalYear,
+                $officeName,
+                $request->filled('staff_id')
+                    ? (int) $request->input('staff_id')
+                    : null,
+                false
+            );
         $personnelOptions = collect();
         if ($personnelStaffId !== null) {
             $personnelOptions = StaffPersonnel::query()
@@ -864,9 +1048,12 @@ class FinancialPlanController extends Controller
         if ($accessPlan) {
             $selectedLevelId = $accessPlan->allocation?->level_id;
             if ($selectedLevelId === null) {
-                $selectedLevelId = FinancialPlan::query()
-                    ->where('fiscal_year', $fiscalYear)
-                    ->where('office_name', $officeName)
+                $selectedLevelId = $this->applyPlanIdentityScope(
+                    FinancialPlan::query(),
+                    $fiscalYear,
+                    $officeName,
+                    (int) $personnelStaffId
+                )
                     ->whereNotNull('allocation_id')
                     ->join('allocations', 'allocations.id', '=', 'financial_plans.allocation_id')
                     ->value('allocations.level_id');
@@ -904,6 +1091,7 @@ class FinancialPlanController extends Controller
             'staffOptions' => $staffOptions,
             'planOptions' => $planOptions,
             'personnelStaffId' => $personnelStaffId,
+            'staffId' => $personnelStaffId,
             'personnelOptions' => $personnelOptions,
             'programClassificationTree' => $programClassificationTree,
             'levels' => $levels,
@@ -922,6 +1110,11 @@ class FinancialPlanController extends Controller
         $this->authorize('viewAny', FinancialPlan::class);
         $fiscalYear = (int) $request->input('fiscal_year', now()->year);
         $officeName = $request->string('office_name')->toString();
+        $requestedStaffId = $request->filled('staff_id')
+            ? (int) $request->input('staff_id')
+            : null;
+
+        $officeName = $this->normalizePlanOfficeName($officeName);
         $query = FinancialPlan::query()
             ->with([
                 'targets',
@@ -929,40 +1122,40 @@ class FinancialPlanController extends Controller
                 'allocation.level',
                 'allocation.program',
                 'allocation.expenses.expenseType',
-            ])
-            ->where('fiscal_year', $fiscalYear);
-        if ($officeName) {
-            $this->authorizePlanRead($fiscalYear, $officeName);
-            $query->where('office_name', $officeName);
-        }
-        // Always scope the returned rows for non-administrators.
-        // Authorization checks the plan; this also prevents mixed-division rows
-        // with the same fiscal year and office name from being returned.
-        $this->applyStaffScope($query);
-        $rows = $query
-            ->orderBy('sort_order')
-            ->get();
-        // Super Admin fallback: resolve the selected Staff/Office through the
-        // staffs master when the stored office_name does not exactly match
-        // the label submitted by the Builder.
-        if ($rows->isEmpty() && $officeName !== '' && in_array((int) auth()->user()->role_id, [1], true)) {
-            $staffId = DB::table('staffs')
-                ->whereRaw('LOWER(TRIM(name)) = LOWER(TRIM(?))', [$officeName])
-                ->value('id');
-            if ($staffId !== null) {
-                $rows = FinancialPlan::query()
-                    ->with([
-                        'targets',
-                        'allocation.fiscalYear',
-                        'allocation.level',
-                        'allocation.program',
-                        'allocation.expenses.expenseType',
-                    ])
-                    ->where('fiscal_year', $fiscalYear)
-                    ->where('staff_id', $staffId)
+            ]);
+
+        if ($officeName !== '') {
+            $accessPlan = $this->authorizePlanRead(
+                $fiscalYear,
+                $officeName,
+                $requestedStaffId
+            );
+            $resolvedStaffId = $accessPlan?->staff_id
+                ?? $this->resolvePlanStaffId(
+                    $fiscalYear,
+                    $officeName,
+                    $requestedStaffId,
+                    false
+                );
+
+            if ($resolvedStaffId === null) {
+                $rows = collect();
+            } else {
+                $rows = $this->applyPlanIdentityScope(
+                    $query,
+                    $fiscalYear,
+                    $officeName,
+                    (int) $resolvedStaffId
+                )
                     ->orderBy('sort_order')
                     ->get();
             }
+        } else {
+            $query->where('fiscal_year', $fiscalYear);
+            $this->applyStaffScope($query);
+            $rows = $query
+                ->orderBy('sort_order')
+                ->get();
         }
         $allocationIds = $rows
             ->pluck('allocation_id')
@@ -1048,7 +1241,7 @@ class FinancialPlanController extends Controller
                 ->whereNotNull('staff_id')
                 ->value('staff_id');
         }
-        if ($catalogStaffId === null && in_array((int) auth()->user()->role_id, [1], true)) {
+        if ($catalogStaffId === null && auth()->user()->isAdministrator()) {
             $catalogStaffId = DB::table('staffs')
                 ->whereRaw('LOWER(TRIM(name)) = LOWER(TRIM(?))', [$officeName])
                 ->value('id');
@@ -1172,46 +1365,62 @@ class FinancialPlanController extends Controller
     public function signatories(Request $request): JsonResponse
     {
         $this->authorize('viewAny', FinancialPlan::class);
-        $fiscalYear = (int) $request->input('fiscal_year', now()->year);
-        $officeName = $request->string('office_name')->toString();
-        $accessPlan = $this->authorizePlanRead($fiscalYear, $officeName);
-        $signatoryQuery = FinancialPlanSignatory::where('fiscal_year', $fiscalYear)
-            ->where('office_name', $officeName);
-        if ($accessPlan?->staff_id !== null) {
-            $signatoryQuery->where('staff_id', $accessPlan->staff_id);
-        } else {
-            $this->applyStaffScope($signatoryQuery);
-        }
-        $signatory = $signatoryQuery->first();
-        // Super Admin fallback: if the office label differs from the stored
-        // plan office name, resolve the signatory through the selected staff.
-        if (!$signatory && $officeName !== '' && in_array((int) auth()->user()->role_id, [1], true)) {
-            $staffId = DB::table('staffs')
-                ->whereRaw('LOWER(TRIM(name)) = LOWER(TRIM(?))', [$officeName])
-                ->value('id');
-            if ($staffId !== null) {
-                $signatory = FinancialPlanSignatory::where('fiscal_year', $fiscalYear)
-                    ->where('staff_id', $staffId)
-                    ->first();
-            }
-        }
-        return response()->json([
-            'prepared_by'              => $signatory->prepared_by ?? '',
-            'prepared_by_position'     => $signatory->prepared_by_position ?? '',
-            'reviewed_by'              => $signatory->reviewed_by ?? '',
-            'reviewed_by_position'     => $signatory->reviewed_by_position ?? '',
-            'recommended_by'           => $signatory->recommended_by ?? '',
-            'recommended_by_position'  => $signatory->recommended_by_position ?? '',
-            'approved_by'              => $signatory->approved_by ?? '',
-            'approved_by_position'     => $signatory->approved_by_position ?? '',
-        ]);
-    }
-    public function saveSignatories(Request $request): JsonResponse
-    {
-        $this->authorize('viewAny', FinancialPlan::class);
+
         $validated = $request->validate([
             'fiscal_year' => ['required', 'integer', 'min:2000', 'max:2100'],
             'office_name' => ['required', 'string', 'max:150'],
+            'staff_id' => ['nullable', 'integer', 'exists:staffs,id'],
+        ]);
+
+        $fiscalYear = (int) $validated['fiscal_year'];
+        $officeName = trim((string) $validated['office_name']);
+        $requestedStaffId = isset($validated['staff_id'])
+            && $validated['staff_id'] !== null
+                ? (int) $validated['staff_id']
+                : null;
+
+        $accessPlan = $this->authorizePlanRead(
+            $fiscalYear,
+            $officeName,
+            $requestedStaffId
+        );
+
+        $staffId = $accessPlan?->staff_id ?? $requestedStaffId;
+
+        if ($staffId === null && ! auth()->user()->isAdministrator()) {
+            $staffId = auth()->user()->staff_id;
+        }
+
+        $signatory = null;
+
+        if ($staffId !== null) {
+            $signatory = FinancialPlanSignatory::query()
+                ->where('fiscal_year', $fiscalYear)
+                ->where('staff_id', $staffId)
+                ->where('office_name', $officeName)
+                ->first();
+        }
+
+        return response()->json([
+            'prepared_by' => $signatory->prepared_by ?? '',
+            'prepared_by_position' => $signatory->prepared_by_position ?? '',
+            'reviewed_by' => $signatory->reviewed_by ?? '',
+            'reviewed_by_position' => $signatory->reviewed_by_position ?? '',
+            'recommended_by' => $signatory->recommended_by ?? '',
+            'recommended_by_position' => $signatory->recommended_by_position ?? '',
+            'approved_by' => $signatory->approved_by ?? '',
+            'approved_by_position' => $signatory->approved_by_position ?? '',
+        ]);
+    }
+
+    public function saveSignatories(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', FinancialPlan::class);
+
+        $validated = $request->validate([
+            'fiscal_year' => ['required', 'integer', 'min:2000', 'max:2100'],
+            'office_name' => ['required', 'string', 'max:150'],
+            'staff_id' => ['nullable', 'integer', 'exists:staffs,id'],
             'prepared_by' => ['nullable', 'string', 'max:150'],
             'prepared_by_position' => ['nullable', 'string', 'max:150'],
             'reviewed_by' => ['nullable', 'string', 'max:150'],
@@ -1221,22 +1430,40 @@ class FinancialPlanController extends Controller
             'approved_by' => ['nullable', 'string', 'max:150'],
             'approved_by_position' => ['nullable', 'string', 'max:150'],
         ]);
+
         $year = (int) $validated['fiscal_year'];
-        $office = $validated['office_name'];
-        $accessPlan = $this->authorizePlanWrite($year, $office);
-        // Prevent changes after finalization
-        if ($this->planIsLocked($year, $office)) {
+        $office = trim((string) $validated['office_name']);
+        $requestedStaffId = isset($validated['staff_id'])
+            && $validated['staff_id'] !== null
+                ? (int) $validated['staff_id']
+                : null;
+
+        $accessPlan = $this->authorizePlanWrite(
+            $year,
+            $office,
+            $requestedStaffId
+        );
+
+        $staffId = $accessPlan?->staff_id
+            ?? $requestedStaffId
+            ?? auth()->user()->staff_id;
+
+        if ($staffId === null) {
+            throw ValidationException::withMessages([
+                'staff_id' => 'The Staff/Office could not be determined.',
+            ]);
+        }
+
+        if ($this->planIsLocked($year, $office, (int) $staffId)) {
             return $this->lockedResponse();
         }
-        // The database has one signatory record per fiscal year and office.
-        // Reuse an existing legacy record and synchronize its Staff/Office ownership.
+
         $signatory = FinancialPlanSignatory::firstOrNew([
             'fiscal_year' => $year,
+            'staff_id' => (int) $staffId,
             'office_name' => $office,
         ]);
-        $signatory->staff_id = $accessPlan?->staff_id
-            ?? auth()->user()->staff_id
-            ?? $signatory->staff_id;
+
         $signatory->division_id = $accessPlan?->division_id
             ?? auth()->user()->division_id
             ?? $signatory->division_id;
@@ -1249,12 +1476,14 @@ class FinancialPlanController extends Controller
         $signatory->approved_by = $validated['approved_by'] ?? null;
         $signatory->approved_by_position = $validated['approved_by_position'] ?? null;
         $signatory->save();
+
         return response()->json([
             'success' => true,
             'message' => 'Signatories saved.',
             'data' => $signatory,
         ]);
     }
+
     public function save(Request $request): JsonResponse
     {
         $this->authorize('viewAny', FinancialPlan::class);
@@ -1283,17 +1512,29 @@ class FinancialPlanController extends Controller
             'rows.*.months.*' => ['nullable', 'numeric', 'min:0'],
         ]);
         $year = (int) $validated['fiscal_year'];
-        $office = $validated['office_name'];
+        $office = $this->normalizePlanOfficeName(
+            (string) $validated['office_name']
+        );
         $requestedStaffId = isset($validated['staff_id']) && $validated['staff_id'] !== null
             ? (int) $validated['staff_id']
             : null;
-        if (! in_array((int) auth()->user()->role_id, [1], true)) {
+        if (! auth()->user()->isAdministrator()) {
             $requestedStaffId = auth()->user()->staff_id !== null ? (int) auth()->user()->staff_id : null;
         }
         $rows = $validated['rows'] ?? [];
         $levelId = (int) $validated['level_id'];
-        $accessPlan = $this->authorizePlanWrite($year, $office);
-        $planStaffId = $accessPlan?->staff_id ?? $requestedStaffId ?? auth()->user()->staff_id;
+        $accessPlan = $this->authorizePlanWrite(
+            $year,
+            $office,
+            $requestedStaffId
+        );
+        $planStaffId = $accessPlan?->staff_id
+            ?? $this->resolvePlanStaffId(
+                $year,
+                $office,
+                $requestedStaffId,
+                true
+            );
         $prexcProgramMap = $this->buildPrexcProgramMap();
         foreach ($rows as $index => &$row) {
             if (($row['row_type'] ?? null) !== 'item') {
@@ -1345,9 +1586,12 @@ class FinancialPlanController extends Controller
         unset($row);
         $programAllocations = $this->buildProgramAllocationContext($year, $levelId, $planStaffId, $office);
         if ($accessPlan) {
-            $existingLevelIds = FinancialPlan::query()
-                ->where('fiscal_year', $year)
-                ->where('office_name', $office)
+            $existingLevelIds = $this->applyPlanIdentityScope(
+                FinancialPlan::query(),
+                $year,
+                $office,
+                (int) $planStaffId
+            )
                 ->whereNotNull('allocation_id')
                 ->join('allocations', 'allocations.id', '=', 'financial_plans.allocation_id')
                 ->distinct()
@@ -1367,8 +1611,13 @@ class FinancialPlanController extends Controller
             ->groupBy('_program_id')
             ->map(fn ($programRows) => $programRows->values()->all())
             ->all();
-        $this->validatePrexcRows($rows, $year, $office);
-        if ($this->planIsLocked($year, $office)) {
+        $this->validatePrexcRows(
+            $rows,
+            $year,
+            $office,
+            (int) $planStaffId
+        );
+        if ($this->planIsLocked($year, $office, $planStaffId !== null ? (int) $planStaffId : null)) {
             return $this->lockedResponse();
         }
         DB::beginTransaction();
@@ -1386,18 +1635,24 @@ class FinancialPlanController extends Controller
                 $lockedAllocations[(int) $programId] = $allocation;
                 $this->validateAllocationAvailableBudget($groupedRows[$programId], $allocation, $year, $office);
             }
-            $existingQuery = FinancialPlan::where('fiscal_year', $year)->where('office_name', $office);
-            $this->applyStaffScope($existingQuery);
+            $existingQuery = $this->applyPlanIdentityScope(
+                FinancialPlan::query(),
+                $year,
+                $office,
+                (int) $planStaffId
+            );
             $existingIds = $existingQuery->pluck('id')->toArray();
             $savedIds = [];
             $sortOrder = 10;
             foreach ($rows as $row) {
                 $plan = null;
                 if (! empty($row['id'])) {
-                    $planQuery = FinancialPlan::where('id', $row['id'])
-                        ->where('fiscal_year', $year)
-                        ->where('office_name', $office);
-                    $this->applyStaffScope($planQuery);
+                    $planQuery = $this->applyPlanIdentityScope(
+                        FinancialPlan::query(),
+                        $year,
+                        $office,
+                        (int) $planStaffId
+                    )->where('id', $row['id']);
                     $plan = $planQuery->first();
                 }
                 $isNew = ! $plan;
@@ -1411,7 +1666,7 @@ class FinancialPlanController extends Controller
                     'fiscal_year' => $year,
                     'allocation_id' => $allocationId,
                     'office_name' => $office,
-                    'staff_id' => $plan->staff_id ?? $accessPlan?->staff_id ?? $requestedStaffId ?? auth()->user()->staff_id,
+                    'staff_id' => (int) $planStaffId,
                     'division_id' => $plan->division_id ?? $accessPlan?->division_id ?? auth()->user()->division_id,
                     'row_type' => $row['row_type'],
                     'program_classification' => $row['program_classification'] ?? null,
@@ -1470,11 +1725,19 @@ class FinancialPlanController extends Controller
         $validated = $request->validate([
             'fiscal_year' => ['required', 'integer', 'min:2000', 'max:2100'],
             'office_name' => ['required', 'string', 'max:150'],
+            'staff_id' => ['nullable', 'integer', 'exists:staffs,id'],
         ]);
         $year = (int) $validated['fiscal_year'];
         $office = $validated['office_name'];
+        $requestedStaffId = isset($validated['staff_id']) && $validated['staff_id'] !== null
+            ? (int) $validated['staff_id']
+            : null;
         // Resolve the Financial Plan inside the current user's Staff/Office scope.
-        $plan = $this->findPlanForAccess($year, $office);
+        $plan = $this->findPlanForAccess(
+            $year,
+            $office,
+            $requestedStaffId
+        );
         if (! $plan) {
             return response()->json([
                 'success' => false,
@@ -1482,7 +1745,7 @@ class FinancialPlanController extends Controller
             ], 404);
         }
         $this->authorize('submit', $plan);
-        if ($this->planIsLocked($year, $office)) {
+        if ($this->planIsLocked($year, $office, $plan->staff_id)) {
             return $this->lockedResponse();
         }
         $oldStatus = $this->getSubmission(
@@ -1570,11 +1833,19 @@ class FinancialPlanController extends Controller
         $validated = $request->validate([
             'fiscal_year' => ['required', 'integer', 'min:2000', 'max:2100'],
             'office_name' => ['required', 'string', 'max:150'],
+            'staff_id' => ['nullable', 'integer', 'exists:staffs,id'],
         ]);
         $year = (int) $validated['fiscal_year'];
         $office = $validated['office_name'];
+        $requestedStaffId = isset($validated['staff_id']) && $validated['staff_id'] !== null
+            ? (int) $validated['staff_id']
+            : null;
         // Resolve the plan first so policy authorization can enforce staff_id.
-        $plan = $this->findPlanForAccess($year, $office);
+        $plan = $this->findPlanForAccess(
+            $year,
+            $office,
+            $requestedStaffId
+        );
         if (! $plan) {
             return response()->json([
                 'success' => false,
@@ -1629,12 +1900,20 @@ class FinancialPlanController extends Controller
         $validated = $request->validate([
             'fiscal_year' => ['required', 'integer', 'min:2000', 'max:2100'],
             'office_name' => ['required', 'string', 'max:150'],
+            'staff_id' => ['nullable', 'integer', 'exists:staffs,id'],
             'return_remarks' => ['required', 'string', 'max:2000'],
         ]);
         $year = (int) $validated['fiscal_year'];
         $office = $validated['office_name'];
+        $requestedStaffId = isset($validated['staff_id']) && $validated['staff_id'] !== null
+            ? (int) $validated['staff_id']
+            : null;
         // Resolve the plan first so policy authorization can enforce staff_id.
-        $plan = $this->findPlanForAccess($year, $office);
+        $plan = $this->findPlanForAccess(
+            $year,
+            $office,
+            $requestedStaffId
+        );
         if (! $plan) {
             return response()->json([
                 'success' => false,
@@ -1691,11 +1970,19 @@ class FinancialPlanController extends Controller
         $validated = $request->validate([
             'fiscal_year' => ['required', 'integer', 'min:2000', 'max:2100'],
             'office_name' => ['required', 'string', 'max:150'],
+            'staff_id' => ['nullable', 'integer', 'exists:staffs,id'],
         ]);
         $year = (int) $validated['fiscal_year'];
         $office = $validated['office_name'];
+        $requestedStaffId = isset($validated['staff_id']) && $validated['staff_id'] !== null
+            ? (int) $validated['staff_id']
+            : null;
         // Resolve the plan first so policy authorization can enforce staff_id.
-        $plan = $this->findPlanForAccess($year, $office);
+        $plan = $this->findPlanForAccess(
+            $year,
+            $office,
+            $requestedStaffId
+        );
         if (! $plan) {
             return response()->json([
                 'success' => false,
@@ -1746,11 +2033,19 @@ class FinancialPlanController extends Controller
         $validated = $request->validate([
             'fiscal_year' => ['required', 'integer', 'min:2000', 'max:2100'],
             'office_name' => ['required', 'string', 'max:150'],
+            'staff_id' => ['nullable', 'integer', 'exists:staffs,id'],
         ]);
         $year = (int) $validated['fiscal_year'];
         $office = $validated['office_name'];
+        $requestedStaffId = isset($validated['staff_id']) && $validated['staff_id'] !== null
+            ? (int) $validated['staff_id']
+            : null;
         // Resolve the plan first so policy authorization can enforce staff_id.
-        $plan = $this->findPlanForAccess($year, $office);
+        $plan = $this->findPlanForAccess(
+            $year,
+            $office,
+            $requestedStaffId
+        );
         if (! $plan) {
             return response()->json([
                 'success' => false,
@@ -1795,26 +2090,31 @@ class FinancialPlanController extends Controller
         $validated = $request->validate([
             'fiscal_year' => ['required', 'integer', 'min:2000', 'max:2100'],
             'office_name' => ['required', 'string', 'max:150'],
+            'staff_id' => ['nullable', 'integer', 'exists:staffs,id'],
         ]);
         $year = (int) $validated['fiscal_year'];
         $office = $validated['office_name'];
+        $requestedStaffId = isset($validated['staff_id']) && $validated['staff_id'] !== null
+            ? (int) $validated['staff_id']
+            : null;
         $plan = $this->authorizePlanRead(
             $year,
-            $office
+            $office,
+            $requestedStaffId
         );
-        $submissionQuery = FinancialPlanSubmission::where(
-            'fiscal_year',
-            $year
-        )
+
+        $staffId = $plan?->staff_id ?? $requestedStaffId;
+
+        $submissionQuery = FinancialPlanSubmission::query()
+            ->where('fiscal_year', $year)
             ->where('office_name', $office);
-        if ($plan?->staff_id !== null) {
-            $submissionQuery->where(
-                'staff_id',
-                $plan->staff_id
-            );
+
+        if ($staffId !== null) {
+            $submissionQuery->where('staff_id', $staffId);
         } else {
             $this->applyStaffScope($submissionQuery);
         }
+
         $submission = $submissionQuery
             ->with([
                 'submittedBy:id,firstname,middlename,lastname,email',
@@ -1902,15 +2202,27 @@ class FinancialPlanController extends Controller
         $validated = $request->validate([
             'fiscal_year' => ['required', 'integer', 'min:2000', 'max:2100'],
             'office_name' => ['required', 'string', 'max:150'],
+            'staff_id' => ['nullable', 'integer', 'exists:staffs,id'],
         ]);
         $year = (int) $validated['fiscal_year'];
         $office = $validated['office_name'];
-        // Prevent deleting a finalized plan
-        if ($this->planIsLocked($year, $office)) {
+        $requestedStaffId = isset($validated['staff_id']) && $validated['staff_id'] !== null
+            ? (int) $validated['staff_id']
+            : null;
+        $staffId = $requestedStaffId ?? auth()->user()->staff_id;
+        if (auth()->user()->isAdministrator() && $staffId === null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Staff/Office is required to identify the Financial Plan to delete.',
+            ], 422);
+        }
+        if ($this->planIsLocked($year, $office, $staffId)) {
             return $this->lockedResponse();
         }
-        $plansQuery = FinancialPlan::where('fiscal_year', $year)
-            ->where('office_name', $office);
+        $plansQuery = FinancialPlan::query()
+            ->where('fiscal_year', $year)
+            ->where('office_name', $office)
+            ->where('staff_id', $staffId);
         $this->applyStaffScope($plansQuery);
         $plans = $plansQuery->get();
         if ($plans->isEmpty()) {
@@ -1923,7 +2235,6 @@ class FinancialPlanController extends Controller
         try {
             $rowCount = $plans->count();
             $planIds = $plans->pluck('id');
-            $staffId = $plans->first()->staff_id;
             DB::transaction(function () use ($plans, $planIds, $year, $office, $staffId) {
                 foreach ($plans as $plan) {
                     $this->auditLog(
@@ -1958,6 +2269,7 @@ class FinancialPlanController extends Controller
                 'line' => $e->getLine(),
                 'file' => $e->getFile(),
                 'fiscal_year' => $year,
+                'staff_id' => $staffId,
                 'office_name' => $office,
             ]);
             return response()->json([

@@ -2,9 +2,10 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Agency extends Model
 {
@@ -17,21 +18,34 @@ class Agency extends Model
 
     protected $guarded = ['id'];
 
-    protected $appends = ['name', 'abbreviation', 'display_name'];
+    protected $appends = [
+        'name',
+        'abbreviation',
+        'display_name',
+    ];
 
-    public function users()
+    public function users(): HasMany
     {
-        return $this->hasMany(User::class, 'agency_id');
+        return $this->hasMany(
+            User::class,
+            'agency_id'
+        );
     }
 
-    public function forms()
+    public function forms(): HasMany
     {
-        return $this->hasMany(Form::class, 'agency_id');
+        return $this->hasMany(
+            Form::class,
+            'agency_id'
+        );
     }
 
-    public function formSubmissions()
+    public function formSubmissions(): HasMany
     {
-        return $this->hasMany(FormSubmission::class, 'agency_id');
+        return $this->hasMany(
+            FormSubmission::class,
+            'agency_id'
+        );
     }
 
     public function getNameAttribute(): ?string
@@ -53,7 +67,9 @@ class Agency extends Model
         $name = $this->name ?? ('Agency #' . $this->id);
         $abbreviation = $this->abbreviation;
 
-        return $abbreviation ? $name . ' (' . $abbreviation . ')' : $name;
+        return $abbreviation
+            ? $name . ' (' . $abbreviation . ')'
+            : $name;
     }
 
     public function getSelectionNameAttribute(): string
@@ -69,7 +85,9 @@ class Agency extends Model
             return $abbreviation;
         }
 
-        return $name !== '' ? $name : 'Agency #' . $this->id;
+        return $name !== ''
+            ? $name
+            : 'Agency #' . $this->id;
     }
 
     public function scopeDepDev(Builder $query): Builder
@@ -87,6 +105,7 @@ class Agency extends Model
             ->merge(self::depDev()->pluck('id'))
             ->unique()
             ->map(fn ($id) => (string) $id)
+            ->values()
             ->all();
     }
 
@@ -100,13 +119,19 @@ class Agency extends Model
             return true;
         }
 
-        return self::whereKey($agencyId)->depDev()->exists();
+        return self::query()
+            ->whereKey($agencyId)
+            ->depDev()
+            ->exists();
     }
 
     public function isDepDev(): bool
     {
         return (int) $this->id === self::DEPDEV_ID
-            || strtoupper((string) $this->abbreviation) === strtoupper(self::DEPDEV_ABBREVIATION)
+            || strcasecmp(
+                (string) $this->abbreviation,
+                self::DEPDEV_ABBREVIATION
+            ) === 0
             || $this->name === self::DEPDEV_NAME
             || $this->name === self::DEPDEV_NAME_WITH_ABBREVIATION;
     }

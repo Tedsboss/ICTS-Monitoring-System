@@ -11,67 +11,86 @@ class WorkPlanPolicy
 
     public function viewAny(User $user): bool
     {
-        return $this->isAdministrator($user)
+        return $user->isAdministrator()
             || $this->hasPermission($user, 'view');
     }
 
     public function create(User $user): bool
     {
-        return $this->isAdministrator($user)
+        return $user->isAdministrator()
             || ($user->staff_id !== null && $this->hasPermission($user, 'add'));
     }
 
     public function view(User $user, WorkPlan $plan): bool
     {
-        return $this->isAdministrator($user)
+        return $user->isAdministrator()
             || ($this->ownsStaff($user, $plan) && $this->hasPermission($user, 'view'));
     }
 
     public function update(User $user, WorkPlan $plan): bool
     {
-        return $this->isAdministrator($user)
-            || ($this->ownsStaff($user, $plan) && $this->hasPermission($user, 'edit'));
+        return $user->isAdministrator()
+            || (
+                $this->ownsStaff($user, $plan)
+                && $plan->isEditable()
+                && $this->hasPermission($user, 'edit')
+            );
     }
 
     public function delete(User $user, WorkPlan $plan): bool
     {
-        return $this->isAdministrator($user)
+        return $user->isAdministrator()
             && $plan->isEditable();
     }
 
     public function submit(User $user, WorkPlan $plan): bool
     {
-        return $this->isAdministrator($user)
+        if (! in_array($plan->status, ['draft', 'returned'], true) || $plan->isFinalized()) {
+            return false;
+        }
+
+        return $user->isAdministrator()
             || ($this->ownsStaff($user, $plan) && $this->hasPermission($user, 'submit'));
     }
 
     public function approve(User $user, WorkPlan $plan): bool
     {
-        return $this->isAdministrator($user)
+        if ($plan->status !== 'submitted' || $plan->isFinalized()) {
+            return false;
+        }
+
+        return $user->isAdministrator()
             || ($this->ownsStaff($user, $plan) && $this->hasPermission($user, 'approve'));
     }
 
     public function return(User $user, WorkPlan $plan): bool
     {
-        return $this->isAdministrator($user)
+        if (! in_array($plan->status, ['submitted', 'approved'], true) || $plan->isFinalized()) {
+            return false;
+        }
+
+        return $user->isAdministrator()
             || ($this->ownsStaff($user, $plan) && $this->hasPermission($user, 'return'));
     }
 
     public function finalize(User $user, WorkPlan $plan): bool
     {
-        return $this->isAdministrator($user)
+        if ($plan->status !== 'approved' || $plan->isFinalized()) {
+            return false;
+        }
+
+        return $user->isAdministrator()
             || ($this->ownsStaff($user, $plan) && $this->hasPermission($user, 'finalize'));
     }
 
     public function reopen(User $user, WorkPlan $plan): bool
     {
-        return $this->isAdministrator($user)
-            || ($this->ownsStaff($user, $plan) && $this->hasPermission($user, 'reopen'));
-    }
+        if (! $plan->isFinalized()) {
+            return false;
+        }
 
-    private function isAdministrator(User $user): bool
-    {
-        return in_array((int) $user->role_id, [1, 29], true);
+        return $user->isAdministrator()
+            || ($this->ownsStaff($user, $plan) && $this->hasPermission($user, 'reopen'));
     }
 
     private function ownsStaff(User $user, WorkPlan $plan): bool

@@ -142,48 +142,161 @@
     </style>
 </head>
 <body>
-    <div class="report-title">FY {{ $fiscalYear }} FINANCIAL PLAN</div>
-    <div class="report-subtitle">(FY {{ $fiscalYear }} Internal Allocation per approved {{ $fiscalYear }} GAA)</div>
-    <div class="report-meta">
-        <strong>Office/Staff:</strong>
-        <span class="office-name">{{ $officeName ?: 'All Offices' }}</span>
-    </div>
-
     @php
-        // Format financial values and shrink long amounts.
+        $rows = $rows ?? collect();
+        $months = $months ?? [
+            1 => 'J', 2 => 'F', 3 => 'M', 4 => 'A', 5 => 'M', 6 => 'J',
+            7 => 'J', 8 => 'A', 9 => 'S', 10 => 'O', 11 => 'N', 12 => 'D',
+        ];
+        $generatedAt = $generatedAt ?? now();
+
         $fmt = function ($value) {
             $value = (float) $value;
             if (abs($value) < 0.005) {
                 return '-';
             }
-
             $negative = $value < 0;
             $text = number_format(abs($value), 2);
             $length = strlen($text);
             $size = 6.3;
-
             if ($length >= 11) $size = 5.6;
             if ($length >= 13) $size = 5.0;
             if ($length >= 15) $size = 4.4;
             if ($length >= 17) $size = 3.9;
-
             $style = $size !== 6.3 ? ' style="font-size:' . $size . 'px;"' : '';
             return $negative
                 ? '<span class="neg"' . $style . '>(' . $text . ')</span>'
                 : ($style ? '<span' . $style . '>' . $text . '</span>' : $text);
         };
 
-        // Reduce font size for unusually long descriptions.
         $isLong = fn ($text) => mb_strlen((string) $text) > 145;
 
-        // Display generic Allocation Type codes cleanly.
         $allocationLabel = function ($code) {
             $code = trim((string) $code);
             return $code !== ''
                 ? strtoupper(str_replace('_', ' ', $code))
                 : '—';
         };
+
+        $effectiveAmounts = function ($mooe, $capitalOutlay, $contractAmount) {
+            $mooe = (float) $mooe;
+            $capitalOutlay = (float) $capitalOutlay;
+
+            if ($contractAmount === null || $contractAmount === '') {
+                return [$mooe, $capitalOutlay];
+            }
+
+            $contractAmount = (float) $contractAmount;
+            $total = $mooe + $capitalOutlay;
+
+            if ($total <= 0) {
+                return [0.0, 0.0];
+            }
+
+            return [
+                $contractAmount * ($mooe / $total),
+                $contractAmount * ($capitalOutlay / $total),
+            ];
+        };
+
+        $blankTotals = function () {
+            return [
+                'mooe' => 0.0,
+                'capital_outlay' => 0.0,
+                'months' => array_fill(1, 12, 0.0),
+                'total' => 0.0,
+            ];
+        };
+
+        $grandTotals = $blankTotals();
+        $blocks = [];
+        $currentGroupIndex = null;
+        $currentGroupKey = null;
+
+        foreach ($rows as $model) {
+            $rowType = (string) ($model->row_type ?? 'item');
+
+            if ($rowType !== 'item') {
+                $blocks[] = [
+                    'type' => 'header',
+                    'row' => [
+                        'program_classification' => $model->program_classification
+                            ?: ($model->specific_activity ?: '—'),
+                        'prexc_code' => $model->prexc_code,
+                        'allocation_type' => '',
+                    ],
+                ];
+                $currentGroupIndex = null;
+                $currentGroupKey = null;
+                continue;
+            }
+
+            [$effectiveMooe, $effectiveCapitalOutlay] = $effectiveAmounts(
+                $model->mooe,
+                $model->capital_outlay,
+                $model->contract_amount
+            );
+
+            $monthValues = array_fill(1, 12, 0.0);
+            foreach (($model->targets ?? collect()) as $target) {
+                $month = (int) $target->month;
+                if ($month >= 1 && $month <= 12) {
+                    $monthValues[$month] = (float) $target->amount;
+                }
+            }
+
+            $rowTotal = array_sum($monthValues);
+            $groupKey = implode('|', [
+                trim((string) $model->program_classification),
+                trim((string) $model->prexc_code),
+            ]);
+
+            if ($currentGroupIndex === null || $currentGroupKey !== $groupKey) {
+                $blocks[] = [
+                    'type' => 'group',
+                    'rows' => [],
+                    'totals' => $blankTotals(),
+                ];
+                $currentGroupIndex = array_key_last($blocks);
+                $currentGroupKey = $groupKey;
+            }
+
+            $row = [
+                'program_classification' => $model->program_classification,
+                'prexc_code' => $model->prexc_code,
+                'allocation_type' => '',
+                'staff_unit_project' => $model->staff_unit_project,
+                'specific_activity' => $model->specific_activity,
+                'expense_item' => $model->expense_item,
+                'assigned_personnel' => $model->assigned_personnel,
+                'effective_mooe' => $effectiveMooe,
+                'effective_capital_outlay' => $effectiveCapitalOutlay,
+                'months' => $monthValues,
+                'total' => $rowTotal,
+            ];
+
+            $blocks[$currentGroupIndex]['rows'][] = $row;
+            $blocks[$currentGroupIndex]['totals']['mooe'] += $effectiveMooe;
+            $blocks[$currentGroupIndex]['totals']['capital_outlay'] += $effectiveCapitalOutlay;
+            $blocks[$currentGroupIndex]['totals']['total'] += $rowTotal;
+
+            $grandTotals['mooe'] += $effectiveMooe;
+            $grandTotals['capital_outlay'] += $effectiveCapitalOutlay;
+            $grandTotals['total'] += $rowTotal;
+
+            for ($m = 1; $m <= 12; $m++) {
+                $blocks[$currentGroupIndex]['totals']['months'][$m] += $monthValues[$m];
+                $grandTotals['months'][$m] += $monthValues[$m];
+            }
+        }
     @endphp
+
+    <div class="report-title">FY {{ $fiscalYear }} FINANCIAL PLAN</div>
+    <div class="report-subtitle">(FY {{ $fiscalYear }} Internal Allocation per approved {{ $fiscalYear }} GAA)</div>
+    <div class="report-meta">
+        <strong>Office/Staff:</strong>
+        <span class="office-name">{{ $officeName ?: 'All Offices' }}</span>
+    </div>
 
     <table>
         <colgroup>
@@ -261,8 +374,7 @@
                             <td class="text-end">{!! $fmt($r['effective_mooe'] ?? 0) !!}</td>
                             <td class="text-end">{!! $fmt($r['effective_capital_outlay'] ?? 0) !!}</td>
                             @for ($m = 1; $m <= 12; $m++)
-                                @php $monthValue = (float) ($r['months'][$m] ?? 0); @endphp
-                                <td class="text-end">{!! $fmt($monthValue) !!}</td>
+                                <td class="text-end">{!! $fmt($r['months'][$m] ?? 0) !!}</td>
                             @endfor
                             <td class="text-end fw-bold">{!! $fmt($r['total'] ?? 0) !!}</td>
                         </tr>
@@ -308,7 +420,6 @@
         </tbody>
     </table>
 
-    {{-- Signatories --}}
     <table class="signatures">
         <tr>
             <td>

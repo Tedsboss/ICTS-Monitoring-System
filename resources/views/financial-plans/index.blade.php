@@ -283,7 +283,7 @@
                                 <th>Other Plans</th>
                                 <th>This Plan</th>
                                 <th>Total Programmed</th>
-                                <th>Available</th>
+                                <th>Remaining Balance</th>
                             </tr>
                         </thead>
                         <tbody id="allocationSummaryBody">
@@ -567,7 +567,7 @@
 $(document).ready(function () {
     let isFinalized = false;
     let activeDataRequest = null;
-    // Escape values before inserting them into HTML*
+    // Escape values before inserting them into HTML
     function esc(value) {
         return String(value ?? '')
             .replace(/&/g, '&amp;')
@@ -576,7 +576,7 @@ $(document).ready(function () {
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#039;');
     }
-    // Format amount*
+    // Format amount
     function money(value) {
         const number = Number(value ?? 0);
         const safeNumber =
@@ -588,7 +588,7 @@ $(document).ready(function () {
             maximumFractionDigits: 2
         });
     }
-    // Format date*
+    // Format date
     function formatDate(value) {
         if (!value) {
             return '—';
@@ -605,7 +605,7 @@ $(document).ready(function () {
             minute: '2-digit'
         });
     }
-    // Show page message*
+    // Show page message
     function showMessage(message, type = 'success') {
         const styles = {
             success: {
@@ -650,7 +650,7 @@ $(document).ready(function () {
     $(document).on('click', '.wfp-message-close', function () {
         $('#pageMessage').empty();
     });
-    // Read Laravel error response*
+    // Read Laravel error response
     function getErrorMessage(xhr, fallback = 'Something went wrong.') {
         if (xhr?.responseJSON?.message) {
             return xhr.responseJSON.message;
@@ -664,17 +664,34 @@ $(document).ready(function () {
         }
         return fallback;
     }
-    // Get selected plan identity*
+    // Get selected plan identity
+    let PLAN_STAFF_ID = Number(@json(request()->input('staff_id') ?? 0)) || null;
+    function rememberResolvedStaffId(rows) {
+        if (PLAN_STAFF_ID || !Array.isArray(rows) || !rows.length) {
+            return;
+        }
+        const resolvedRow = rows.find(row => Number(row?.staff_id || 0) > 0);
+        const resolvedStaffId = Number(resolvedRow?.staff_id || 0);
+        if (!resolvedStaffId) {
+            return;
+        }
+        PLAN_STAFF_ID = resolvedStaffId;
+        const url = new URL(window.location.href);
+        url.searchParams.set('staff_id', String(resolvedStaffId));
+        window.history.replaceState({}, '', url.toString());
+    }
     function selectedPlan() {
         return {
             fiscalYear: $('#filterFiscalYear').val(),
+            staffId: PLAN_STAFF_ID,
             officeName: $('#filterOffice').val().trim()
         };
     }
-    // Validate selected plan identity*
+    // Validate selected plan identity
     function validateSelection() {
         const {
             fiscalYear,
+            staffId,
             officeName
         } = selectedPlan();
         if (
@@ -697,10 +714,11 @@ $(document).ready(function () {
         }
         return true;
     }
-    // Update heading*
+    // Update heading
     function updateHeading() {
         const {
             fiscalYear,
+            staffId,
             officeName
         } = selectedPlan();
         $('#planTitle')
@@ -710,7 +728,7 @@ $(document).ready(function () {
         $('#planOfficeName')
             .text(officeName || '—');
     }
-    // Render one WFP item row*
+    // Render one WFP item row
     function renderItemRow(row, rowspan) {
         let monthCells = '';
         for (let month = 1; month <= 12; month++) {
@@ -769,7 +787,7 @@ $(document).ready(function () {
             </tr>
         `;
     }
-    // Render section header*
+    // Render section header
     function renderHeaderRow(row) {
         return `
             <tr class="section-header-row">
@@ -785,7 +803,7 @@ $(document).ready(function () {
             </tr>
         `;
     }
-    // Render subtotal*
+    // Render subtotal
     function renderSubtotalRow(totals) {
         let monthCells = '';
         for (let month = 1; month <= 12; month++) {
@@ -813,7 +831,7 @@ $(document).ready(function () {
             </tr>
         `;
     }
-    // Create empty subtotal*
+    // Create empty subtotal
     function emptyTotals() {
         const totals = {
             mooe: 0,
@@ -826,7 +844,7 @@ $(document).ready(function () {
         }
         return totals;
     }
-    // Add item values to subtotal*
+    // Add item values to subtotal
     function addToTotals(totals, row) {
         if (row.row_type !== 'item') {
             return;
@@ -845,7 +863,7 @@ $(document).ready(function () {
                 Number(row.months?.[month]) || 0;
         }
     }
-    // Group consecutive rows using classification and PREXC*
+    // Group consecutive rows using classification and PREXC
     function buildBlocks(rows) {
         const blocks = [];
         let run = null;
@@ -883,7 +901,7 @@ $(document).ready(function () {
         }
         return blocks;
     }
-    // Render grouped WFP rows*
+    // Render grouped WFP rows
     function renderBlocks(blocks, $body) {
         blocks.forEach(block => {
             if (block.type === 'header') {
@@ -932,14 +950,13 @@ $(document).ready(function () {
             }
         });
     }
-    // Update negative class*
+    // Update negative class
     function setBalance(selector, value) {
         $(selector)
             .text(money(value))
             .toggleClass('wfp-negative', value < 0);
     }
-    // Reset grand totals*
-    // Reset grand totals*
+    // Reset grand totals    // Reset grand totals
     function resetGrandTotals() {
         $('#totMooe, #totCo, #totGrand')
             .text('0.00');
@@ -948,7 +965,7 @@ $(document).ready(function () {
                 .text('0.00');
         }
     }
-    // Load financial plan rows*
+    // Load financial plan rows
     function loadTable() {
         if (!validateSelection()) {
             return $.Deferred()
@@ -957,6 +974,7 @@ $(document).ready(function () {
         }
         const {
             fiscalYear,
+            staffId,
             officeName
         } = selectedPlan();
         if (
@@ -974,9 +992,11 @@ $(document).ready(function () {
             '{{ route("financial-plans.data") }}',
             {
                 fiscal_year: fiscalYear,
+                staff_id: staffId,
                 office_name: officeName
             }
         ).done(function (rows) {
+            rememberResolvedStaffId(rows);
             const $body =
                 $('#fpBody').empty();
             if (!rows.length) {
@@ -1068,13 +1088,12 @@ $(document).ready(function () {
         });
         return activeDataRequest;
     }
-    // Load allocation summary*
-    // Load Allocation Management summary from the financial-plan data response.*
+    // Load allocation summary    // Load Allocation Management summary from the financial-plan data response.
     function loadAllocationSummary() {
         if (!validateSelection()) {
             return $.Deferred().reject().promise();
         }
-        const { fiscalYear, officeName } = selectedPlan();
+        const { fiscalYear, staffId, officeName } = selectedPlan();
         const $body = $('#allocationSummaryBody');
         $body.html(`
             <tr>
@@ -1085,6 +1104,7 @@ $(document).ready(function () {
         `);
         return $.getJSON('{{ route("financial-plans.data") }}', {
             fiscal_year: fiscalYear,
+            staff_id: staffId,
             office_name: officeName
         }).done(function (response) {
             const rows = Array.isArray(response) ? response : [];
@@ -1179,7 +1199,7 @@ $(document).ready(function () {
             );
         });
     }
-    // Apply workflow status*
+    // Apply workflow status
     function applyPlanStatus(response) {
         const status =
             response.status || 'draft';
@@ -1255,8 +1275,7 @@ $(document).ready(function () {
                 'd-none',
                 !response.can_reopen
             );
-        // Edit availability is controlled by the Financial Plan policy.*
-        // Finalized plans remain locked even for users with edit permission.*
+    // Edit availability is controlled by the Financial Plan policy.    // Finalized plans remain locked even for users with edit permission.
         const canEdit =
             response.can_edit === true &&
             !isFinalized;
@@ -1314,7 +1333,7 @@ $(document).ready(function () {
                 !hasWorkflowInfo
             );
     }
-    // Load workflow status*
+    // Load workflow status
     function loadPlanStatus() {
         if (!validateSelection()) {
             return $.Deferred()
@@ -1323,12 +1342,14 @@ $(document).ready(function () {
         }
         const {
             fiscalYear,
+            staffId,
             officeName
         } = selectedPlan();
         return $.getJSON(
             '{{ route("financial-plans.status") }}',
             {
                 fiscal_year: fiscalYear,
+                staff_id: staffId,
                 office_name: officeName
             }
         ).done(function (response) {
@@ -1343,7 +1364,7 @@ $(document).ready(function () {
             );
         });
     }
-    // Load selected plan*
+    // Load selected plan
     function loadSelectedPlan() {
         if (!validateSelection()) {
             return;
@@ -1359,17 +1380,23 @@ $(document).ready(function () {
                 '<i class="fa fa-spinner fa-spin"></i>' +
                 '<span> Loading...</span>'
             );
-        $.when(
-            loadTable(),
-            loadAllocationSummary(),
-            loadPlanStatus()
-        ).always(function () {
+        const tableRequest = loadTable();
+        tableRequest.done(function () {
+            $.when(
+                loadAllocationSummary(),
+                loadPlanStatus()
+            ).always(function () {
+                $button
+                    .prop('disabled', false)
+                    .html(originalHtml);
+            });
+        }).fail(function () {
             $button
                 .prop('disabled', false)
                 .html(originalHtml);
         });
     }
-    // Open builder*
+    // Open builder
     $('#btnEditPlan').on('click', function () {
         if (
             isFinalized ||
@@ -1386,16 +1413,18 @@ $(document).ready(function () {
         }
         const {
             fiscalYear,
+            staffId,
             officeName
         } = selectedPlan();
         const url =
             `{{ route('financial-plans.builder') }}` +
             `?fiscal_year=${encodeURIComponent(fiscalYear)}` +
+            (staffId ? `&staff_id=${encodeURIComponent(staffId)}` : '') +
             `&office_name=${encodeURIComponent(officeName)}`;
         window.location.href =
             url;
     });
-    // Download PDF*
+    // Download PDF
     $('#btnDownloadPdf').on('click', function () {
         if (!validateSelection()) {
             return;
@@ -1404,11 +1433,13 @@ $(document).ready(function () {
             $(this);
         const {
             fiscalYear,
+            staffId,
             officeName
         } = selectedPlan();
         const url =
             `{{ route('financial-plans.export-pdf') }}` +
             `?fiscal_year=${encodeURIComponent(fiscalYear)}` +
+            (staffId ? `&staff_id=${encodeURIComponent(staffId)}` : '') +
             `&office_name=${encodeURIComponent(officeName)}`;
         const originalHtml =
             $button.html();
@@ -1478,7 +1509,7 @@ $(document).ready(function () {
                     .html(originalHtml);
             });
     });
-    // Send workflow action*
+    // Send workflow action
     function workflowRequest(
         $button,
         url,
@@ -1525,7 +1556,7 @@ $(document).ready(function () {
                 .html(originalHtml);
         });
     }
-    // Submit*
+    // Submit
     $('#btnSubmit').on('click', function () {
         if (!validateSelection()) {
             return;
@@ -1539,6 +1570,7 @@ $(document).ready(function () {
         }
         const {
             fiscalYear,
+            staffId,
             officeName
         } = selectedPlan();
         workflowRequest(
@@ -1546,13 +1578,14 @@ $(document).ready(function () {
             '{{ route("financial-plans.submit") }}',
             {
                 fiscal_year: fiscalYear,
+                staff_id: staffId,
                 office_name: officeName
             },
             'Submitting...',
             'Plan submitted for approval.'
         );
     });
-    // Approve*
+    // Approve
     $('#btnApprove').on('click', function () {
         if (!validateSelection()) {
             return;
@@ -1566,6 +1599,7 @@ $(document).ready(function () {
         }
         const {
             fiscalYear,
+            staffId,
             officeName
         } = selectedPlan();
         workflowRequest(
@@ -1573,13 +1607,14 @@ $(document).ready(function () {
             '{{ route("financial-plans.approve") }}',
             {
                 fiscal_year: fiscalYear,
+                staff_id: staffId,
                 office_name: officeName
             },
             'Approving...',
             'Plan approved.'
         );
     });
-    // Return*
+    // Return
     $('#btnReturn').on('click', function () {
         if (!validateSelection()) {
             return;
@@ -1600,6 +1635,7 @@ $(document).ready(function () {
         }
         const {
             fiscalYear,
+            staffId,
             officeName
         } = selectedPlan();
         workflowRequest(
@@ -1607,6 +1643,7 @@ $(document).ready(function () {
             '{{ route("financial-plans.return") }}',
             {
                 fiscal_year: fiscalYear,
+                staff_id: staffId,
                 office_name: officeName,
                 return_remarks: remarks.trim()
             },
@@ -1614,7 +1651,7 @@ $(document).ready(function () {
             'Plan returned for revision.'
         );
     });
-    // Finalize*
+    // Finalize
     $('#btnFinalize').on('click', function () {
         if (!validateSelection()) {
             return;
@@ -1630,6 +1667,7 @@ $(document).ready(function () {
             $(this);
         const {
             fiscalYear,
+            staffId,
             officeName
         } = selectedPlan();
         const originalHtml =
@@ -1650,6 +1688,7 @@ $(document).ready(function () {
             data:
                 JSON.stringify({
                     fiscal_year: fiscalYear,
+                    staff_id: staffId,
                     office_name: officeName
                 }),
             headers: {
@@ -1676,7 +1715,7 @@ $(document).ready(function () {
                 .html(originalHtml);
         });
     });
-    // Reopen*
+    // Reopen
     $('#btnReopen').on('click', function () {
         if (!validateSelection()) {
             return;
@@ -1692,6 +1731,7 @@ $(document).ready(function () {
             $(this);
         const {
             fiscalYear,
+            staffId,
             officeName
         } = selectedPlan();
         const originalHtml =
@@ -1712,6 +1752,7 @@ $(document).ready(function () {
             data:
                 JSON.stringify({
                     fiscal_year: fiscalYear,
+                    staff_id: staffId,
                     office_name: officeName
                 }),
             headers: {
@@ -1738,12 +1779,12 @@ $(document).ready(function () {
                 .html(originalHtml);
         });
     });
-    // Load*
+    // Load
     $('#btnLoad').on(
         'click',
         loadSelectedPlan
     );
-    // Enter key*
+    // Enter key
     $('#filterFiscalYear, #filterOffice')
         .on(
             'keydown',
@@ -1754,13 +1795,13 @@ $(document).ready(function () {
                 }
             }
         );
-    // Bootstrap tooltips if available*
+    // Bootstrap tooltips if available
     if (
         typeof $.fn.tooltip === 'function'
     ) {
         $('[data-bs-toggle="tooltip"]').tooltip();
     }
-    // Initial load*
+    // Initial load
     loadSelectedPlan();
 });
 </script>

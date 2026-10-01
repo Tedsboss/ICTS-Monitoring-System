@@ -25,11 +25,17 @@ class ProgramSubHeader extends Model
 
     public function header(): BelongsTo
     {
-        return $this->belongsTo(ProgramHeader::class, 'header_id');
+        return $this->belongsTo(
+            ProgramHeader::class,
+            'header_id'
+        );
     }
 
     public function programs(): HasMany
     {
-        return $this->hasMany(Program::class, 'sub_header_id');
+        return $this->hasMany(
+            Program::class,
+            'sub_header_id'
+        );
     }
 }

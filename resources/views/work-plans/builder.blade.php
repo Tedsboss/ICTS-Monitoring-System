@@ -2,9 +2,8 @@
 @section('content')
 @php
     $selectedStaff = $staffs->firstWhere('id', $staffId);
-    // Preserve the actual office_name of the selected Work Plan /*
-    // Financial Plan. This is important because one staff_id can*
-    // have multiple office names such as ICTS and ICT NEP.*
+    // Preserve the actual office_name of the selected Work Plan / Financial Plan.
+    // One staff_id can have multiple office names such as ICTS and ICT NEP.
     $selectedOfficeName =
         $plan?->office_name
         ?? request('office_name')
@@ -375,13 +374,13 @@
     text-align: center;
     color: #94a3b8;
 }
-.drag-handle.locked {
+***.drag-handle.locked*** {
     cursor: default;
     opacity: .5;
 }
 .drag-handle:not(.locked):active{cursor:grabbing}
-#builderBody>tr.work-plan-row.dragging{opacity:.45}
-#builderBody>tr.work-plan-row.drag-over{box-shadow:inset 0 2px 0 #0ea5e9}
+\#builderBody>t&#x72;***.work-plan-row.dragging***{opacity:.45}
+\#builderBody>t&#x72;***.work-plan-row.drag-over***{box-shadow:inset 0 2px 0 #0ea5e9}
 .target-delete:disabled,
 .add-target:disabled,
 .target-month-action:disabled,
@@ -454,7 +453,7 @@
 .structural-row td {
     background: #f8fafc;
 }
-.structural-row.header-row td {
+***.structural-row.header-row*** td {
     background: #e2e8f0;
 }
 .structural-title {

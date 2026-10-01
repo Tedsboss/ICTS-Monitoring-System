@@ -273,6 +273,7 @@
                         <tr
                             class="plan-row transition hover:bg-slate-50"
                             data-fiscal-year="{{ $plan->fiscal_year }}"
+                                        data-staff-id="{{ $plan->staff_id }}"
                             data-office="{{ strtolower($plan->office_name) }}"
                             data-status="{{ $statusKey }}"
                        >
@@ -351,7 +352,8 @@
                                     <a
                                         href="{{ route('financial-plans.index', [
                                             'fiscal_year' => $plan->fiscal_year,
-                                            'office_name' => $plan->office_name,
+                                            'staff_id' => $plan->staff_id,
+                                        'office_name' => $plan->office_name,
                                         ]) }}"
                                         class="inline-flex items-center gap-1.5
                                                rounded-lg border border-sky-200
@@ -371,6 +373,7 @@
                                         <a
                                             href="{{ route('financial-plans.builder', [
                                                 'fiscal_year' => $plan->fiscal_year,
+                                                'staff_id' => $plan->staff_id,
                                                 'office_name' => $plan->office_name,
                                             ]) }}"
                                             class="inline-flex items-center gap-1.5
@@ -656,7 +659,8 @@ $(document).ready(function () {
             }
             const fiscalYear =
                 $button.data('fiscal-year');
-            const officeName =
+            const staffId = Number($button.data('staff-id') || 0) || null;
+        const officeName =
                 $button.data('office');
             if (
                 !confirm(
@@ -680,7 +684,8 @@ $(document).ready(function () {
                 data: {
                     fiscal_year:
                         fiscalYear,
-                    office_name:
+                    staff_id: staffId,
+                office_name:
                         officeName,
                     _token:
                         '{{ csrf_token() }}'

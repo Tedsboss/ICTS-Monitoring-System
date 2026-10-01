@@ -29,7 +29,7 @@ class WorkPlanClassification extends Model
     public function parent(): BelongsTo
     {
         return $this->belongsTo(
-            WorkPlanClassification::class,
+            self::class,
             'parent_id'
         );
     }
@@ -37,7 +37,7 @@ class WorkPlanClassification extends Model
     public function children(): HasMany
     {
         return $this->hasMany(
-            WorkPlanClassification::class,
+            self::class,
             'parent_id'
         )
             ->orderBy('sort_order')
@@ -69,5 +69,15 @@ class WorkPlanClassification extends Model
         return $query
             ->orderBy('sort_order')
             ->orderBy('id');
+    }
+
+    public function isRoot(): bool
+    {
+        return $this->parent_id === null;
+    }
+
+    public function hasChildren(): bool
+    {
+        return $this->children()->exists();
     }
 }

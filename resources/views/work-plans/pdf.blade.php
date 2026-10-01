@@ -8,7 +8,7 @@
             size: A4 landscape;
             margin: 8mm;
         }
-        * {
+         {
             box-sizing: border-box;
         }
         body {
@@ -78,7 +78,7 @@
         .target-cell {
             font-size: 7px;
             line-height: 1.25;
-        }   
+        }
         .target-range-cell {
             vertical-align: top;
             text-align: left;
@@ -144,7 +144,6 @@
                 <strong>
                     {{ $plan->office_name ?: ($plan->staff?->name ?? '—') }}
                 </strong>
-
                 @if($plan->division)
                     / {{ $plan->division->name }}
                 @endif
@@ -283,7 +282,6 @@
                     @php
                         $classificationPrinted = false;
                     @endphp
-
                     @foreach($displayRow['items'] as $activityData)
                         @foreach($activityData['lanes'] as $lane)
                             <tr>
@@ -302,19 +300,16 @@
                                         @else
                                             —
                                         @endif
-
                                         @php
                                             $classificationPrinted = true;
                                         @endphp
                                     @endif
                                 </td>
-
                                 <td class="activity-cell">
                                     @if($loop->first)
                                         {!! nl2br(e($activityData['item']->specific_activity ?: '—')) !!}
                                     @endif
                                 </td>
-
                                 @foreach($lane['segments'] as $segment)
                                     <td
                                         colspan="{{ $segment['span'] }}"

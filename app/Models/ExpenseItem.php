@@ -47,4 +47,9 @@ class ExpenseItem extends Model
             'updated_by'
         );
     }
+
+    public function isActive(): bool
+    {
+        return (bool) $this->is_active;
+    }
 }

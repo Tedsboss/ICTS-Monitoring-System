@@ -2,8 +2,6 @@
 
 namespace App\Models;
 
-use App\Models\AllocationExpense;
-use App\Models\Staff;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -27,11 +25,17 @@ class ExpenseType extends Model
 
     public function staff(): BelongsTo
     {
-        return $this->belongsTo(Staff::class, 'staff_id');
+        return $this->belongsTo(
+            Staff::class,
+            'staff_id'
+        );
     }
 
     public function allocationExpenses(): HasMany
     {
-        return $this->hasMany(AllocationExpense::class, 'expense_id');
+        return $this->hasMany(
+            AllocationExpense::class,
+            'expense_id'
+        );
     }
 }
