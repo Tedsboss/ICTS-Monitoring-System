@@ -505,19 +505,6 @@
                                         </span>
                                     </a>
                                 </li>
-                                <li class="nav-item">
-                                    <a
-                                        class="nav-link {{ request()->routeIs('expense-types.*') ? 'active' : '' }}"
-                                        href="{{ route('expense-types.index') }}"
-                                    >
-                                        <span class="sidenav-mini-icon">
-                                            <i class="fa fa-tags" aria-hidden="true"></i>
-                                        </span>
-                                        <span class="sidenav-normal">
-                                            Expense Types
-                                        </span>
-                                    </a>
-                                </li>
                             </ul>
                         </div>
                     </li>

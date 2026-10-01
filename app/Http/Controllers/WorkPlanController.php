@@ -1,7 +1,5 @@
 <?php
-
 namespace App\Http\Controllers;
-
 use App\Models\Staff;
 use App\Models\WorkPlan;
 use App\Models\WorkPlanClassification;
@@ -18,7 +16,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use App\Models\FinancialPlan;
-
 class WorkPlanController extends Controller
 {
     private const MONTHS = [
@@ -35,56 +32,36 @@ class WorkPlanController extends Controller
         11 => 'November',
         12 => 'December',
     ];
-
     public function plans(Request $request): View
     {
         $this->authorize('viewAny', WorkPlan::class);
-
         $fiscalYear = (int) $request->input(
             'fiscal_year',
             now()->year
         );
-
         $staffId = $request->filled('staff_id')
             ? (int) $request->input('staff_id')
             : null;
-
         if ($staffId !== null) {
             $this->ensureStaffAccess($staffId);
         }
-
         $financialPlanQuery = FinancialPlan::query()
             ->where('fiscal_year', $fiscalYear)
             ->whereNotNull('staff_id')
             ->whereNotNull('office_name')
             ->where('office_name', '!=', '');
-
-        /*
-        |--------------------------------------------------------------------------
-        | Staff access
-        |--------------------------------------------------------------------------
-        */
-
         if (! $this->isAdministrator()) {
             $financialPlanQuery->where(
                 'staff_id',
                 (int) auth()->user()->staff_id
             );
         }
-
         if ($staffId !== null) {
             $financialPlanQuery->where(
                 'staff_id',
                 $staffId
             );
         }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Get unique Financial Plan scopes
-        |--------------------------------------------------------------------------
-        */
-
         $financialPlanScopes = $financialPlanQuery
             ->select([
                 'fiscal_year',
@@ -95,27 +72,17 @@ class WorkPlanController extends Controller
             ->orderBy('staff_id')
             ->orderBy('office_name')
             ->get();
-
-        /*
-        |--------------------------------------------------------------------------
-        | Load existing Work Plans for those scopes
-        |--------------------------------------------------------------------------
-        */
-
         $workPlanQuery = WorkPlan::query()
             ->with('staff')
             ->withCount('items')
             ->where('fiscal_year', $fiscalYear);
-
         $this->applyStaffScope($workPlanQuery);
-
         if ($staffId !== null) {
             $workPlanQuery->where(
                 'staff_id',
                 $staffId
             );
         }
-
         $existingWorkPlans = $workPlanQuery
             ->get()
             ->keyBy(function (WorkPlan $plan) {
@@ -125,93 +92,53 @@ class WorkPlanController extends Controller
                     trim((string) $plan->office_name),
                 ]);
             });
-
-        /*
-        |--------------------------------------------------------------------------
-        | Build Work Plan list
-        |--------------------------------------------------------------------------
-        */
-
         $plans = $financialPlanScopes
             ->map(function ($scope) use ($existingWorkPlans) {
-
                 $key = implode('|', [
                     (int) $scope->fiscal_year,
                     (int) $scope->staff_id,
                     trim((string) $scope->office_name),
                 ]);
-
                 $existing = $existingWorkPlans->get($key);
-
                 if ($existing) {
                     return $existing;
                 }
-
-                /*
-                * Unsaved Work Plan placeholder.
-                *
-                * This allows the Plans page to display the Financial Plan
-                * scope before the user has created/saved its Work Plan.
-                */
-
                 $plan = new WorkPlan();
-
                 $plan->fiscal_year =
                     (int) $scope->fiscal_year;
-
                 $plan->staff_id =
                     (int) $scope->staff_id;
-
                 $plan->office_name =
                     trim((string) $scope->office_name);
-
                 $plan->status = 'draft';
                 $plan->finalized = 'no';
-
-                /*
-                * Important:
-                * id remains NULL because the Work Plan has not been saved yet.
-                */
-
                 $plan->setRelation(
                     'staff',
                     Staff::query()->find(
                         (int) $scope->staff_id
                     )
                 );
-
                 $plan->setAttribute(
                     'items_count',
                     0
                 );
-
                 return $plan;
             })
             ->values();
-
-        /*
-        |--------------------------------------------------------------------------
-        | Fiscal Year filter
-        |--------------------------------------------------------------------------
-        */
-
         $fiscalYearsQuery = FinancialPlan::query()
             ->whereNotNull('staff_id')
             ->whereNotNull('office_name')
             ->where('office_name', '!=', '');
-
         if (! $this->isAdministrator()) {
             $fiscalYearsQuery->where(
                 'staff_id',
                 (int) auth()->user()->staff_id
             );
         }
-
         $fiscalYears = $fiscalYearsQuery
             ->distinct()
             ->orderByDesc('fiscal_year')
             ->pluck('fiscal_year');
-
         return view('work-plans.plans', [
             'plans' => $plans,
             'fiscalYear' => $fiscalYear,
@@ -220,34 +147,26 @@ class WorkPlanController extends Controller
             'staffs' => $this->availableStaffs(),
         ]);
     }
-
     public function index(Request $request): View
     {
         $this->authorize('viewAny', WorkPlan::class);
-
         $fiscalYear = (int) $request->input(
             'fiscal_year',
             now()->year
         );
-
         $staffId = $this->resolveRequestedStaffId($request);
-
         $officeName = trim(
             (string) $request->input('office_name', '')
         );
-
         $plan = null;
-
         if ($staffId !== null && $officeName !== '') {
             $plan = $this->findPlanForAccess(
                 $fiscalYear,
                 $staffId,
                 $officeName
             );
-
             if ($plan) {
                 $this->authorize('view', $plan);
-
                 $plan->load([
                     'staff',
                     'signatory',
@@ -259,7 +178,6 @@ class WorkPlanController extends Controller
                 ]);
             }
         }
-
         return view('work-plans.index', [
             'plan' => $plan,
             'fiscalYear' => $fiscalYear,
@@ -269,36 +187,26 @@ class WorkPlanController extends Controller
             'months' => self::MONTHS,
         ]);
     }
-
     public function builder(Request $request): View
     {
         $this->authorize('viewAny', WorkPlan::class);
-
         $fiscalYear = (int) $request->input(
             'fiscal_year',
             now()->year
         );
-
         $staffId = $this->resolveRequestedStaffId($request);
-
         $officeName = trim(
             (string) $request->input('office_name', '')
         );
-
         $plan = null;
-
         if ($staffId !== null && $officeName !== '') {
-
             $plan = $this->findPlanForAccess(
                 $fiscalYear,
                 $staffId,
                 $officeName
             );
-
             if ($plan) {
-
                 $this->authorize('view', $plan);
-
                 $plan->load([
                     'staff',
                     'signatory',
@@ -308,42 +216,31 @@ class WorkPlanController extends Controller
                     'items.targets.months',
                     'submissions.actor',
                 ]);
-
             } else {
-
                 $this->authorize(
                     'create',
                     WorkPlan::class
                 );
-
                 $this->ensureStaffAccess($staffId);
             }
-
         } elseif ($staffId !== null) {
-
             $this->authorize(
                 'create',
                 WorkPlan::class
             );
-
             $this->ensureStaffAccess($staffId);
-
         } else {
-
             $this->authorize(
                 'create',
                 WorkPlan::class
             );
         }
-
         $classifications = WorkPlanClassification::query()
             ->forFiscalYear($fiscalYear)
             ->active()
             ->ordered()
             ->get();
-
         $financialPlanActivities = collect();
-
         if ($staffId !== null) {
             $financialPlanActivities = $this->financialPlanActivities(
                 $fiscalYear,
@@ -351,20 +248,17 @@ class WorkPlanController extends Controller
                 $officeName
             );
         }
-
         $financialPlanScopesQuery = FinancialPlan::query()
                 ->where('fiscal_year', $fiscalYear)
                 ->whereNotNull('staff_id')
                 ->whereNotNull('office_name')
                 ->where('office_name', '!=', '');
-
             if (! $this->isAdministrator()) {
                 $financialPlanScopesQuery->where(
                     'staff_id',
                     (int) auth()->user()->staff_id
                 );
             }
-
             $financialPlanScopes = $financialPlanScopesQuery
                 ->select([
                     'staff_id',
@@ -373,7 +267,6 @@ class WorkPlanController extends Controller
                 ->distinct()
                 ->orderBy('office_name')
                 ->get();
-                
         return view('work-plans.builder', [
             'plan' => $plan,
             'fiscalYear' => $fiscalYear,
@@ -386,11 +279,9 @@ class WorkPlanController extends Controller
             'months' => self::MONTHS,
         ]);
     }
-
     public function data(Request $request): JsonResponse
     {
         $this->authorize('viewAny', WorkPlan::class);
-
         $validated = $request->validate([
             'fiscal_year' => [
                 'required',
@@ -409,28 +300,22 @@ class WorkPlanController extends Controller
                 'max:150',
             ],
         ]);
-
         $fiscalYear = (int) $validated['fiscal_year'];
         $staffId = (int) $validated['staff_id'];
         $officeName = trim($validated['office_name']);
-
         $this->ensureStaffAccess($staffId);
-
         $plan = $this->findPlanForAccess(
             $fiscalYear,
             $staffId,
             $officeName
         );
-
         if (! $plan) {
             return response()->json([
                 'success' => true,
                 'data' => null,
             ]);
         }
-
         $this->authorize('view', $plan);
-
         $plan->load([
             'staff',
             'signatory',
@@ -440,20 +325,17 @@ class WorkPlanController extends Controller
             'items.targets.months',
             'submissions.actor',
         ]);
-
         return response()->json([
             'success' => true,
             'data' => $plan,
         ]);
     }
-
     public function save(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'fiscal_year' => ['required', 'integer', 'min:2000', 'max:2100'],
             'staff_id' => ['required', 'integer', 'exists:staffs,id'],
             'office_name' => ['required','string','max:150',],
-            
             'signatory' => ['nullable', 'array'],
             'signatory.prepared_by' => ['nullable', 'string', 'max:150'],
             'signatory.prepared_by_position' => ['nullable', 'string', 'max:150'],
@@ -463,7 +345,6 @@ class WorkPlanController extends Controller
             'signatory.recommended_by_position' => ['nullable', 'string', 'max:150'],
             'signatory.approved_by' => ['nullable', 'string', 'max:150'],
             'signatory.approved_by_position' => ['nullable', 'string', 'max:150'],
-
             'items' => ['nullable', 'array'],
             'items.*.id' => ['nullable', 'integer'],
             'items.*.row_key' => ['nullable', 'string', 'max:100'],
@@ -522,37 +403,30 @@ class WorkPlanController extends Controller
                 'min:0',
             ],
         ]);
-
         $year = (int) $validated['fiscal_year'];
         $staffId = (int) $validated['staff_id'];
         $officeName = trim(
             $validated['office_name']
         );
-
         $items = $validated['items'] ?? [];
-
         $this->ensureStaffAccess($staffId);
-
         $plan = $this->findPlanForAccess(
             $year,
             $staffId,
             $officeName
         );
-
         if ($plan) {
             $this->authorize('update', $plan);
-
             if (! $plan->isEditable()) {
                 return $this->notEditableResponse();
             }
         } else {
             $this->authorize('create', WorkPlan::class);
         }
-
         $this->validateItemStructure($items);
         $this->validateClassifications($year, $items);
+        $this->validateFinancialPlanSources($year, $staffId, $officeName, $items);
         $this->validateTargetMonths($items);
-
         $plan = DB::transaction(function () use (
             $validated,
             $year,
@@ -575,44 +449,36 @@ class WorkPlanController extends Controller
                 $plan->updated_by = auth()->id();
                 $plan->save();
             }
-
             $this->saveSignatory(
                 $plan,
                 $validated['signatory'] ?? []
             );
-
             $keepItemIds = [];
             $savedRowKeys = [];
-
             foreach ($items as $itemIndex => $itemData) {
                 $item = null;
-
                 if (! empty($itemData['id'])) {
                     $item = WorkPlanItem::query()
                         ->where('id', (int) $itemData['id'])
                         ->where('work_plan_id', $plan->id)
                         ->first();
                 }
-
                 if (! $item) {
                     $item = new WorkPlanItem();
                     $item->work_plan_id = $plan->id;
                 }
-
                 $rowType = $itemData['row_type'];
                 $parentId = $this->resolveParentId(
                     $plan,
                     $itemData,
                     $savedRowKeys
                 );
-
                 $item->parent_id = $parentId;
                 $item->row_type = $rowType;
                 $item->sort_order = (int) (
                     $itemData['sort_order']
                     ?? (($itemIndex + 1) * 10)
                 );
-
                 if ($rowType === 'item') {
                     $item->title = null;
                     $item->classification_id = ! empty(
@@ -644,15 +510,11 @@ class WorkPlanController extends Controller
                     $item->prexc_code = null;
                     $item->specific_activity = null;
                 }
-
                 $item->save();
-
                 $keepItemIds[] = $item->id;
-
                 if (! empty($itemData['row_key'])) {
                     $savedRowKeys[$itemData['row_key']] = $item->id;
                 }
-
                 if ($rowType === 'item') {
                     $this->saveTargets(
                         $item,
@@ -664,19 +526,14 @@ class WorkPlanController extends Controller
                         ->delete();
                 }
             }
-
             $itemDeleteQuery = WorkPlanItem::query()
                 ->where('work_plan_id', $plan->id);
-
             if (! empty($keepItemIds)) {
                 $itemDeleteQuery->whereNotIn('id', $keepItemIds);
             }
-
             $itemDeleteQuery->delete();
-
             return $plan;
         });
-
         return response()->json([
             'success' => true,
             'message' => 'Work Plan saved successfully.',
@@ -690,17 +547,13 @@ class WorkPlanController extends Controller
             ]),
         ]);
     }
-
     public function syncFinancialPlan(WorkPlan $workPlan): JsonResponse
     {
         $this->authorize('update', $workPlan);
-
         if (! $workPlan->isEditable()) {
             return $this->notEditableResponse();
         }
-
         $this->ensureStaffAccess((int) $workPlan->staff_id);
-
         $financialPlanActivities =
             $this->financialPlanActivities(
                 (int) $workPlan->fiscal_year,
@@ -710,7 +563,6 @@ class WorkPlanController extends Controller
                     ? (int) $workPlan->division_id
                     : null
             );
-
         if ($financialPlanActivities->isEmpty()) {
             return response()->json([
                 'success' => true,
@@ -718,7 +570,6 @@ class WorkPlanController extends Controller
                 'added_count' => 0,
             ]);
         }
-
         $existingItems = WorkPlanItem::query()
             ->where('work_plan_id', $workPlan->id)
             ->where('row_type', 'item')
@@ -728,13 +579,11 @@ class WorkPlanController extends Controller
                 'prexc_code',
                 'specific_activity',
             ]);
-
         $existingSourceIds = $existingItems
             ->pluck('financial_plan_id')
             ->filter()
             ->map(fn ($id) => (int) $id)
             ->unique();
-
         $existingKeys = $existingItems
             ->map(function ($item) {
                 return $this->financialPlanActivityKey(
@@ -745,7 +594,6 @@ class WorkPlanController extends Controller
             })
             ->filter()
             ->unique();
-
         $missingActivities = $financialPlanActivities
             ->filter(function ($activity) use (
                 $existingSourceIds,
@@ -754,25 +602,21 @@ class WorkPlanController extends Controller
                 $financialPlanId = (int) (
                     $activity['financial_plan_id'] ?? 0
                 );
-
                 if (
                     $financialPlanId > 0
                     && $existingSourceIds->contains($financialPlanId)
                 ) {
                     return false;
                 }
-
                 $key = $this->financialPlanActivityKey(
                     $activity['program_classification'] ?? null,
                     $activity['prexc_code'] ?? null,
                     $activity['specific_activity'] ?? null
                 );
-
                 return $key !== null
                     && ! $existingKeys->contains($key);
             })
             ->values();
-
         if ($missingActivities->isEmpty()) {
             return response()->json([
                 'success' => true,
@@ -780,7 +624,6 @@ class WorkPlanController extends Controller
                 'added_count' => 0,
             ]);
         }
-
         $addedCount = DB::transaction(function () use (
             $workPlan,
             $missingActivities
@@ -788,12 +631,9 @@ class WorkPlanController extends Controller
             $maxSortOrder = (int) WorkPlanItem::query()
                 ->where('work_plan_id', $workPlan->id)
                 ->max('sort_order');
-
             $addedCount = 0;
-
             foreach ($missingActivities as $activity) {
                 $maxSortOrder += 10;
-
                 WorkPlanItem::create([
                     'work_plan_id' => $workPlan->id,
                     'financial_plan_id' => (int) $activity['financial_plan_id'],
@@ -812,16 +652,12 @@ class WorkPlanController extends Controller
                     ),
                     'sort_order' => $maxSortOrder,
                 ]);
-
                 $addedCount++;
             }
-
             $workPlan->updated_by = auth()->id();
             $workPlan->save();
-
             return $addedCount;
         });
-
         return response()->json([
             'success' => true,
             'message' => $addedCount === 1
@@ -849,41 +685,32 @@ class WorkPlanController extends Controller
             'work-plan-fy-' . $workPlan->fiscal_year . '-' . $workPlan->id . '.pdf'
         );
     }
-
     public function destroy(WorkPlan $workPlan): RedirectResponse
     {
         $this->authorize('delete', $workPlan);
-
         if (! $workPlan->isEditable()) {
             return redirect()->back()->with(
                 'error',
                 'Only draft or returned Work Plans can be deleted.'
             );
         }
-
         $workPlan->delete();
-
         return redirect()
             ->route('work-plans.plans')
             ->with('success', 'Work Plan deleted successfully.');
     }
-
     public function submit(WorkPlan $workPlan): JsonResponse
     {
         $this->authorize('submit', $workPlan);
-
         if (! $workPlan->isEditable()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Only draft or returned Work Plans can be submitted.',
             ], 422);
         }
-
         $this->validateForSubmit($workPlan);
-
         DB::transaction(function () use ($workPlan) {
             $fromStatus = $workPlan->status;
-
             $workPlan->update([
                 'status' => 'submitted',
                 'finalized' => 'no',
@@ -895,7 +722,6 @@ class WorkPlanController extends Controller
                 'finalized_by' => null,
                 'updated_by' => auth()->id(),
             ]);
-
             $this->recordSubmission(
                 $workPlan,
                 'submit',
@@ -903,24 +729,20 @@ class WorkPlanController extends Controller
                 'submitted'
             );
         });
-
         return response()->json([
             'success' => true,
             'message' => 'Work Plan submitted for approval.',
         ]);
     }
-
     public function approve(WorkPlan $workPlan): JsonResponse
     {
         $this->authorize('approve', $workPlan);
-
         if ($workPlan->status !== 'submitted') {
             return response()->json([
                 'success' => false,
                 'message' => 'Only submitted Work Plans can be approved.',
             ], 422);
         }
-
         DB::transaction(function () use ($workPlan) {
             $workPlan->update([
                 'status' => 'approved',
@@ -928,7 +750,6 @@ class WorkPlanController extends Controller
                 'approved_by' => auth()->id(),
                 'updated_by' => auth()->id(),
             ]);
-
             $this->recordSubmission(
                 $workPlan,
                 'approve',
@@ -936,23 +757,19 @@ class WorkPlanController extends Controller
                 'approved'
             );
         });
-
         return response()->json([
             'success' => true,
             'message' => 'Work Plan approved.',
         ]);
     }
-
     public function returnPlan(
         Request $request,
         WorkPlan $workPlan
     ): JsonResponse {
         $this->authorize('return', $workPlan);
-
         $validated = $request->validate([
             'remarks' => ['required', 'string', 'max:5000'],
         ]);
-
         if (! in_array(
             $workPlan->status,
             ['submitted', 'approved'],
@@ -963,13 +780,11 @@ class WorkPlanController extends Controller
                 'message' => 'Only submitted or approved Work Plans can be returned.',
             ], 422);
         }
-
         DB::transaction(function () use (
             $workPlan,
             $validated
         ) {
             $fromStatus = $workPlan->status;
-
             $workPlan->update([
                 'status' => 'returned',
                 'finalized' => 'no',
@@ -979,7 +794,6 @@ class WorkPlanController extends Controller
                 'finalized_by' => null,
                 'updated_by' => auth()->id(),
             ]);
-
             $this->recordSubmission(
                 $workPlan,
                 'return',
@@ -988,24 +802,20 @@ class WorkPlanController extends Controller
                 $validated['remarks']
             );
         });
-
         return response()->json([
             'success' => true,
             'message' => 'Work Plan returned for revision.',
         ]);
     }
-
     public function finalize(WorkPlan $workPlan): JsonResponse
     {
         $this->authorize('finalize', $workPlan);
-
         if ($workPlan->status !== 'approved') {
             return response()->json([
                 'success' => false,
                 'message' => 'Only approved Work Plans can be finalized.',
             ], 422);
         }
-
         DB::transaction(function () use ($workPlan) {
             $workPlan->update([
                 'status' => 'finalized',
@@ -1014,7 +824,6 @@ class WorkPlanController extends Controller
                 'finalized_by' => auth()->id(),
                 'updated_by' => auth()->id(),
             ]);
-
             $this->recordSubmission(
                 $workPlan,
                 'finalize',
@@ -1022,24 +831,20 @@ class WorkPlanController extends Controller
                 'finalized'
             );
         });
-
         return response()->json([
             'success' => true,
             'message' => 'Work Plan finalized.',
         ]);
     }
-
     public function reopen(WorkPlan $workPlan): JsonResponse
     {
         $this->authorize('reopen', $workPlan);
-
         if (! $workPlan->isFinalized()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Only finalized Work Plans can be reopened.',
             ], 422);
         }
-
         DB::transaction(function () use ($workPlan) {
             $workPlan->update([
                 'status' => 'draft',
@@ -1052,7 +857,6 @@ class WorkPlanController extends Controller
                 'finalized_by' => null,
                 'updated_by' => auth()->id(),
             ]);
-
             $this->recordSubmission(
                 $workPlan,
                 'reopen',
@@ -1060,13 +864,11 @@ class WorkPlanController extends Controller
                 'draft'
             );
         });
-
         return response()->json([
             'success' => true,
             'message' => 'Work Plan reopened as draft.',
         ]);
     }
-
     private function saveSignatory(
         WorkPlan $plan,
         array $signatoryData
@@ -1081,53 +883,43 @@ class WorkPlanController extends Controller
             'approved_by',
             'approved_by_position',
         ];
-
         $data = [];
-
         foreach ($fields as $field) {
             $data[$field] = $this->nullableTrim(
                 $signatoryData[$field] ?? null
             );
         }
-
         WorkPlanSignatory::updateOrCreate(
             ['work_plan_id' => $plan->id],
             $data
         );
     }
-
     private function saveTargets(
         WorkPlanItem $item,
         array $targets
     ): void {
         $keepTargetIds = [];
-
         foreach ($targets as $targetIndex => $targetData) {
             $target = null;
-
             if (! empty($targetData['id'])) {
                 $target = WorkPlanTarget::query()
                     ->where('id', (int) $targetData['id'])
                     ->where('work_plan_item_id', $item->id)
                     ->first();
             }
-
             if (! $target) {
                 $target = new WorkPlanTarget();
                 $target->work_plan_item_id = $item->id;
             }
-
             $months = collect($targetData['months'] ?? [])
                 ->map(fn ($month) => (int) $month)
                 ->filter(fn ($month) => $month >= 1 && $month <= 12)
                 ->unique()
                 ->sort()
                 ->values();
-
             if ($months->isEmpty() && ! empty($targetData['month'])) {
                 $months = collect([(int) $targetData['month']]);
             }
-
             $target->month = $months->first();
             $target->target_output = trim(
                 $targetData['target_output']
@@ -1136,14 +928,11 @@ class WorkPlanController extends Controller
                 $targetData['sort_order']
                 ?? (($targetIndex + 1) * 10)
             );
-
             $target->save();
-
             WorkPlanTargetMonth::query()
                 ->where('work_plan_target_id', $target->id)
                 ->whereNotIn('month', $months->all())
                 ->delete();
-
             foreach ($months as $month) {
                 WorkPlanTargetMonth::updateOrCreate(
                     [
@@ -1153,20 +942,15 @@ class WorkPlanController extends Controller
                     []
                 );
             }
-
             $keepTargetIds[] = $target->id;
         }
-
         $deleteQuery = WorkPlanTarget::query()
             ->where('work_plan_item_id', $item->id);
-
         if (! empty($keepTargetIds)) {
             $deleteQuery->whereNotIn('id', $keepTargetIds);
         }
-
         $deleteQuery->delete();
     }
-
     private function resolveParentId(
         WorkPlan $plan,
         array $itemData,
@@ -1174,7 +958,6 @@ class WorkPlanController extends Controller
     ): ?int {
         if (! empty($itemData['parent_key'])) {
             $parentKey = $itemData['parent_key'];
-
             if (! isset($savedRowKeys[$parentKey])) {
                 throw ValidationException::withMessages([
                     'items' => [
@@ -1182,18 +965,14 @@ class WorkPlanController extends Controller
                     ],
                 ]);
             }
-
             return (int) $savedRowKeys[$parentKey];
         }
-
         if (! empty($itemData['parent_id'])) {
             $parentId = (int) $itemData['parent_id'];
-
             $exists = WorkPlanItem::query()
                 ->where('id', $parentId)
                 ->where('work_plan_id', $plan->id)
                 ->exists();
-
             if (! $exists) {
                 throw ValidationException::withMessages([
                     'items' => [
@@ -1201,103 +980,78 @@ class WorkPlanController extends Controller
                     ],
                 ]);
             }
-
             return $parentId;
         }
-
         return null;
     }
-
     private function applyStaffScope($query)
     {
         if ($this->isAdministrator()) {
             return $query;
         }
-
         $staffId = auth()->user()->staff_id;
-
         if ($staffId === null) {
             return $query->whereRaw('1 = 0');
         }
-
         return $query->where('staff_id', (int) $staffId);
     }
-
     private function findPlanForAccess(
         int $fiscalYear,
         int $staffId,
         string $officeName
     ): ?WorkPlan {
         $officeName = trim($officeName);
-
         if ($officeName === '') {
             return null;
         }
-
         $query = WorkPlan::query()
             ->where('fiscal_year', $fiscalYear)
             ->where('staff_id', $staffId)
             ->where('office_name', $officeName);
-
         $this->applyStaffScope($query);
-
         return $query->first();
     }
-
     private function resolveRequestedStaffId(
         Request $request
     ): ?int {
         if ($request->filled('staff_id')) {
             $staffId = (int) $request->input('staff_id');
-
             $this->ensureStaffAccess($staffId);
-
             return $staffId;
         }
-
         if (! $this->isAdministrator()) {
             return auth()->user()->staff_id !== null
                 ? (int) auth()->user()->staff_id
                 : null;
         }
-
         return null;
     }
-
     private function ensureStaffAccess(int $staffId): void
     {
         $exists = Staff::query()
             ->where('id', $staffId)
             ->exists();
-
         abort_unless($exists, 404);
-
         if ($this->isAdministrator()) {
             return;
         }
-
         abort_unless(
             auth()->user()->staff_id !== null
                 && (int) auth()->user()->staff_id === $staffId,
             403
         );
     }
-
     private function availableStaffs()
     {
         $query = Staff::query()
             ->orderBy('name');
-
         if (! $this->isAdministrator()) {
             $staffId = auth()->user()->staff_id;
-
             if ($staffId === null) {
                 return collect();
             }
-
             $query->where('id', (int) $staffId);
         }
-
         return $query->get([
             'id',
             'name',
@@ -1306,14 +1060,11 @@ class WorkPlanController extends Controller
             'group_id',
         ]);
     }
-
     private function validateItemStructure(array $items): void
     {
         $rowKeys = [];
-
         foreach ($items as $index => $item) {
             $rowType = $item['row_type'] ?? 'item';
-
             if (! empty($item['row_key'])) {
                 if (isset($rowKeys[$item['row_key']])) {
                     throw ValidationException::withMessages([
@@ -1322,10 +1073,8 @@ class WorkPlanController extends Controller
                         ],
                     ]);
                 }
-
                 $rowKeys[$item['row_key']] = true;
             }
-
             if (in_array(
                 $rowType,
                 ['header', 'subheader'],
@@ -1338,20 +1087,16 @@ class WorkPlanController extends Controller
                         ],
                     ]);
                 }
-
                 continue;
             }
-
             $hasLegacyClassification = ! empty(
                 $item['classification_id']
             );
-
             $hasFpClassification = ! empty(
                 $item['financial_plan_id']
             ) && trim(
                 (string) ($item['program_classification'] ?? '')
             ) !== '';
-
             if (! $hasLegacyClassification && ! $hasFpClassification) {
                 throw ValidationException::withMessages([
                     "items.$index.program_classification" => [
@@ -1359,7 +1104,6 @@ class WorkPlanController extends Controller
                     ],
                 ]);
             }
-
             if (
                 trim(
                     (string) ($item['specific_activity'] ?? '')
@@ -1372,7 +1116,6 @@ class WorkPlanController extends Controller
                 ]);
             }
         }
-
         foreach ($items as $index => $item) {
             if (
                 ! empty($item['parent_key'])
@@ -1386,6 +1129,29 @@ class WorkPlanController extends Controller
             }
         }
     }
+    private function validateFinancialPlanSources(int $fiscalYear, int $staffId, string $officeName, array $items): void
+    {
+        $ids = collect($items)->filter(fn ($item) => ($item['row_type'] ?? null) === 'item' && ! empty($item['financial_plan_id']))->pluck('financial_plan_id')->map(fn ($id) => (int) $id)->unique()->values();
+        if ($ids->isEmpty()) {
+            return;
+        }
+        $sources = FinancialPlan::query()->whereIn('id', $ids)->where('fiscal_year', $fiscalYear)->where('staff_id', $staffId)->where('office_name', $officeName)->where('row_type', 'item')->get()->keyBy('id');
+        foreach ($items as $item) {
+            if (($item['row_type'] ?? null) !== 'item' || empty($item['financial_plan_id'])) {
+                continue;
+            }
+            $id = (int) $item['financial_plan_id'];
+            $source = $sources->get($id);
+            if (! $source) {
+                throw ValidationException::withMessages(['items' => "Financial Plan source {$id} is not valid for the selected fiscal year, staff, and office."]);
+            }
+            foreach (['program_classification', 'prexc_code', 'specific_activity'] as $field) {
+                if (strcasecmp(trim((string) ($item[$field] ?? '')), trim((string) ($source->{$field} ?? ''))) !== 0) {
+                    throw ValidationException::withMessages(['items' => "Financial Plan source {$id} does not match the submitted {$field}."]);
+                }
+            }
+        }
+    }
 
     private function validateTargetMonths(array $items): void
     {
@@ -1393,14 +1159,11 @@ class WorkPlanController extends Controller
             if (($item['row_type'] ?? 'item') !== 'item') {
                 continue;
             }
-
             foreach (($item['targets'] ?? []) as $targetIndex => $target) {
                 $months = $target['months'] ?? [];
-
                 if (empty($months) && ! empty($target['month'])) {
                     $months = [(int) $target['month']];
                 }
-
                 if (empty($months)) {
                     throw ValidationException::withMessages([
                         "items.$itemIndex.targets.$targetIndex.months" => [
@@ -1411,7 +1174,6 @@ class WorkPlanController extends Controller
             }
         }
     }
-
     private function validateClassifications(
         int $fiscalYear,
         array $items
@@ -1425,20 +1187,16 @@ class WorkPlanController extends Controller
             ->map(fn ($id) => (int) $id)
             ->unique()
             ->values();
-
         if ($classificationIds->isEmpty()) {
             return;
         }
-
         $validIds = WorkPlanClassification::query()
             ->where('fiscal_year', $fiscalYear)
             ->where('is_active', true)
             ->whereIn('id', $classificationIds)
             ->pluck('id')
             ->map(fn ($id) => (int) $id);
-
         $invalidIds = $classificationIds->diff($validIds);
-
         if ($invalidIds->isNotEmpty()) {
             throw ValidationException::withMessages([
                 'items' => [
@@ -1447,18 +1205,15 @@ class WorkPlanController extends Controller
             ]);
         }
     }
-
     private function validateForSubmit(WorkPlan $workPlan): void
     {
         $workPlan->load([
             'items.targets.months',
             'signatory',
         ]);
-
         $budgetLines = $workPlan->items
             ->where('row_type', 'item')
             ->values();
-
         if ($budgetLines->isEmpty()) {
             throw ValidationException::withMessages([
                 'items' => [
@@ -1466,7 +1221,6 @@ class WorkPlanController extends Controller
                 ],
             ]);
         }
-
         foreach ($workPlan->items as $item) {
             if (in_array(
                 $item->row_type,
@@ -1480,20 +1234,16 @@ class WorkPlanController extends Controller
                         ],
                     ]);
                 }
-
                 continue;
             }
-
             $hasLegacyClassification = ! empty(
                 $item->classification_id
             );
-
             $hasFpClassification = ! empty(
                 $item->financial_plan_id
             ) && trim(
                 (string) $item->program_classification
             ) !== '';
-
             if (! $hasLegacyClassification && ! $hasFpClassification) {
                 throw ValidationException::withMessages([
                     'items' => [
@@ -1501,7 +1251,6 @@ class WorkPlanController extends Controller
                     ],
                 ]);
             }
-
             if (trim((string) $item->specific_activity) === '') {
                 throw ValidationException::withMessages([
                     'items' => [
@@ -1509,7 +1258,6 @@ class WorkPlanController extends Controller
                     ],
                 ]);
             }
-
             if ($item->targets->isEmpty()) {
                 throw ValidationException::withMessages([
                     'items' => [
@@ -1519,18 +1267,14 @@ class WorkPlanController extends Controller
             }
         }
     }
-
     private function nullableTrim($value): ?string
     {
         if ($value === null) {
             return null;
         }
-
         $value = trim((string) $value);
-
         return $value === '' ? null : $value;
     }
-
     private function recordSubmission(
         WorkPlan $workPlan,
         string $action,
@@ -1549,7 +1293,6 @@ class WorkPlanController extends Controller
             'acted_at' => now(),
         ]);
     }
-
     private function isAdministrator(): bool
     {
         return in_array(
@@ -1558,7 +1301,6 @@ class WorkPlanController extends Controller
             true
         );
     }
-
     private function notEditableResponse(): JsonResponse
     {
         return response()->json([
@@ -1566,7 +1308,6 @@ class WorkPlanController extends Controller
             'message' => 'This Work Plan cannot be edited in its current status.',
         ], 403);
     }
-
     private function financialPlanActivityKey(
         $programClassification,
         $prexcCode,
@@ -1575,29 +1316,24 @@ class WorkPlanController extends Controller
         $programClassification = mb_strtolower(
             trim((string) $programClassification)
         );
-
         $prexcCode = mb_strtolower(
             trim((string) $prexcCode)
         );
-
         $specificActivity = mb_strtolower(
             trim((string) $specificActivity)
         );
-
         if (
             $programClassification === ''
             || $specificActivity === ''
         ) {
             return null;
         }
-
         return implode('|', [
             $programClassification,
             $prexcCode,
             $specificActivity,
         ]);
     }
-
     private function financialPlanActivities(
         int $fiscalYear,
         int $staffId,
@@ -1612,21 +1348,18 @@ class WorkPlanController extends Controller
             ->whereNotNull('specific_activity')
             ->where('program_classification', '!=', '')
             ->where('specific_activity', '!=', '');
-
         if ($officeName !== null && trim($officeName) !== '') {
             $query->where(
                 'office_name',
                 trim($officeName)
             );
         }
-
         if ($divisionId !== null) {
             $query->where(
                 'division_id',
                 $divisionId
             );
         }
-
         return $query
             ->orderBy('sort_order')
             ->orderBy('id')
@@ -1655,25 +1388,19 @@ class WorkPlanController extends Controller
             ->map(function ($row) {
                 return [
                     'financial_plan_id' => (int) $row->id,
-
                     'division_id' => $row->division_id
                         ? (int) $row->division_id
                         : null,
-
                     'office_name' =>
                         trim((string) $row->office_name),
-
                     'program_classification' =>
                         trim((string) $row->program_classification),
-
                     'prexc_code' =>
                         trim((string) $row->prexc_code),
-
                     'specific_activity' =>
                         trim((string) $row->specific_activity),
                 ];
             })
             ->values();
     }
-
 }

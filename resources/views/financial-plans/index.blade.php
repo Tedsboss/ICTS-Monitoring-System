@@ -270,13 +270,39 @@
             <div class="mb-6">
                 <div class="mb-3">
                     <h2 class="text-sm font-bold text-slate-900">Allocation Summary</h2>
-                    <p class="mt-1 text-xs text-slate-500">Allocation Management budget configured for this Financial Plan.</p>
+                    <p class="mt-1 text-xs text-slate-500">
+                        Allocation Management budget configured for this Financial Plan.
+                    </p>
                 </div>
                 <div class="max-w-4xl overflow-hidden rounded-xl border border-slate-200">
                     <table class="allocation-summary-table w-full">
-                        <thead><tr><th>Type</th><th>Expense Description</th><th>Configured Allocation</th><th>Programmed</th><th>Balance</th></tr></thead>
-                        <tbody id="allocationSummaryBody"><tr><td colspan="5" class="allocation-label text-slate-400">Loading allocation summary...</td></tr></tbody>
-                        <tfoot><tr class="allocation-total-row"><td colspan="2" class="allocation-label">TOTAL</td><td id="sumTotalAlloc">0.00</td><td id="sumTotalProg">0.00</td><td id="sumTotalBalance">0.00</td></tr></tfoot>
+                        <thead>
+                            <tr>
+                                <th>Type</th>
+                                <th>Allocation</th>
+                                <th>Other Plans</th>
+                                <th>This Plan</th>
+                                <th>Total Programmed</th>
+                                <th>Available</th>
+                            </tr>
+                        </thead>
+                        <tbody id="allocationSummaryBody">
+                            <tr>
+                                <td colspan="6" class="allocation-label text-slate-400">
+                                    Loading allocation summary...
+                                </td>
+                            </tr>
+                        </tbody>
+                        <tfoot>
+                            <tr class="allocation-total-row">
+                                <td class="allocation-label">TOTAL</td>
+                                <td id="sumTotalAlloc">0.00</td>
+                                <td id="sumTotalOther">0.00</td>
+                                <td id="sumTotalThis">0.00</td>
+                                <td id="sumTotalProg">0.00</td>
+                                <td id="sumTotalBalance">0.00</td>
+                            </tr>
+                        </tfoot>
                     </table>
                 </div>
             </div>
@@ -371,7 +397,6 @@
 @endsection
 @push('css')
 <style>
-    /* Isolate the WFP toolbar from Bootstrap / Argon layout rules. */
     .wfp-control-card { padding: 18px 20px; }
     .wfp-control-layout { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 20px; min-height: 0; }
     .wfp-control-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
@@ -469,8 +494,6 @@
         vertical-align: middle;
     }
     #fpTable thead tr:nth-child(2) th {
-        // Keep the month row directly below the first sticky header row.
-        // 49px left a visible gap where scrolling body amounts appeared.
         top: 28px;
         background: #f0f9ff;
     }
@@ -544,7 +567,7 @@
 $(document).ready(function () {
     let isFinalized = false;
     let activeDataRequest = null;
-    // Escape values before inserting them into HTML
+    // Escape values before inserting them into HTML*
     function esc(value) {
         return String(value ?? '')
             .replace(/&/g, '&amp;')
@@ -553,7 +576,7 @@ $(document).ready(function () {
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#039;');
     }
-    // Format amount
+    // Format amount*
     function money(value) {
         const number = Number(value ?? 0);
         const safeNumber =
@@ -565,7 +588,7 @@ $(document).ready(function () {
             maximumFractionDigits: 2
         });
     }
-    // Format date
+    // Format date*
     function formatDate(value) {
         if (!value) {
             return '—';
@@ -582,7 +605,7 @@ $(document).ready(function () {
             minute: '2-digit'
         });
     }
-    // Show page message
+    // Show page message*
     function showMessage(message, type = 'success') {
         const styles = {
             success: {
@@ -627,7 +650,7 @@ $(document).ready(function () {
     $(document).on('click', '.wfp-message-close', function () {
         $('#pageMessage').empty();
     });
-    // Read Laravel error response
+    // Read Laravel error response*
     function getErrorMessage(xhr, fallback = 'Something went wrong.') {
         if (xhr?.responseJSON?.message) {
             return xhr.responseJSON.message;
@@ -641,14 +664,14 @@ $(document).ready(function () {
         }
         return fallback;
     }
-    // Get selected plan identity
+    // Get selected plan identity*
     function selectedPlan() {
         return {
             fiscalYear: $('#filterFiscalYear').val(),
             officeName: $('#filterOffice').val().trim()
         };
     }
-    // Validate selected plan identity
+    // Validate selected plan identity*
     function validateSelection() {
         const {
             fiscalYear,
@@ -674,7 +697,7 @@ $(document).ready(function () {
         }
         return true;
     }
-    // Update heading
+    // Update heading*
     function updateHeading() {
         const {
             fiscalYear,
@@ -687,7 +710,7 @@ $(document).ready(function () {
         $('#planOfficeName')
             .text(officeName || '—');
     }
-    // Render one WFP item row
+    // Render one WFP item row*
     function renderItemRow(row, rowspan) {
         let monthCells = '';
         for (let month = 1; month <= 12; month++) {
@@ -746,7 +769,7 @@ $(document).ready(function () {
             </tr>
         `;
     }
-    // Render section header
+    // Render section header*
     function renderHeaderRow(row) {
         return `
             <tr class="section-header-row">
@@ -762,7 +785,7 @@ $(document).ready(function () {
             </tr>
         `;
     }
-    // Render subtotal
+    // Render subtotal*
     function renderSubtotalRow(totals) {
         let monthCells = '';
         for (let month = 1; month <= 12; month++) {
@@ -790,7 +813,7 @@ $(document).ready(function () {
             </tr>
         `;
     }
-    // Create empty subtotal
+    // Create empty subtotal*
     function emptyTotals() {
         const totals = {
             mooe: 0,
@@ -803,7 +826,7 @@ $(document).ready(function () {
         }
         return totals;
     }
-    // Add item values to subtotal
+    // Add item values to subtotal*
     function addToTotals(totals, row) {
         if (row.row_type !== 'item') {
             return;
@@ -822,7 +845,7 @@ $(document).ready(function () {
                 Number(row.months?.[month]) || 0;
         }
     }
-    // Group consecutive rows using classification and PREXC
+    // Group consecutive rows using classification and PREXC*
     function buildBlocks(rows) {
         const blocks = [];
         let run = null;
@@ -860,7 +883,7 @@ $(document).ready(function () {
         }
         return blocks;
     }
-    // Render grouped WFP rows
+    // Render grouped WFP rows*
     function renderBlocks(blocks, $body) {
         blocks.forEach(block => {
             if (block.type === 'header') {
@@ -909,14 +932,14 @@ $(document).ready(function () {
             }
         });
     }
-    // Update negative class
+    // Update negative class*
     function setBalance(selector, value) {
         $(selector)
             .text(money(value))
             .toggleClass('wfp-negative', value < 0);
     }
-    // Reset grand totals
-    // Reset grand totals
+    // Reset grand totals*
+    // Reset grand totals*
     function resetGrandTotals() {
         $('#totMooe, #totCo, #totGrand')
             .text('0.00');
@@ -925,7 +948,7 @@ $(document).ready(function () {
                 .text('0.00');
         }
     }
-    // Load financial plan rows
+    // Load financial plan rows*
     function loadTable() {
         if (!validateSelection()) {
             return $.Deferred()
@@ -1045,74 +1068,118 @@ $(document).ready(function () {
         });
         return activeDataRequest;
     }
-    // Load allocation summary
-    // Load Allocation Management summary from the financial-plan data response.
+    // Load allocation summary*
+    // Load Allocation Management summary from the financial-plan data response.*
     function loadAllocationSummary() {
         if (!validateSelection()) {
             return $.Deferred().reject().promise();
         }
         const { fiscalYear, officeName } = selectedPlan();
         const $body = $('#allocationSummaryBody');
-        $body.html(`<tr><td colspan="5" class="allocation-label text-slate-400">Loading allocation summary...</td></tr>`);
+        $body.html(`
+            <tr>
+                <td colspan="6" class="allocation-label text-slate-400">
+                    Loading allocation summary...
+                </td>
+            </tr>
+        `);
         return $.getJSON('{{ route("financial-plans.data") }}', {
             fiscal_year: fiscalYear,
             office_name: officeName
         }).done(function (response) {
             const rows = Array.isArray(response) ? response : [];
-            const allocation = rows.find(row => row && row.allocation)?.allocation || null;
-            const expenses = Array.isArray(allocation?.expenses) ? allocation.expenses : [];
-            let totalProgrammed = 0;
-            rows.forEach(row => {
-                if (row?.row_type !== 'item') return;
-                totalProgrammed += Number(row.effective_mooe ?? row.mooe) || 0;
-                totalProgrammed += Number(row.effective_capital_outlay ?? row.capital_outlay) || 0;
-            });
-            if (!allocation) {
-                $body.html(`<tr><td colspan="5" class="allocation-label text-slate-400">No Allocation Management allocation is linked to this Financial Plan.</td></tr>`);
-                $('#sumTotalAlloc').text('0.00');
-                $('#sumTotalProg').text(money(totalProgrammed));
-                setBalance('#sumTotalBalance', -totalProgrammed);
+            const catalogRow = rows.find(row => Array.isArray(row?.allocation_catalog));
+            const allocations = catalogRow?.allocation_catalog || [];
+            if (!allocations.length) {
+                $body.html(`
+                    <tr>
+                        <td colspan="6" class="allocation-label text-slate-400">
+                            No Allocation Management allocations are configured for this Financial Plan.
+                        </td>
+                    </tr>
+                `);
+                $('#sumTotalAlloc, #sumTotalOther, #sumTotalThis, #sumTotalProg, #sumTotalBalance').text('0.00');
                 return;
             }
-            const totalAllocation = Number(allocation.total) || 0;
-            const allocationLabel = [
-                allocation.fiscal_year ? `FY ${allocation.fiscal_year}` : '',
-                allocation.level?.code || allocation.level?.level_code || ''
-            ].filter(Boolean).join(' — ');
-            if (!expenses.length) {
-                $body.html(`<tr><td colspan="5" class="allocation-label text-slate-400">${esc(allocationLabel || 'Allocation')} has no configured expenses.</td></tr>`);
-            } else {
-                $body.html(expenses.map(function (expense) {
-                    const type = String(expense.type || '').trim();
-                    const description = String(expense.description || expense.expense_description || '').trim();
-                    const cost = Number(expense.cost) || 0;
-                    const normalizedDescription = description.toLowerCase();
-                    const programmed = rows.reduce((sum, row) => {
-                        if (row?.row_type !== 'item') return sum;
-                        const itemName = String(row.expense_item || '').trim().toLowerCase();
-                        if (!itemName || itemName !== normalizedDescription) return sum;
-                        const rowType = String(type).toUpperCase();
-                        const amount = rowType === 'CO'
-                            ? Number(row.effective_capital_outlay ?? row.capital_outlay) || 0
-                            : Number(row.effective_mooe ?? row.mooe) || 0;
-                        return sum + amount;
-                    }, 0);
-                    const balance = cost - programmed;
-                    return `<tr><td class="allocation-label">${esc(type || '—')}</td><td class="allocation-label">${esc(description || '—')}</td><td>${money(cost)}</td><td>${money(programmed)}</td><td class="allocation-balance font-bold ${balance < 0 ? 'wfp-negative' : ''}">${money(balance)}</td></tr>`;
-                }).join(''));
-            }
-            const programmedFromExpenses = expenses.reduce((sum, expense) => sum + (Number(expense.programmed) || 0), 0);
-            const displayedProgrammed = programmedFromExpenses > 0 ? programmedFromExpenses : totalProgrammed;
-            $('#sumTotalAlloc').text(money(totalAllocation));
-            $('#sumTotalProg').text(money(displayedProgrammed));
-            setBalance('#sumTotalBalance', totalAllocation - displayedProgrammed);
+            let totalAllocationBudget = 0;
+            let totalOther = 0;
+            let totalThis = 0;
+            let totalProgrammed = 0;
+            let totalBalance = 0;
+            let html = '';
+            allocations.forEach(allocation => {
+                const allocationId = Number(allocation.id || 0);
+                const mooeBudget = Number(allocation.mooe_budget || 0);
+                const coBudget = Number(allocation.co_budget || 0);
+                const thisMooe = Number(allocation.this_mooe || 0);
+                const thisCo = Number(allocation.this_capital_outlay || 0);
+                const otherMooe = Number(allocation.other_mooe || 0);
+                const otherCo = Number(allocation.other_capital_outlay || 0);
+                const totalMooe = otherMooe + thisMooe;
+                const totalCo = otherCo + thisCo;
+                const allocationName = allocation.program || `Allocation #${allocationId}`;
+                const levelName = allocation.level_code
+                    ? `${allocation.level_code}${allocation.level_description ? ` - ${allocation.level_description}` : ''}`
+                    : '';
+                const renderRow = (type, budget, other, current, programmed) => {
+                    const balance = budget - programmed;
+                    return `
+                        <tr>
+                            <td class="allocation-label">${type}</td>
+                            <td>
+                                <div class="font-semibold">${esc(allocationName)}</div>
+                                ${levelName ? `<div class="text-[10px] text-slate-400">${esc(levelName)}</div>` : ''}
+                                <div class="text-[10px] text-slate-400">Allocation #${allocationId}</div>
+                            </td>
+                            <td>${money(other)}</td>
+                            <td>${money(current)}</td>
+                            <td>${money(programmed)}</td>
+                            <td class="allocation-balance font-bold ${balance < -0.01 ? 'wfp-negative' : ''}">
+                                ${money(balance)}
+                            </td>
+                        </tr>
+                    `;
+                };
+                if (mooeBudget > 0 || thisMooe > 0 || otherMooe > 0) {
+                    html += renderRow('MOOE', mooeBudget, otherMooe, thisMooe, totalMooe);
+                }
+                if (coBudget > 0 || thisCo > 0 || otherCo > 0) {
+                    html += renderRow('CO', coBudget, otherCo, thisCo, totalCo);
+                }
+                totalAllocationBudget += mooeBudget + coBudget;
+                totalOther += otherMooe + otherCo;
+                totalThis += thisMooe + thisCo;
+                totalProgrammed += totalMooe + totalCo;
+                totalBalance += (mooeBudget - totalMooe) + (coBudget - totalCo);
+            });
+            $body.html(html || `
+                <tr>
+                    <td colspan="6" class="allocation-label text-slate-400">
+                        No Allocation Management allocations are configured for this Financial Plan.
+                    </td>
+                </tr>
+            `);
+            $('#sumTotalAlloc').text(money(totalAllocationBudget));
+            $('#sumTotalOther').text(money(totalOther));
+            $('#sumTotalThis').text(money(totalThis));
+            $('#sumTotalProg').text(money(totalProgrammed));
+            setBalance('#sumTotalBalance', totalBalance);
         }).fail(function (xhr) {
-            $body.html(`<tr><td colspan="5" class="allocation-label text-rose-600">Failed to load allocation summary.</td></tr>`);
-            $('#sumTotalAlloc, #sumTotalProg, #sumTotalBalance').text('0.00');
-            showMessage(getErrorMessage(xhr, 'Failed to load allocation summary.'), 'danger');
+            $body.html(`
+                <tr>
+                    <td colspan="6" class="allocation-label text-rose-600">
+                        Failed to load allocation summary.
+                    </td>
+                </tr>
+            `);
+            $('#sumTotalAlloc, #sumTotalOther, #sumTotalThis, #sumTotalProg, #sumTotalBalance').text('0.00');
+            showMessage(
+                getErrorMessage(xhr, 'Failed to load allocation summary.'),
+                'danger'
+            );
         });
     }
-    // Apply workflow status
+    // Apply workflow status*
     function applyPlanStatus(response) {
         const status =
             response.status || 'draft';
@@ -1188,8 +1255,8 @@ $(document).ready(function () {
                 'd-none',
                 !response.can_reopen
             );
-        // Edit availability is controlled by the Financial Plan policy.
-        // Finalized plans remain locked even for users with edit permission.
+        // Edit availability is controlled by the Financial Plan policy.*
+        // Finalized plans remain locked even for users with edit permission.*
         const canEdit =
             response.can_edit === true &&
             !isFinalized;
@@ -1247,7 +1314,7 @@ $(document).ready(function () {
                 !hasWorkflowInfo
             );
     }
-    // Load workflow status
+    // Load workflow status*
     function loadPlanStatus() {
         if (!validateSelection()) {
             return $.Deferred()
@@ -1276,7 +1343,7 @@ $(document).ready(function () {
             );
         });
     }
-    // Load selected plan
+    // Load selected plan*
     function loadSelectedPlan() {
         if (!validateSelection()) {
             return;
@@ -1302,7 +1369,7 @@ $(document).ready(function () {
                 .html(originalHtml);
         });
     }
-    // Open builder
+    // Open builder*
     $('#btnEditPlan').on('click', function () {
         if (
             isFinalized ||
@@ -1328,7 +1395,7 @@ $(document).ready(function () {
         window.location.href =
             url;
     });
-    // Download PDF
+    // Download PDF*
     $('#btnDownloadPdf').on('click', function () {
         if (!validateSelection()) {
             return;
@@ -1411,7 +1478,7 @@ $(document).ready(function () {
                     .html(originalHtml);
             });
     });
-    // Send workflow action
+    // Send workflow action*
     function workflowRequest(
         $button,
         url,
@@ -1458,7 +1525,7 @@ $(document).ready(function () {
                 .html(originalHtml);
         });
     }
-    // Submit
+    // Submit*
     $('#btnSubmit').on('click', function () {
         if (!validateSelection()) {
             return;
@@ -1485,7 +1552,7 @@ $(document).ready(function () {
             'Plan submitted for approval.'
         );
     });
-    // Approve
+    // Approve*
     $('#btnApprove').on('click', function () {
         if (!validateSelection()) {
             return;
@@ -1512,7 +1579,7 @@ $(document).ready(function () {
             'Plan approved.'
         );
     });
-    // Return
+    // Return*
     $('#btnReturn').on('click', function () {
         if (!validateSelection()) {
             return;
@@ -1547,7 +1614,7 @@ $(document).ready(function () {
             'Plan returned for revision.'
         );
     });
-    // Finalize
+    // Finalize*
     $('#btnFinalize').on('click', function () {
         if (!validateSelection()) {
             return;
@@ -1609,7 +1676,7 @@ $(document).ready(function () {
                 .html(originalHtml);
         });
     });
-    // Reopen
+    // Reopen*
     $('#btnReopen').on('click', function () {
         if (!validateSelection()) {
             return;
@@ -1671,12 +1738,12 @@ $(document).ready(function () {
                 .html(originalHtml);
         });
     });
-    // Load
+    // Load*
     $('#btnLoad').on(
         'click',
         loadSelectedPlan
     );
-    // Enter key
+    // Enter key*
     $('#filterFiscalYear, #filterOffice')
         .on(
             'keydown',
@@ -1687,13 +1754,13 @@ $(document).ready(function () {
                 }
             }
         );
-    // Bootstrap tooltips if available
+    // Bootstrap tooltips if available*
     if (
         typeof $.fn.tooltip === 'function'
     ) {
         $('[data-bs-toggle="tooltip"]').tooltip();
     }
-    // Initial load
+    // Initial load*
     loadSelectedPlan();
 });
 </script>

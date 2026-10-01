@@ -16,7 +16,6 @@
     };
     $selectedStaff = $plan?->staff
         ?? $staffs->firstWhere('id', $staffId);
-
     $officeName =
         $plan?->office_name
         ?? request('office_name')
@@ -46,9 +45,9 @@
                 </span>
             @endif
         </div>
-        @if(session()->has('succes'))
+        @if(session()->has('success'))
             <div class="alert alert-success alert-dismissible fade show" role="alert">
-                {{ session('succes') }}
+                {{ session('success') }}
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
         @endif
@@ -106,7 +105,6 @@
                                         'office_name' => $plan->office_name,
                                     ]) }}"
                                     class="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">
-
                                         <i class="fa fa-pencil"></i>
                                         Edit
                                     </a>
@@ -182,7 +180,6 @@
                                         'office_name' => $officeName,
                                     ]) }}"
                                     class="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-sky-700">
-
                                         <i class="fa fa-plus"></i>
                                         Create Work Plan
                                     </a>
@@ -216,7 +213,8 @@
                     <a href="{{ route('work-plans.builder', [
                         'fiscal_year' => $fiscalYear,
                         'staff_id' => $staffId,
-                    ]) }}"
+                        'office_name' => $officeName,
+                        ]) }}"
                        class="mt-4 inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-700">
                         <i class="fa fa-plus"></i>
                         Create Work Plan
@@ -235,7 +233,6 @@
                         </span>
                         <span class="ml-2">
                             <strong>{{ $plan->office_name ?: ($plan->staff?->name ?? '—') }}</strong>
-
                             @if($plan->division)
                                 / {{ $plan->division->name }}
                             @endif
@@ -297,7 +294,6 @@
                 'items' => [],
             ];
         }
-        /* Pack targets into the minimum number of visual rows (lanes). Targets whose applicable months do not overlap share one row. */
         $lanes = [];
         foreach ($planItem->targets->sortBy('sort_order')->values() as $target) {
             $targetMonths = $target->relationLoaded('months') && $target->months->isNotEmpty()

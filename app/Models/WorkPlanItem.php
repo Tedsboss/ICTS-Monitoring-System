@@ -63,6 +63,14 @@ class WorkPlanItem extends Model
         );
     }
 
+    public function financialPlan(): BelongsTo
+    {
+        return $this->belongsTo(
+            FinancialPlan::class,
+            'financial_plan_id'
+        );
+    }
+
     public function targets(): HasMany
     {
         return $this->hasMany(
@@ -96,13 +104,4 @@ class WorkPlanItem extends Model
     {
         return $this->row_type === 'item';
     }
-
-    public function financialPlan(): BelongsTo
-    {
-        return $this->belongsTo(
-            FinancialPlan::class,
-            'financial_plan_id'
-        );
-    }
-
 }

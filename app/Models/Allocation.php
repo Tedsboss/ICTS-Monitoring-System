@@ -16,12 +16,18 @@ class Allocation extends Model
     protected $fillable = [
         'year_id',
         'level_id',
+        'program_id',
+        'mooe_budget',
+        'co_budget',
         'staff_id',
     ];
 
     protected $casts = [
         'year_id' => 'integer',
         'level_id' => 'integer',
+        'program_id' => 'integer',
+        'mooe_budget' => 'decimal:2',
+        'co_budget' => 'decimal:2',
         'staff_id' => 'integer',
     ];
 
@@ -33,6 +39,11 @@ class Allocation extends Model
     public function level(): BelongsTo
     {
         return $this->belongsTo(Level::class, 'level_id');
+    }
+
+    public function program(): BelongsTo
+    {
+        return $this->belongsTo(Program::class, 'program_id');
     }
 
     public function staff(): BelongsTo

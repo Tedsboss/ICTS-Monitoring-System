@@ -63,47 +63,74 @@
                         </button>
                     </div>
                 </div>
-                <div class="grid gap-3 md:grid-cols-[140px_minmax(280px,560px)]">
+                <div class="grid gap-3 md:grid-cols-[140px_minmax(280px,1fr)_minmax(220px,360px)]">
                     <div>
                         <label for="fiscalYear" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Fiscal Year</label>
                         <input type="number" id="fiscalYear" value="{{ $fiscalYear }}" min="2000" max="2100"
                                class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100">
                     </div>
                     <div>
+                        <label for="levelId"
+                            class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Allocation Level
+                        </label>
+                        <select id="levelId"
+                                class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100">
+                            <option value="">Select Level</option>
+                            @foreach(($levels ?? []) as $level)
+                                <option value="{{ $level->id }}"
+                                        {{ (int)($selectedLevelId ?? 0) === (int)$level->id ? 'selected' : '' }}>
+                                    {{ $level->level_code }}
+                                    @if($level->level_description)
+                                        — {{ $level->level_description }}
+                                    @endif
+                                </option>
+                            @endforeach
+                        </select>
+                        <p class="mb-0 mt-1 text-[11px] text-slate-500">Programs under this FY and Level use their matching Allocation budgets.</p>
+                    </div>
+                    <div>
                         <label for="officeName"
                             class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
                             Name of Office/Staff
                         </label>
-
                         @if($isAdmin ?? false)
-
                             {{-- ADMIN: select which Staff/Office owns the Financial Plan --}}
                             <select id="officeSelector"
                                     class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100">
-
                                 <option value="">Select Office/Staff</option>
-
                                 @foreach(($staffOptions ?? []) as $staff)
                                     <option value="{{ $staff->id }}"
                                             data-office-name="{{ $staff->name }}"
                                             {{ (int)($personnelStaffId ?? 0) === (int)$staff->id ? 'selected' : '' }}>
                                         {{ $staff->name }}
-
                                         @if(!empty($staff->abbreviation))
                                             ({{ $staff->abbreviation }})
                                         @endif
                                     </option>
                                 @endforeach
-
                             </select>
-
-                            {{-- Actual value used by the Financial Plan requests --}}
+                            {{-- Actual Financial Plan office context used by requests --}}
                             <input type="hidden"
                                 id="officeName"
                                 value="{{ $officeName ?? '' }}">
-
+                            <div class="mt-3">
+                                <label for="planSelector"
+                                    class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                    Financial Plan
+                                </label>
+                                <select id="planSelector"
+                                        class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100">
+                                    <option value="">Select Financial Plan</option>
+                                    @foreach(($planOptions ?? []) as $plan)
+                                        <option value="{{ $plan->office_name }}"
+                                                {{ ($officeName ?? '') === $plan->office_name ? 'selected' : '' }}>
+                                            {{ $plan->office_name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
                         @else
-
                             {{-- STAFF: allow Office/Staff name to be entered for a new plan --}}
                             <input type="text"
                                 id="officeName"
@@ -112,7 +139,6 @@
                                 placeholder="Enter Name of Office/Staff"
                                 autocomplete="off"
                                 class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100">
-
                         @endif
                     </div>
                 </div>
@@ -124,94 +150,26 @@
             <section class="border-b border-slate-200 p-4">
                 <div class="mb-3 flex flex-wrap items-start justify-between gap-3">
                     <div>
-                        <h2 class="m-0 text-base font-bold text-slate-900">Allocation Management</h2>
-                        <p class="mb-0 mt-1 text-xs text-slate-500">
-                            Select the allocation that will be used by this Financial Plan.
-                        </p>
+                        <h2 class="m-0 text-base font-bold text-slate-900">Program Allocation Availability</h2>
+                        <p class="mb-0 mt-1 text-xs text-slate-500">Each Program automatically uses its Allocation Management budget for the selected Fiscal Year and Level. No Allocation needs to be selected per Budget Line.</p>
                     </div>
-                    <span id="allocationManagementStatus"
-                        class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1.5 text-[11px] font-semibold text-slate-600">
-                        Not selected
-                    </span>
+                    <span id="programAllocationStatus" class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1.5 text-[11px] font-semibold text-slate-600">Select a Level</span>
                 </div>
-
-                <div class="grid gap-3 lg:grid-cols-2">
-                    <div>
-                        <label for="allocationSelector"
-                            class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Allocation
-                        </label>
-
-                        <select id="allocationSelector"
-                                class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100">
-                            <option value="">Select Allocation</option>
-
-                            @foreach(($allocations ?? []) as $allocation)
-                                <option value="{{ $allocation->id }}"
-                                        data-year="{{ $allocation->fiscalYear?->year }}"
-                                        data-level="{{ $allocation->level?->level_code }}"
-                                        data-level-description="{{ $allocation->level?->level_description }}">
-                                    {{ $allocation->fiscalYear?->year }}
-                                    — {{ $allocation->level?->level_code }}
-                                    @if($allocation->level?->level_description)
-                                        ({{ $allocation->level->level_description }})
-                                    @endif
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <div>
-                        <label for="allocationLevel"
-                            class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Selected Level
-                        </label>
-
-                        <input type="text"
-                            id="allocationLevel"
-                            value=""
-                            readonly
-                            placeholder="Select an Allocation first"
-                            class="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 outline-none">
-                    </div>
-                </div>
-
-                <div id="allocationExpenseSummary" class="mt-4 hidden">
-                    <div class="mb-2 flex items-center justify-between">
-                        <div>
-                            <div class="text-xs font-bold uppercase tracking-wide text-slate-600">
-                                Allocation Expenses
-                            </div>
-                            <div class="mt-0.5 text-[11px] text-slate-500">
-                                Budget configured in Allocation Management.
-                            </div>
-                        </div>
-
-                        <div class="grid grid-cols-3 gap-3 text-right">
-                            <div>
-                                <div class="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Total Allocation</div>
-                                <div id="allocationManagementTotal" class="text-base font-bold text-slate-900">0.00</div>
-                            </div>
-                            <div>
-                                <div class="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Programmed</div>
-                                <div id="allocationManagementProgrammed" class="text-base font-bold text-sky-700">0.00</div>
-                            </div>
-                            <div>
-                                <div class="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Remaining</div>
-                                <div id="allocationManagementRemaining" class="text-base font-bold text-emerald-700">0.00</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div id="allocationExpenseCards"
-                        class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                    </div>
-                </div>
-
-                <div id="allocationManagementEmpty"
-                    class="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
-                    <i class="fa fa-info-circle mr-1"></i>
-                    Select an Allocation to view its configured expenses.
+                <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+                    <table class="w-full min-w-[850px] border-collapse text-xs">
+                        <thead class="bg-slate-50 text-left">
+                            <tr>
+                                <th class="border-b border-slate-200 px-3 py-2 font-bold text-slate-600">Program / Project</th>
+                                <th class="border-b border-slate-200 px-3 py-2 text-right font-bold text-slate-600">Allocation Budget</th>
+                                <th class="border-b border-slate-200 px-3 py-2 text-right font-bold text-slate-600">Other Plans</th>
+                                <th class="border-b border-slate-200 px-3 py-2 text-right font-bold text-slate-600">This Plan</th>
+                                <th class="border-b border-slate-200 px-3 py-2 text-right font-bold text-slate-600">Available</th>
+                            </tr>
+                        </thead>
+                        <tbody id="programAllocationSummaryBody">
+                            <tr><td colspan="5" class="px-3 py-4 text-center text-slate-500">Select a Fiscal Year and Level to view available Program Allocations.</td></tr>
+                        </tbody>
+                    </table>
                 </div>
             </section>
             <section class="border-b border-slate-200 p-4">
@@ -266,9 +224,8 @@
                             <tr>
                                 <th style="width:32px;"></th>
                                 <th style="width:44px;"></th>
-                                <th style="min-width:210px;">Program Classification (a)</th>
+                                <th style="min-width:320px; width:320px;">Program Classification (a)</th>
                                 <th style="min-width:120px;">PREXC Code (b)</th>
-                                <th style="min-width:125px;">Allocation Type</th>
                                 <th style="min-width:140px;">Staff/Unit (c)</th>
                                 <th style="min-width:260px;">Specific Activity (d)</th>
                                 <th style="min-width:130px;">Expense Item</th>
@@ -400,48 +357,43 @@ $(document).ready(function () {
     const PERSONNEL_OPTIONS = @json($personnelOptions ?? []);
     // Controlled Program Classification hierarchy.
     const PROGRAM_CLASSIFICATION_TREE = @json($programClassificationTree ?? []);
-    // Allocation Types are configured for the current Staff/Office.
-    // The Builder must not assume that every office uses MITHI/NINP.
-    const ALLOCATION_TYPE_OPTIONS = @json($allocationTypeOptions ?? []);
     window.PLAN_STAFF_ID = Number(@json($personnelStaffId ?? 0));
     const IS_ADMIN = @json($isAdmin ?? false);
-    const RAW_ALLOCATIONS = @json($allocations ?? []);
-    const ALLOCATIONS = Array.isArray(RAW_ALLOCATIONS)
-        ? RAW_ALLOCATIONS.map(allocation => ({
+    const LEVELS = @json($levels ?? []);
+    const PROGRAM_ALLOCATION_CONTEXT = @json($programAllocations ?? []);
+    const ROW_ALLOCATION_CONTEXT = {};
+    function cacheRowAllocation(row) {
+        const allocation = row?.allocation;
+        const id = Number(row?.allocation_id || allocation?.id || 0);
+        if (!id || !allocation) return;
+        ROW_ALLOCATION_CONTEXT[String(id)] = {
             ...allocation,
-            id: Number(allocation.id || 0),
-            fiscalYear: allocation.fiscalYear || allocation.fiscal_year || {},
-            level: allocation.level || {},
-            expenses: Array.isArray(allocation.expenses) ? allocation.expenses : []
-        }))
-        : [];
-    let SELECTED_ALLOCATION_ID = null;
-
+            allocation_id: id,
+            program_id: Number(row?.program_id || allocation?.program?.id || allocation?.program_id || 0),
+            expenses: Array.isArray(allocation?.expenses) ? allocation.expenses.map(item => ({
+                ...item,
+                name: String(item?.name || item?.description || item?.expense_description || '').trim(),
+                type: String(item?.type || '').trim()
+            })).filter(item => item.name !== '') : []
+        };
+    }
+    const PREXC_PROGRAM_MAP = @json($prexcProgramMap ?? []);
+    const INITIAL_LEVEL_ID = Number(@json($selectedLevelId ?? 0));
+    const INITIAL_PLAN_OFFICE_NAME = String(@json($officeName ?? ''));
+    const PLAN_OPTIONS = @json($planOptions ?? []);
     function syncSelectedOffice() {
         const $selector = $('#officeSelector');
-
         // Staff accounts do not have an officeSelector.
         if (!$selector.length) {
             return;
         }
-
         const $selected = $selector.find('option:selected');
-
         const staffId = parseInt($selected.val(), 10) || null;
-        const officeName = String(
-            $selected.data('office-name') || ''
-        ).trim();
-
         window.PLAN_STAFF_ID = staffId;
-
-        $('#officeName').val(officeName);
-
-        console.log('Selected Office:', {
-            staff_id: window.PLAN_STAFF_ID,
-            office_name: officeName
+        console.log('Selected Staff:', {
+            staff_id: window.PLAN_STAFF_ID
         });
     }
-
     $('#officeSelector').on('change', function () {
         if (hasUnsavedChanges) {
             const proceed = confirm(
@@ -451,70 +403,66 @@ $(document).ready(function () {
                 return;
             }
         }
-
         syncSelectedOffice();
-
         if (!window.PLAN_STAFF_ID) {
             return;
         }
-
         const url = new URL('{{ route('financial-plans.builder') }}', window.location.origin);
         url.searchParams.set('fiscal_year', $('#fiscalYear').val() || '');
-        url.searchParams.set('office_name', $('#officeName').val() || '');
+        url.searchParams.set('staff_id', String(window.PLAN_STAFF_ID || ''));
         window.location.href = url.toString();
     });
-
+    function refreshPlanSelector(selectedOfficeName = '') {
+        const $selector = $('#planSelector');
+        if (!$selector.length) return;
+        const selected = String(selectedOfficeName || '').trim();
+        $selector.val(selected);
+    }
+    $('#planSelector').on('change', function () {
+        const officeName = String($(this).val() || '').trim();
+        if (!officeName) return;
+        $('#officeName').val(officeName);
+        loadPlan(true);
+    });
     @if(!($isAdmin ?? false))
     $('#officeName').on('input', function () {
-
         const officeName = String($(this).val() || '').trim();
-
         if (officeName !== '') {
             setDirty(true);
         }
-
     });
-
     @endif
-
     function cleanHierarchyLabel(value = '') {
         return String(value ?? '')
             .trim()
             .replace(/^[A-Z]\.\s*/, '')
             .replace(/^[IVX]+\.\s*/, '');
     }
-
     function getPreviousHierarchyContext($tr) {
         let header = '';
         let subHeader = '';
-
         $tr.prevAll('tr').get().reverse().forEach(row => {
             const $row = $(row);
             const type = $row.attr('data-row-type');
             const value = String(
                 $row.find('[data-field="program_classification"]').val() || ''
             ).trim();
-
             if (type === 'header') {
                 header = cleanHierarchyLabel(value);
                 subHeader = '';
             }
-
             if (type === 'subheader' && header && !subHeader) {
                 subHeader = cleanHierarchyLabel(value);
             }
         });
-
         return { header, subHeader };
     }
-
     function findHeaderByLabel(label = '') {
         const target = cleanHierarchyLabel(label).toLowerCase();
         return PROGRAM_CLASSIFICATION_TREE.find(header =>
             cleanHierarchyLabel(header.header).toLowerCase() === target
         ) || null;
     }
-
     function findSubHeaderByLabel(header, label = '') {
         if (!header) return null;
         const target = cleanHierarchyLabel(label).toLowerCase();
@@ -522,7 +470,6 @@ $(document).ready(function () {
             cleanHierarchyLabel(subHeader.sub_header).toLowerCase() === target
         ) || null;
     }
-
     function classificationOptionsFromTree(
         selectedValue = '',
         selectedPrexc = '',
@@ -533,9 +480,7 @@ $(document).ready(function () {
         const selectedCode = String(selectedPrexc ?? '').trim();
         const html = ['<option value="">Select Classification</option>'];
         let selectedFound = false;
-
         const header = findHeaderByLabel(headerLabel);
-
         if (!header) {
             if (selected) {
                 html.push(
@@ -544,41 +489,31 @@ $(document).ready(function () {
             }
             return html.join('');
         }
-
         const subHeader = findSubHeaderByLabel(header, subHeaderLabel);
         const subHeaders = subHeader ? [subHeader] : (header.sub_headers || []);
-
         subHeaders.forEach(currentSubHeader => {
             (currentSubHeader.programs || []).forEach(program => {
                 const programLabel = String(program.program ?? '').trim();
                 const expenditures = program.expenditures || [];
                 if (!expenditures.length) return;
-
                 const groupParts = [];
-
                 if (cleanHierarchyLabel(currentSubHeader.sub_header)) {
                     groupParts.push(cleanHierarchyLabel(currentSubHeader.sub_header));
                 }
-
                 if (programLabel && programLabel !== cleanHierarchyLabel(currentSubHeader.sub_header)) {
                     groupParts.push(programLabel);
                 }
-
                 const $group = $('<optgroup>', {
                     label: groupParts.join(' — ')
                 });
-
                 expenditures.forEach(expenditure => {
                     const classification = String(expenditure.expenditure ?? '').trim();
                     const prexc = String(expenditure.prexc ?? '').trim();
                     if (!classification || !prexc) return;
-
                     const isSelected =
                         classification === selected &&
                         (!selectedCode || prexc === selectedCode);
-
                     if (isSelected) selectedFound = true;
-
                     $group.append($('<option>', {
                         value: classification,
                         text: classification,
@@ -588,13 +523,11 @@ $(document).ready(function () {
                         'data-expenditure-id': String(expenditure.id || '')
                     }));
                 });
-
                 if ($group.children().length) {
                     html.push($group.prop('outerHTML'));
                 }
             });
         });
-
         if (selected && !selectedFound) {
             html.splice(
                 1,
@@ -602,61 +535,46 @@ $(document).ready(function () {
                 `<option value="${esc(selected)}" data-prexc="${esc(selectedCode)}" selected>${esc(selected)} (Legacy)</option>`
             );
         }
-
         return html.join('');
     }
-
     function subHeaderOptionsForRow($tr, selectedValue = '') {
         const selected = cleanHierarchyLabel(selectedValue);
         const contextHeader = getPreviousHierarchyContext($tr).header;
         const header = findHeaderByLabel(contextHeader);
         const html = ['<option value="">Select Sub Header</option>'];
-
         const subHeaders = header
             ? (header.sub_headers || [])
             : PROGRAM_CLASSIFICATION_TREE.flatMap(item => item.sub_headers || []);
-
         const seen = new Set();
-
         subHeaders.forEach(subHeader => {
             const label = cleanHierarchyLabel(subHeader.sub_header);
             if (!label || seen.has(label.toLowerCase())) return;
-
             seen.add(label.toLowerCase());
-
             html.push(
                 `<option value="${esc(label)}" ${label === selected ? 'selected' : ''}>${esc(label)}</option>`
             );
         });
-
         return html.join('');
     }
-
     function allHeaderOptions(selectedValue = '') {
         const selected = cleanHierarchyLabel(selectedValue);
         const html = ['<option value="">Select Header</option>'];
-
         PROGRAM_CLASSIFICATION_TREE.forEach(header => {
             const label = cleanHierarchyLabel(header.header);
             if (!label) return;
-
             html.push(
                 `<option value="${esc(label)}" ${label === selected ? 'selected' : ''}>${esc(label)}</option>`
             );
         });
-
         return html.join('');
     }
-
     function programClassificationControl(row = {}, isItem = true, disabled = false, $tr = null) {
         const classification = String(row.program_classification ?? '').trim();
         const prexc = String(row.prexc_code ?? '').trim();
-
         if (!isItem) {
             const options = row.row_type === 'header'
                 ? allHeaderOptions(classification)
                 : subHeaderOptionsForRow($tr || $('<tr>'), classification);
-
             return `
                 <select class="builder-input field-input program-structural-select program-classification-input"
                         data-field="program_classification"
@@ -665,11 +583,9 @@ $(document).ready(function () {
                 </select>
             `;
         }
-
         const context = $tr && $tr.length
             ? getPreviousHierarchyContext($tr)
             : { header: '', subHeader: '' };
-
         return `
             <select class="builder-input field-input program-classification-input"
                     data-field="program_classification"
@@ -680,50 +596,6 @@ $(document).ready(function () {
                     context.header,
                     context.subHeader
                 )}
-            </select>
-        `;
-    }
-    // Allocation source is independent from Program Classification / PREXC.
-    // Draft rows may remain unclassified until strict Submit validation is enabled.
-    function allocationTypeOptions(selectedValue = '') {
-        const selected = String(selectedValue ?? '').trim().toLowerCase();
-        const html = ['<option value="">Select Allocation Type</option>'];
-        let selectedFound = false;
-        ALLOCATION_TYPE_OPTIONS.forEach(item => {
-            const code = String(item.code ?? '').trim().toLowerCase();
-            const name = String(item.name ?? '').trim();
-            if (!code || !name) return;
-            const isSelected = code === selected;
-            if (isSelected) {
-                selectedFound = true;
-            }
-            html.push(
-                `<option value="${esc(code)}"
-                         data-allows-mooe="${item.allows_mooe ? '1' : '0'}"
-                         data-allows-capital-outlay="${item.allows_capital_outlay ? '1' : '0'}"
-                         ${isSelected ? 'selected' : ''}>${esc(name)}</option>`
-            );
-        });
-        // Preserve an existing legacy value so opening an older plan does not
-        // silently erase its stored Allocation Type.
-        if (selected && !selectedFound) {
-            html.push(
-                `<option value="${esc(selected)}" selected>${esc(selected)} (Legacy / Unavailable)</option>`
-            );
-        }
-        return html.join('');
-    }
-    function allocationTypeControl(row = {}, isItem = true, disabled = false) {
-        const hasConfiguredTypes = ALLOCATION_TYPE_OPTIONS.length > 0;
-        const title = hasConfiguredTypes
-            ? 'Select which allocation source funds this budget line'
-            : 'No active Allocation Types are configured for this Staff/Office';
-        return `
-            <select class="builder-input field-input allocation-type-input"
-                    data-field="allocation_type"
-                    title="${esc(title)}"
-                    ${isItem && !disabled && hasConfiguredTypes ? '' : 'disabled'}>
-                ${allocationTypeOptions(row.allocation_type ?? '')}
             </select>
         `;
     }
@@ -796,60 +668,163 @@ $(document).ready(function () {
             : '<span class="personnel-placeholder">Select personnel...</span>';
         $control.find('.personnel-selected').html(selectedHtml);
     }
-    // Expense Items for new Financial Plans come from the selected Allocation and its Allocation Expenses. Legacy saved values are preserved below.
-    window.ALLOCATION_EXPENSE_OPTIONS = @json($allocationExpenseOptions ?? []);
-
-    function getSelectedAllocationExpenseItems() {
-        const allocationId = Number(SELECTED_ALLOCATION_ID || $('#allocationSelector').val() || 0);
-        const allocation = (Array.isArray(window.ALLOCATION_EXPENSE_OPTIONS)
-            ? window.ALLOCATION_EXPENSE_OPTIONS
-            : []
-        ).find(item => Number(item.allocation_id) === allocationId);
-
-        return Array.isArray(allocation?.items) ? allocation.items : [];
+    function getProgramIdFromClassification(classification = '', prexc = '') {
+        const target = String(classification ?? '').trim();
+        const code = String(prexc ?? '').trim();
+        if (!target) return 0;
+        for (const header of PROGRAM_CLASSIFICATION_TREE || []) {
+            for (const subHeader of header.sub_headers || []) {
+                for (const program of subHeader.programs || []) {
+                    for (const expenditure of program.expenditures || []) {
+                        if (String(expenditure.expenditure ?? '').trim() === target &&
+                            (!code || String(expenditure.prexc ?? '').trim() === code)) {
+                            return Number(program.id || 0);
+                        }
+                    }
+                }
+            }
+        }
+        return 0;
     }
-
-    function expenseItemOptions(selectedValue = '') {
+    function getRowProgramId($tr) {
+        const existing = Number($tr.attr('data-program-id') || 0);
+        if (existing) return existing;
+        const allocation = getProgramAllocationById($tr.attr('data-allocation-id'));
+        if (allocation?.program_id) return Number(allocation.program_id);
+        const prexc = String($tr.find('[data-field="prexc_code"]').val() || '').trim();
+        const mapped = Number(PREXC_PROGRAM_MAP[prexc]?.program_id || 0);
+        if (mapped) return mapped;
+        const classification = String($tr.find('[data-field="program_classification"]').val() || '').trim();
+        return getProgramIdFromClassification(classification, prexc);
+    }
+    function getProgramAllocation(programId) {
+        return PROGRAM_ALLOCATION_CONTEXT[String(programId)]
+            || PROGRAM_ALLOCATION_CONTEXT[programId]
+            || null;
+    }
+    function getProgramAllocationById(allocationId) {
+        const id = Number(allocationId || 0);
+        if (!id) return null;
+        const configured = Object.values(PROGRAM_ALLOCATION_CONTEXT || {}).find(allocation =>
+            Number(allocation?.allocation_id || 0) === id
+        );
+        return configured || ROW_ALLOCATION_CONTEXT[String(id)] || null;
+    }
+    function getRowAllocation($tr) {
+        if (!$tr || !$tr.length) return null;
+        const allocationId = Number($tr.attr('data-allocation-id') || 0);
+        const byId = getProgramAllocationById(allocationId);
+        if (byId) return byId;
+        return getProgramAllocation(getRowProgramId($tr));
+    }
+    function expenseItemOptions(selectedValue = '', programId = 0, allocationId = 0) {
         const selected = String(selectedValue ?? '').trim();
-        const items = getSelectedAllocationExpenseItems();
+        const allocation = getProgramAllocationById(allocationId)
+            || getProgramAllocation(programId);
+        const items = Array.isArray(allocation?.expenses) ? allocation.expenses : [];
         const options = items
             .map(item => ({
-                name: String(item.name ?? '').trim(),
+                name: String(item.name ?? item.description ?? item.expense_description ?? '').trim(),
                 type: String(item.type ?? '').trim()
             }))
             .filter(item => item.name !== '');
-
         const selectedFound = options.some(item => item.name === selected);
         const html = ['<option value="">Select Expense Item</option>'];
-
         if (selected && !selectedFound) {
-            html.push(
-                `<option value="${esc(selected)}" selected>${esc(selected)} (Legacy / Unavailable)</option>`
-            );
+            html.push(`<option value="${esc(selected)}" selected>${esc(selected)} (Legacy / Unavailable)</option>`);
         }
-
         options.forEach(item => {
-            html.push(
-                `<option value="${esc(item.name)}" ${item.name === selected ? 'selected' : ''}>${esc(item.name)}</option>`
-            );
+            html.push(`<option value="${esc(item.name)}" ${item.name === selected ? 'selected' : ''}>${esc(item.name)}</option>`);
         });
-
         return html.join('');
     }
-
     function refreshExpenseItemDropdowns() {
         $('#builderBody tr[data-row-type="item"]').each(function () {
             const $tr = $(this);
-            const selected = String(
-                $tr.find('[data-field="expense_item"]').val() || ''
-            ).trim();
-
-            $tr.find('[data-field="expense_item"]').html(
-                expenseItemOptions(selected)
-            );
+            const programId = getRowProgramId($tr);
+            const selected = String($tr.find('[data-field="expense_item"]').val() || '').trim();
+            $tr.find('[data-field="expense_item"]').html(expenseItemOptions(selected, programId, $tr.attr('data-allocation-id')));
+        });
+        refreshExpenseTypeBudgetFields();
+    }
+    function normalizeExpenseType(type = '') {
+        const normalized = String(type ?? '').trim().toUpperCase();
+        if (['CO', 'CAPITAL OUTLAY', 'CAPITAL_OUTLAY', 'CAPITAL-OUTLAY'].includes(normalized)) {
+            return 'CO';
+        }
+        if (normalized === 'MOOE') {
+            return 'MOOE';
+        }
+        return '';
+    }
+    function getSelectedExpenseType($tr) {
+        const allocation = getRowAllocation($tr);
+        const selectedExpense = String(
+            $tr.find('[data-field="expense_item"]').val() || ''
+        ).trim();
+        if (!selectedExpense || !allocation) {
+            return '';
+        }
+        const expense = (allocation.expenses || []).find(item =>
+            String(item.name ?? '').trim() === selectedExpense
+        );
+        return normalizeExpenseType(expense?.type || '');
+    }
+    function applyExpenseTypeBudgetRule($tr) {
+        if (!$tr || !$tr.length || $tr.attr('data-row-type') !== 'item') {
+            return;
+        }
+        const $mooe = $tr.find('[data-field="mooe"]');
+        const $co = $tr.find('[data-field="capital_outlay"]');
+        const expenseType = getSelectedExpenseType($tr);
+        const isEditable = !isLocked;
+        if (expenseType === 'CO') {
+            const mooe = parseFloat($mooe.val()) || 0;
+            const co = parseFloat($co.val()) || 0;
+            const total = mooe + co;
+            $mooe.val('0');
+            $co.val(total.toFixed(2));
+            $mooe.prop('disabled', true);
+            $co.prop('disabled', !isEditable);
+            return;
+        }
+        if (expenseType === 'MOOE') {
+            const mooe = parseFloat($mooe.val()) || 0;
+            const co = parseFloat($co.val()) || 0;
+            const total = mooe + co;
+            $co.val('0');
+            $mooe.val(total.toFixed(2));
+            $co.prop('disabled', true);
+            $mooe.prop('disabled', !isEditable);
+            return;
+        }
+        $mooe.prop('disabled', !isEditable);
+        $co.prop('disabled', !isEditable);
+    }
+    function refreshExpenseTypeBudgetFields() {
+        $('#builderBody tr[data-row-type="item"]').each(function () {
+            applyExpenseTypeBudgetRule($(this));
         });
     }
-
+    function refreshRowProgramAllocation($tr) {
+        const programId = getRowProgramId($tr);
+        const allocation = getProgramAllocation(programId);
+        $tr.attr('data-program-id', programId || '');
+        if (allocation?.allocation_id) {
+            $tr.attr('data-allocation-id', String(allocation.allocation_id));
+        } else {
+            $tr.removeAttr('data-allocation-id');
+        }
+        $tr.find('[data-field="expense_item"]').html(
+            expenseItemOptions(
+                $tr.find('[data-field="expense_item"]').val() || '',
+                programId,
+                $tr.attr('data-allocation-id')
+            )
+        );
+        applyExpenseTypeBudgetRule($tr);
+        refreshProgramAllocationSummary();
+    }
     let activeLoadRequest = null;
     let hasUnsavedChanges = false;
     let isLocked = false;
@@ -866,155 +841,43 @@ $(document).ready(function () {
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#039;');
     }
-    function refreshAllocationProgrammedSummary() {
-        const allocation = ALLOCATIONS.find(item => Number(item.id) === Number(SELECTED_ALLOCATION_ID || 0));
-        const $programmed = $('#allocationManagementProgrammed');
-        const $remaining = $('#allocationManagementRemaining');
-        if (!$programmed.length || !$remaining.length) return;
-        if (!allocation) {
-            $programmed.text('0.00');
-            $remaining.text('0.00').removeClass('text-rose-700').addClass('text-emerald-700');
+    function refreshProgramAllocationSummary() {
+        const $body = $('#programAllocationSummaryBody');
+        if (!$body.length) return;
+        const context = Object.values(PROGRAM_ALLOCATION_CONTEXT || {});
+        if (!context.length) {
+            $body.html('<tr><td colspan="5" class="px-3 py-4 text-center text-amber-700">No Program Allocation is configured for the selected Fiscal Year and Level.</td></tr>');
+            $('#programAllocationStatus').text('No allocations found').removeClass('bg-slate-100 text-slate-600').addClass('bg-amber-100 text-amber-800');
             return;
         }
-        let programmed = 0;
+        const current = {};
         $('#builderBody tr[data-row-type="item"]').each(function () {
-            const info = getEffectiveFinancialTarget($(this));
-            programmed += Number(info.effectiveBudget) || 0;
+            const $tr = $(this);
+            const programId = getRowProgramId($tr);
+            if (!programId) return;
+            const info = getEffectiveFinancialTarget($tr);
+            if (!current[programId]) current[programId] = { mooe: 0, co: 0 };
+            current[programId].mooe += Number(info.effectiveMooe) || 0;
+            current[programId].co += Number(info.effectiveCo) || 0;
         });
-        const allocationTotal = (Array.isArray(allocation.expenses) ? allocation.expenses : [])
-            .reduce((sum, expense) => sum + (Number(expense.cost) || 0), 0);
-        const remaining = allocationTotal - programmed;
-        $programmed.text(fmtNum(programmed));
-        $remaining.text(fmtNum(remaining))
-            .removeClass('text-emerald-700 text-rose-700')
-            .addClass(remaining < -0.01 ? 'text-rose-700' : 'text-emerald-700');
-    }
-    function renderAllocationManagement(allocationId = '') {
-        const selectedId = Number(allocationId || 0);
-        const allocation = ALLOCATIONS.find(item => Number(item.id) === selectedId);
-
-        SELECTED_ALLOCATION_ID = allocation ? Number(allocation.id) : null;
-
-        const $selector = $('#allocationSelector');
-        const $level = $('#allocationLevel');
-        const $summary = $('#allocationExpenseSummary');
-        const $empty = $('#allocationManagementEmpty');
-        const $cards = $('#allocationExpenseCards');
-        const $total = $('#allocationManagementTotal');
-        const $status = $('#allocationManagementStatus');
-
-        $selector.val(allocation ? String(allocation.id) : '');
-        $cards.empty();
-        $total.text('0.00');
-        $('#allocationManagementProgrammed, #allocationManagementRemaining').text('0.00');
-
-        if (!allocation) {
-            $level
-                .val('')
-                .attr('placeholder', 'Select an Allocation first');
-
-            $summary.addClass('hidden');
-            $empty.removeClass('hidden');
-
-            $status
-                .removeClass('bg-emerald-100 text-emerald-700')
-                .addClass('bg-slate-100 text-slate-600')
-                .text('Not selected');
-
-            return;
-        }
-
-        const levelCode = allocation.level?.level_code || '';
-        const levelDescription = allocation.level?.level_description || '';
-
-        $level
-            .val(levelDescription ? `${levelCode} — ${levelDescription}` : levelCode)
-            .attr('placeholder', '');
-
-        let total = 0;
-
-        const expenses = Array.isArray(allocation.expenses)
-            ? allocation.expenses
-            : [];
-
-        expenses.forEach(expense => {
-            const expenseType = expense.expense_type || expense.expenseType || {};
-            const type = String(expenseType.type || '').trim();
-            const description = String(expenseType.expense_description || '').trim();
-            const cost = Number(expense.cost || 0);
-
-            total += cost;
-
-            $cards.append(`
-                <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                    <div class="flex items-start justify-between gap-2">
-                        <div>
-                            <div class="text-[10px] font-bold uppercase tracking-wide text-slate-500">
-                                ${esc(type)}
-                            </div>
-                            <div class="mt-1 text-xs font-semibold text-slate-800">
-                                ${esc(description)}
-                            </div>
-                        </div>
-                        <div class="text-right text-sm font-bold text-slate-900">
-                            ${fmtNum(cost)}
-                        </div>
-                    </div>
-                </div>
-            `);
-        });
-
-        $total.text(fmtNum(total));
-        refreshAllocationProgrammedSummary();
-        $summary.removeClass('hidden');
-        $empty.toggleClass('hidden', expenses.length > 0);
-
-        $status
-            .removeClass('bg-slate-100 text-slate-600')
-            .addClass('bg-emerald-100 text-emerald-700')
-            .text('Selected');
-    }
-
-    function refreshAllocationOptions() {
-        const fiscalYear = Number($('#fiscalYear').val() || 0);
-        const currentId = Number(SELECTED_ALLOCATION_ID || 0);
-        const $selector = $('#allocationSelector');
-        const matchingAllocations = ALLOCATIONS.filter(allocation => {
-            const allocationYear = Number(
-                allocation.fiscalYear?.year
-                ?? allocation.fiscal_year?.year
-                ?? allocation.fiscal_year
-                ?? 0
-            );
-            return allocationYear === fiscalYear;
-        });
-
-        $selector.empty().append('<option value="">Select Allocation</option>');
-
-        matchingAllocations.forEach(allocation => {
-            const levelCode = String(allocation.level?.level_code ?? '').trim();
-            const levelDescription = String(allocation.level?.level_description ?? '').trim();
-            const label = levelDescription
-                ? `${fiscalYear} — ${levelCode} (${levelDescription})`
-                : `${fiscalYear} — ${levelCode}`;
-            $selector.append($('<option>', {
-                value: String(allocation.id),
-                text: label
-            }));
-        });
-
-        if (currentId && matchingAllocations.some(allocation => Number(allocation.id) === currentId)) {
-            $selector.val(String(currentId));
-        } else {
-            renderAllocationManagement('');
-        }
-
-        console.log('Allocation options refreshed:', {
-            fiscal_year: fiscalYear,
-            total_allocations: ALLOCATIONS.length,
-            matching_allocations: matchingAllocations.length,
-            allocations: matchingAllocations
-        });
+        const rows = context.map(item => {
+            const thisPlan = current[item.program_id] || { mooe: 0, co: 0 };
+            const thisTotal = thisPlan.mooe + thisPlan.co;
+            const otherTotal = Number(item.other_mooe || 0) + Number(item.other_co || 0);
+            const available = Number(item.total_budget || 0) - otherTotal - thisTotal;
+            const cls = available < -0.01 ? 'text-rose-700' : 'text-emerald-700';
+            return `<tr>
+                <td class="border-b border-slate-100 px-3 py-2 font-semibold text-slate-700">${esc(item.program_name || 'Program ' + item.program_id)}</td>
+                <td class="border-b border-slate-100 px-3 py-2 text-right">${fmtNum(item.total_budget)}</td>
+                <td class="border-b border-slate-100 px-3 py-2 text-right">${fmtNum(otherTotal)}</td>
+                <td class="border-b border-slate-100 px-3 py-2 text-right font-semibold text-sky-700">${fmtNum(thisTotal)}</td>
+                <td class="border-b border-slate-100 px-3 py-2 text-right font-bold ${cls}">${fmtNum(available)}</td>
+            </tr>`;
+        }).join('');
+        $body.html(rows);
+        $('#programAllocationStatus').text(`${context.length} Program Allocation${context.length === 1 ? '' : 's'} available`)
+            .removeClass('bg-slate-100 text-slate-600 bg-amber-100 text-amber-800')
+            .addClass('bg-emerald-100 text-emerald-700');
     }
     // Show a Bootstrap message
     function showMessage(message, type = 'success') {
@@ -1262,6 +1125,7 @@ $(document).ready(function () {
         if (locked) $('#builderBody .personnel-menu').addClass('hidden');
         $('#builderBody .drag-handle').toggleClass('locked-handle', locked);
         refreshProgramClassificationDisplay();
+        refreshExpenseTypeBudgetFields();
     }
     // Toggle loading state
     function setLoading(loading) {
@@ -1275,6 +1139,15 @@ $(document).ready(function () {
         const rowId = row.id ?? '';
         const type = row.row_type ?? 'item';
         const isItem = type === 'item';
+        const rowAllocationId = Number(row.allocation_id || row.allocation?.id || 0);
+        const rowPrexc = String(row.prexc_code ?? '').trim();
+        const rowProgramId = Number(
+            row.program_id ||
+            row.allocation?.program_id ||
+            PREXC_PROGRAM_MAP[rowPrexc]?.program_id ||
+            getProgramIdFromClassification(row.program_classification, rowPrexc) ||
+            0
+        );
         const rowClass = type === 'header'
             ? 'table-secondary fw-semibold'
             : type === 'subheader'
@@ -1302,6 +1175,8 @@ $(document).ready(function () {
                 data-row-type="${esc(type)}"
                 data-original-program-classification="${esc(row.program_classification ?? '')}"
                 data-original-prexc-code="${esc(row.prexc_code ?? '')}"
+                data-program-id="${rowProgramId || ''}"
+                data-allocation-id="${rowAllocationId || ''}"
                 class="${rowClass}">
                 <td class="text-center drag-handle" title="Drag to reorder">
                     <i class="fa fa-grip-vertical text-muted"></i>
@@ -1331,9 +1206,6 @@ $(document).ready(function () {
                            ${isItem && !isLocked ? '' : 'disabled'}>
                 </td>
                 <td>
-                    ${allocationTypeControl(row, isItem, isLocked)}
-                </td>
-                <td>
                     <input type="text" class="builder-input field-input" data-field="staff_unit_project"
                            maxlength="150" value="${esc(row.staff_unit_project ?? '')}" ${isItem && !isLocked ? '' : 'disabled'}>
                 </td>
@@ -1347,7 +1219,7 @@ $(document).ready(function () {
                 <td>
                     <select class="builder-input field-input" data-field="expense_item"
                             ${isItem && !isLocked ? '' : 'disabled'}>
-                        ${expenseItemOptions(row.expense_item ?? '')}
+                        ${expenseItemOptions(row.expense_item ?? '', rowProgramId, rowAllocationId)}
                     </select>
                 </td>
                 <td>
@@ -1391,15 +1263,12 @@ $(document).ready(function () {
         const currentValue = String($wrap.find('[data-field="program_classification"]').val() ?? '');
         const currentPrexc = String($tr.find('[data-field="prexc_code"]').val() ?? '');
         const isItem = type === 'item';
-
         $wrap.html(programClassificationControl({
             row_type: type,
             program_classification: currentValue,
             prexc_code: currentPrexc
         }, isItem, isLocked, $tr));
-
         if (!isItem) return;
-
         const $classification = $wrap.find('.program-classification-input');
         const $option = $classification.find('option:selected');
         const prexc = String($option.data('prexc') ?? currentPrexc).trim();
@@ -1433,32 +1302,25 @@ $(document).ready(function () {
         $('#builderBody tr').each(function () {
             const $tr = $(this);
             const type = $tr.attr('data-row-type');
-
             if (type === 'header' || type === 'subheader') {
                 const currentValue = String(
                     $tr.find('[data-field="program_classification"]').val() || ''
                 ).trim();
-
                 $tr.find('.program-classification-wrap').html(
                     programClassificationControl({
                         row_type: type,
                         program_classification: currentValue
                     }, false, isLocked, $tr)
                 );
-
                 return;
             }
-
             if (type !== 'item') return;
-
             const currentValue = String(
                 $tr.find('[data-field="program_classification"]').val() || ''
             ).trim();
-
             const currentPrexc = String(
                 $tr.find('[data-field="prexc_code"]').val() || ''
             ).trim();
-
             $tr.find('.program-classification-wrap').html(
                 programClassificationControl({
                     row_type: 'item',
@@ -1466,10 +1328,8 @@ $(document).ready(function () {
                     prexc_code: currentPrexc
                 }, true, isLocked, $tr)
             );
-
             const $option = $tr.find('.program-classification-input option:selected');
             const prexc = String($option.data('prexc') ?? '').trim();
-
             $tr.find('[data-field="prexc_code"]').val(
                 prexc || currentPrexc
             );
@@ -1479,17 +1339,25 @@ $(document).ready(function () {
     function renderRows(rows) {
         const $body = $('#builderBody').empty();
         rows.forEach(row => {
+            cacheRowAllocation(row);
             $body.append(fieldRow(row));
         });
         $body.find('.specific-activity-input').each(function () {
             autoGrow(this);
         });
         $body.find('tr[data-row-type="item"]').each(function () {
-            rememberEffectiveBudget($(this));
-            refreshFinancialTargetDisplay($(this));
+            const $tr = $(this);
+            const allocationId = Number($tr.attr('data-allocation-id') || 0);
+            const allocation = getProgramAllocationById(allocationId);
+            if (allocation?.program_id) {
+                $tr.attr('data-program-id', String(allocation.program_id));
+            }
+            applyExpenseTypeBudgetRule($tr);
+            rememberEffectiveBudget($tr);
+            refreshFinancialTargetDisplay($tr);
         });
         refreshProgramClassificationDisplay();
-        refreshAllocationProgrammedSummary();
+        refreshProgramAllocationSummary();
         applyLockState(isLocked, $('#builderStatusBadge').text());
         refreshSubmissionReadiness();
     }
@@ -1503,7 +1371,6 @@ $(document).ready(function () {
         const prefill = { row_type: type };
         if (type === 'item' && $rows.length > 0) {
             const $last = $rows.last();
-            prefill.allocation_type = $last.find('[data-field="allocation_type"]').val() || '';
         }
         const $newRow = $(fieldRow(prefill));
         $body.append($newRow);
@@ -1515,7 +1382,7 @@ $(document).ready(function () {
             autoGrow(this);
         });
         refreshProgramClassificationDisplay();
-        refreshAllocationProgrammedSummary();
+        refreshProgramAllocationSummary();
         setDirty(true);
         refreshSubmissionReadiness();
     }
@@ -1525,7 +1392,8 @@ $(document).ready(function () {
             '{{ route("financial-plans.status") }}',
             {
                 fiscal_year: $('#fiscalYear').val(),
-                office_name: $('#officeName').val()
+                office_name: $('#officeName').val(),
+                staff_id: window.PLAN_STAFF_ID || null
             }
         ).done(function (response) {
             const finalized = response.finalized === 'yes';
@@ -1542,7 +1410,8 @@ $(document).ready(function () {
             '{{ route("financial-plans.signatories") }}',
             {
                 fiscal_year: $('#fiscalYear').val(),
-                office_name: $('#officeName').val()
+                office_name: $('#officeName').val(),
+                staff_id: window.PLAN_STAFF_ID || null
             }
         ).done(function (sig) {
             $('#sigPreparedBy').val(sig.prepared_by || '');
@@ -1564,6 +1433,7 @@ $(document).ready(function () {
             data: JSON.stringify({
                 fiscal_year: $('#fiscalYear').val(),
                 office_name: $('#officeName').val(),
+                staff_id: window.PLAN_STAFF_ID || null,
                 prepared_by: $('#sigPreparedBy').val(),
                 prepared_by_position: $('#sigPreparedByPosition').val(),
                 reviewed_by: $('#sigReviewedBy').val(),
@@ -1580,7 +1450,6 @@ $(document).ready(function () {
     }
     // Load the selected plan
     function loadPlan(manualReload = false) {
-
         if (manualReload && hasUnsavedChanges) {
             if (!confirm(
                 'You have unsaved changes. Loading another plan will discard them. Continue?'
@@ -1588,29 +1457,21 @@ $(document).ready(function () {
                 return;
             }
         }
-
-        /*
-        * ADMIN:
-        * Synchronize selected Staff/Office FIRST.
-        *
-        * This updates:
-        *   window.PLAN_STAFF_ID
-        *   #officeName
-        */
         if ($('#officeSelector').length) {
-            syncSelectedOffice();
+            const $selectedStaff = $('#officeSelector').find('option:selected');
+            window.PLAN_STAFF_ID = parseInt($selectedStaff.val(), 10) || null;
         }
-
+        if ($('#levelId').length && !$('#levelId').val() && INITIAL_LEVEL_ID) {
+            $('#levelId').val(String(INITIAL_LEVEL_ID));
+        }
         const fiscalYear = $('#fiscalYear').val();
         const officeName = String(
             $('#officeName').val() || ''
         ).trim();
-
         if (!officeName) {
             showMessage('Please select a Staff/Office.', 'danger');
             return;
         }
-
         if (!IS_ADMIN && !window.PLAN_STAFF_ID) {
             showMessage(
                 'Unable to determine the selected Staff/Office.',
@@ -1618,44 +1479,36 @@ $(document).ready(function () {
             );
             return;
         }
-
         if (
             activeLoadRequest &&
             activeLoadRequest.readyState !== 4
         ) {
             activeLoadRequest.abort();
         }
-
         setLoading(true);
-
         $.when(
             loadStatus(),
             loadSignatories()
         ).always(function () {
-
             activeLoadRequest = $.getJSON(
                 '{{ route("financial-plans.data") }}',
                 {
                     fiscal_year: fiscalYear,
-                    office_name: officeName
+                    office_name: officeName,
+                    staff_id: window.PLAN_STAFF_ID || null
                 }
             ).done(function (rows) {
-                const existingAllocationId = rows.length
-                    ? Number(rows[0].allocation_id || 0)
-                    : 0;
-
-                renderAllocationManagement(existingAllocationId);
+                if (rows.length) {
+                    const existingLevelId = Number(rows.find(row => row.allocation?.level_id)?.allocation?.level_id || 0);
+                    if (existingLevelId) $('#levelId').val(String(existingLevelId));
+                }
                 renderRows(rows);
-
                 if (rows.length === 0 && !isLocked) {
                     addRow('header');
                     addRow('item');
                 }
-
                 setDirty(false);
-        
             }).fail(function (xhr) {
-
                 showMessage(
                     getErrorMessage(
                         xhr,
@@ -1663,11 +1516,8 @@ $(document).ready(function () {
                     ),
                     'danger'
                 );
-
             }).always(function () {
-
                 setLoading(false);
-
                 applyLockState(
                     isLocked,
                     currentWorkflowStatus,
@@ -1676,17 +1526,17 @@ $(document).ready(function () {
             });
         });
     }
-    
     // Collect all builder rows
     function collectPayload() {
         const rows = [];
-
         $('#builderBody tr').each(function () {
             const $tr = $(this);
             const rowType = $tr.attr('data-row-type') || $tr.find('.row-type-select').val();
             const row = {
                 id: $tr.attr('data-row-id') || null,
                 row_type: rowType,
+                program_id: rowType === 'item' ? Number($tr.attr('data-program-id') || 0) || null : null,
+                allocation_id: rowType === 'item' ? Number($tr.attr('data-allocation-id') || 0) || null : null,
                 months: {}
             };
             $tr.find('[data-field]').each(function () {
@@ -1706,7 +1556,8 @@ $(document).ready(function () {
         return {
             fiscal_year: Number($('#fiscalYear').val()),
             office_name: String($('#officeName').val() || '').trim(),
-            allocation_id: SELECTED_ALLOCATION_ID,
+            staff_id: window.PLAN_STAFF_ID || null,
+            level_id: Number($('#levelId').val() || 0),
             rows
         };
     }
@@ -1714,6 +1565,12 @@ $(document).ready(function () {
     function validatePayload(payload) {
         if (!payload.office_name) {
             return 'Name of Office/Staff is required.';
+        }
+        if (!payload.staff_id) {
+            return 'Unable to determine the selected Staff/Office.';
+        }
+        if (!payload.level_id) {
+            return 'Please select the Allocation Level.';
         }
         if (!payload.fiscal_year || payload.fiscal_year < 2000 || payload.fiscal_year > 2100) {
             return 'Please enter a valid fiscal year from 2000 to 2100.';
@@ -1738,6 +1595,9 @@ $(document).ready(function () {
                 if (Number.isNaN(value) || value < 0) {
                     return `Row ${index + 1} contains an invalid negative or non-numeric amount.`;
                 }
+            }
+            if (!row.program_id) {
+                return `Row ${index + 1} is missing its Program Allocation. Please reselect the Program Classification.`;
             }
             for (let month = 1; month <= 12; month++) {
                 const value = Number(row.months[month] || 0);
@@ -1774,74 +1634,48 @@ $(document).ready(function () {
         });
         return warnings;
     }
-    // Compare the Financial Plan against the selected Allocation Management expenses.
-    // MOOE and CO are checked separately; Contract Amount is the effective total.
-    function getAllocationExpenseCeilingIssues() {
-        const allocation = ALLOCATIONS.find(item => Number(item.id) === Number(SELECTED_ALLOCATION_ID || 0));
-        if (!allocation) {
-            return [{
-                type: 'error',
-                message: 'Please select an Allocation Management allocation before entering budget amounts.'
-            }];
-        }
-
-        const ceilings = { mooe: 0, capitalOutlay: 0 };
-        (Array.isArray(allocation.expenses) ? allocation.expenses : []).forEach(expense => {
-            const expenseType = expense.expense_type || expense.expenseType || {};
-            const type = String(expenseType.type || '').trim().toUpperCase();
-            const cost = Number(expense.cost || 0);
-            if (type === 'MOOE') {
-                ceilings.mooe += cost;
-            } else if (type === 'CO' || type === 'CAPITAL OUTLAY') {
-                ceilings.capitalOutlay += cost;
-            }
-        });
-
-        let programmedMooe = 0;
-        let programmedCapitalOutlay = 0;
-        let contractTotal = 0;
-        let effectiveTotal = 0;
-
-        $('#builderBody tr[data-row-type="item"]').each(function () {
-            const info = getEffectiveFinancialTarget($(this));
-            programmedMooe += info.effectiveMooe;
-            programmedCapitalOutlay += info.effectiveCo;
-            effectiveTotal += info.effectiveBudget;
-            if (info.contractAmount !== null && Number.isFinite(info.contractAmount)) {
-                contractTotal += info.contractAmount;
-            }
-        });
-
+    function getProgramAllocationIssues() {
         const issues = [];
-        if (programmedMooe > ceilings.mooe + 0.01) {
-            issues.push({
-                type: 'error',
-                message: `Financial Plan MOOE exceeds the Allocation Management MOOE by ${fmtNum(programmedMooe - ceilings.mooe)}.`
-            });
-        }
-        if (programmedCapitalOutlay > ceilings.capitalOutlay + 0.01) {
-            issues.push({
-                type: 'error',
-                message: `Financial Plan Capital Outlay exceeds the Allocation Management Capital Outlay by ${fmtNum(programmedCapitalOutlay - ceilings.capitalOutlay)}.`
-            });
-        }
-        const allocationTotal = ceilings.mooe + ceilings.capitalOutlay;
-        if (effectiveTotal > allocationTotal + 0.01) {
-            issues.push({
-                type: 'error',
-                message: `Financial Plan total exceeds the Allocation Management total by ${fmtNum(effectiveTotal - allocationTotal)}.`
-            });
-        }
-        if (contractTotal > allocationTotal + 0.01) {
-            issues.push({
-                type: 'error',
-                message: `Total Contract Amount exceeds the Allocation Management total by ${fmtNum(contractTotal - allocationTotal)}.`
-            });
-        }
-
+        const current = {};
+        $('#builderBody tr[data-row-type="item"]').each(function (index) {
+            const $tr = $(this);
+            const programId = getRowProgramId($tr);
+            if (!programId) {
+                return;
+            }
+            const info = getEffectiveFinancialTarget($tr);
+            if (!current[programId]) current[programId] = { mooe: 0, co: 0, contract: 0 };
+            current[programId].mooe += Number(info.effectiveMooe) || 0;
+            current[programId].co += Number(info.effectiveCo) || 0;
+            if (info.contractAmount !== null && Number.isFinite(info.contractAmount)) {
+                current[programId].contract += Number(info.contractAmount) || 0;
+            }
+        });
+        Object.entries(current).forEach(([programId, totals]) => {
+            const allocation = getProgramAllocation(programId);
+            if (!allocation) {
+                issues.push({ type: 'error', message: `Program ${programId}: no Allocation Management budget exists for the selected Fiscal Year and Level.` });
+                return;
+            }
+            const availableMooe = Number(allocation.available_mooe || 0);
+            const availableCo = Number(allocation.available_co || 0);
+            const availableTotal = Number(allocation.available_total || 0);
+            const effectiveTotal = totals.mooe + totals.co;
+            if (totals.mooe > availableMooe + 0.01) {
+                issues.push({ type: 'error', message: `${allocation.program_name}: MOOE exceeds the remaining Program Allocation by ${fmtNum(totals.mooe - availableMooe)}.` });
+            }
+            if (totals.co > availableCo + 0.01) {
+                issues.push({ type: 'error', message: `${allocation.program_name}: Capital Outlay exceeds the remaining Program Allocation by ${fmtNum(totals.co - availableCo)}.` });
+            }
+            if (effectiveTotal > availableTotal + 0.01) {
+                issues.push({ type: 'error', message: `${allocation.program_name}: total programmed budget exceeds the remaining Program Allocation by ${fmtNum(effectiveTotal - availableTotal)}.` });
+            }
+            if (Number(allocation.other_contract || 0) + totals.contract > Number(allocation.total_budget || 0) + 0.01) {
+                issues.push({ type: 'error', message: `${allocation.program_name}: combined Contract Amount exceeds the Program Allocation budget by ${fmtNum(Number(allocation.other_contract || 0) + totals.contract - Number(allocation.total_budget || 0))}.` });
+            }
+        });
         return issues;
     }
-
     // Build a client-side preview of the server Submit validation.
     // Laravel remains the authoritative validation when the plan is submitted.
     function getSubmissionReadiness() {
@@ -1862,9 +1696,6 @@ $(document).ready(function () {
             const prexcCode = String(
                 $tr.find('[data-field="prexc_code"]').val() || ''
             ).trim();
-            const allocationType = String(
-                $tr.find('[data-field="allocation_type"]').val() || ''
-            ).trim().toLowerCase();
             const staffUnit = String(
                 $tr.find('[data-field="staff_unit_project"]').val() || ''
             ).trim();
@@ -1884,7 +1715,20 @@ $(document).ready(function () {
                 ? null
                 : parseFloat(contractRaw);
             const originalBudget = mooe + co;
+            const expenseType = getSelectedExpenseType($tr);
             const label = specificActivity || classification || `Budget Line ${rowNumber}`;
+            if (expenseType === 'CO' && mooe > 0.01) {
+                issues.push({
+                    type: 'error',
+                    message: `${label}: CO Expense Item amounts must be entered in the Capital Outlay column, not MOOE.`
+                });
+            }
+            if (expenseType === 'MOOE' && co > 0.01) {
+                issues.push({
+                    type: 'error',
+                    message: `${label}: MOOE Expense Item amounts must be entered in the MOOE column, not Capital Outlay.`
+                });
+            }
             if (!classification) {
                 issues.push({ type: 'error', message: `${label}: Program Classification is required.` });
             }
@@ -1951,42 +1795,6 @@ $(document).ready(function () {
                     message: `${label}: Contract Amount cannot exceed the original MOOE + Capital Outlay budget.`
                 });
             }
-            let allocationMaster = null;
-            if (originalBudget > 0 || (contractAmount !== null && contractAmount > 0)) {
-                if (!allocationType) {
-                    issues.push({
-                        type: 'error',
-                        message: `${label}: Allocation Type is required before submission.`
-                    });
-                } else {
-                    allocationMaster = ALLOCATION_TYPE_OPTIONS.find(item =>
-                        String(item.code ?? '').trim().toLowerCase() === allocationType
-                    );
-                    if (!allocationMaster) {
-                        issues.push({
-                            type: 'error',
-                            message: `${label}: The selected Allocation Type is not available for this Staff/Office.`
-                        });
-                    }
-                }
-            }
-            if (allocationMaster) {
-                const allowsMooe = Boolean(Number(allocationMaster.allows_mooe));
-                const allowsCo = Boolean(Number(allocationMaster.allows_capital_outlay));
-                const allocationName = String(allocationMaster.name ?? allocationType).trim();
-                if (mooe > 0 && !allowsMooe) {
-                    issues.push({
-                        type: 'error',
-                        message: `${label}: ${allocationName} does not allow MOOE.`
-                    });
-                }
-                if (co > 0 && !allowsCo) {
-                    issues.push({
-                        type: 'error',
-                        message: `${label}: ${allocationName} does not allow Capital Outlay.`
-                    });
-                }
-            }
             const info = getEffectiveFinancialTarget($tr);
             let monthlyTotal = 0;
             $tr.find('.month-input').each(function () {
@@ -1999,7 +1807,7 @@ $(document).ready(function () {
                 });
             }
         });
-        getAllocationExpenseCeilingIssues().forEach(issue => issues.push(issue));
+        getProgramAllocationIssues().forEach(issue => issues.push(issue));
         return {
             ready: issues.length === 0,
             issues
@@ -2064,17 +1872,8 @@ $(document).ready(function () {
             showMessage('This plan is finalized and cannot be changed.', 'warning');
             return;
         }
-
-        if (!SELECTED_ALLOCATION_ID) {
-            showMessage(
-                'Please select an Allocation Management allocation before saving the Financial Plan.',
-                'danger'
-            );
-            return;
-        }
-        
         const payload = collectPayload();
-        const allocationCeilingIssues = getAllocationExpenseCeilingIssues();
+        const allocationCeilingIssues = getProgramAllocationIssues();
         if (allocationCeilingIssues.length) {
             showMessage(
                 allocationCeilingIssues.map(issue => issue.message).join(' '),
@@ -2214,7 +2013,6 @@ $(document).ready(function () {
             }
         }
         if ($sourceRow.length) {
-            prefill.allocation_type = $sourceRow.find('[data-field="allocation_type"]').val() || '';
         }
         const $newRow = $(fieldRow(prefill));
         $currentRow.after($newRow);
@@ -2224,7 +2022,7 @@ $(document).ready(function () {
             autoGrow(this);
         });
         refreshProgramClassificationDisplay();
-        refreshAllocationProgrammedSummary();
+        refreshProgramAllocationSummary();
         setDirty(true);
     });
     // Handle row type changes
@@ -2242,18 +2040,24 @@ $(document).ready(function () {
     // Budget Line classification automatically fills the PREXC code.
     $('#builderBody').on('change', '.program-classification-input', function () {
         if (isLocked) return;
-
         const $tr = $(this).closest('tr');
         const rowType = $tr.attr('data-row-type');
-
         if (rowType === 'item') {
             const $option = $(this).find('option:selected');
             const prexc = String($option.data('prexc') ?? '').trim();
             $tr.find('[data-field="prexc_code"]').val(prexc);
+            const programId = Number($option.data('program-id') || 0);
+            const allocation = getProgramAllocation(programId);
+            $tr.attr('data-program-id', String(programId || ''));
+            if (allocation?.allocation_id) {
+                $tr.attr('data-allocation-id', String(allocation.allocation_id));
+            } else {
+                $tr.removeAttr('data-allocation-id');
+            }
+            refreshRowProgramAllocation($tr);
         } else {
             refreshProgramClassificationDisplay();
         }
-
         setDirty(true);
         refreshSubmissionReadiness();
     });
@@ -2292,25 +2096,19 @@ $(document).ready(function () {
     $(document).on('click', function () {
         $('#builderBody .personnel-menu').addClass('hidden');
     });
-    $('#allocationSelector').on('change', function () {
-        const allocationId = Number($(this).val() || 0);
-
+    $('#levelId').on('change', function () {
         if (hasUnsavedChanges) {
-            const proceed = confirm(
-                'Changing the Allocation will change the allocation linked to this Financial Plan. Continue?'
-            );
-
-            if (!proceed) {
-                renderAllocationManagement(SELECTED_ALLOCATION_ID);
-                return;
-            }
+            const proceed = confirm('Changing the Allocation Level may change which Program Allocations are available. Continue?');
+            if (!proceed) return;
         }
-
-        renderAllocationManagement(allocationId);
-        refreshExpenseItemDropdowns();
-        refreshAllocationProgrammedSummary();
-        setDirty(true);
-        refreshSubmissionReadiness();
+        const levelId = Number($(this).val() || 0);
+        if (!levelId) return;
+        const url = new URL('{{ route('financial-plans.builder') }}', window.location.origin);
+        url.searchParams.set('fiscal_year', $('#fiscalYear').val() || '');
+        url.searchParams.set('level_id', String(levelId));
+        if ($('#officeName').val()) url.searchParams.set('office_name', $('#officeName').val());
+        if (window.PLAN_STAFF_ID) url.searchParams.set('staff_id', String(window.PLAN_STAFF_ID));
+        window.location.href = url.toString();
     });
     // Track changes inside WFP rows.
     // MOOE / CO / Contract Amount changes also synchronize the Financial Target.
@@ -2324,7 +2122,15 @@ $(document).ready(function () {
         }
         const field = $(this).data('field');
         const $tr = $(this).closest('tr');
-        if (['mooe', 'capital_outlay', 'contract_amount'].includes(field)) {
+        if (field === 'expense_item') {
+            const previousEffectiveBudget = parseFloat($tr.attr('data-effective-budget'));
+            applyExpenseTypeBudgetRule($tr);
+            syncFinancialTargetsToEffectiveBudget(
+                $tr,
+                Number.isFinite(previousEffectiveBudget) ? previousEffectiveBudget : null
+            );
+            rememberEffectiveBudget($tr);
+        } else if (['mooe', 'capital_outlay', 'contract_amount'].includes(field)) {
             const previousEffectiveBudget = parseFloat($tr.attr('data-effective-budget'));
             syncFinancialTargetsToEffectiveBudget(
                 $tr,
@@ -2335,8 +2141,7 @@ $(document).ready(function () {
             refreshFinancialTargetDisplay($tr);
         } else if (field === 'prexc_code') {
             }
-        refreshAllocationProgrammedSummary();
-        refreshAllocationProgrammedSummary();
+        refreshProgramAllocationSummary();
         refreshSubmissionReadiness();
     });
     // Financial Target distribution.
@@ -2346,21 +2151,18 @@ $(document).ready(function () {
     $('#fiscalYear').on('change', function () {
         if (hasUnsavedChanges) {
             const proceed = confirm(
-                'Changing the Fiscal Year may change the available Allocations. Continue?'
+                'Changing the Fiscal Year may change the available Program Allocations. Continue?'
             );
-
-            if (!proceed) {
-                return;
-            }
+            if (!proceed) return;
         }
-
-        SELECTED_ALLOCATION_ID = null;
-        refreshAllocationOptions();
-        renderAllocationManagement('');
-        refreshAllocationProgrammedSummary();
-
-        setDirty(true);
-        refreshSubmissionReadiness();
+        const fiscalYear = Number($(this).val() || 0);
+        if (!fiscalYear) return;
+        const url = new URL('{{ route('financial-plans.builder') }}', window.location.origin);
+        url.searchParams.set('fiscal_year', String(fiscalYear));
+        if ($('#officeName').val()) url.searchParams.set('office_name', $('#officeName').val());
+        if ($('#levelId').val()) url.searchParams.set('level_id', $('#levelId').val());
+        if (window.PLAN_STAFF_ID) url.searchParams.set('staff_id', String(window.PLAN_STAFF_ID));
+        window.location.href = url.toString();
     });
     $('input[name="targetDistributionMode"]').on('change', function () {
         $('#distributionMonthSelector').toggleClass('hidden', $(this).val() !== 'selected');
@@ -2407,7 +2209,7 @@ $(document).ready(function () {
         }
         $(this).closest('tr').remove();
         refreshProgramClassificationDisplay();
-        refreshAllocationProgrammedSummary();
+        refreshProgramAllocationSummary();
         setDirty(true);
         refreshSubmissionReadiness();
     });
@@ -2441,9 +2243,8 @@ $(document).ready(function () {
         event.returnValue = '';
     });
     enableRowDragging();
-    // Build the Allocation dropdown immediately from Allocation Management data.
-    // This is required on initial page load; the fiscal-year handler also refreshes it later.
-    refreshAllocationOptions();
+    // Build the Program Allocation availability summary from the selected Fiscal Year and Level.
+    refreshProgramAllocationSummary();
     // Only auto-load when an office/staff was supplied by the page.
     // A blank Builder is a valid new-plan state and should not show validation immediately.
     if ($('#officeName').val().trim()) {
@@ -2457,7 +2258,7 @@ $(document).ready(function () {
 @endpush
 <style>
 #builderTable {
-    min-width: 2725px;
+    min-width: 2600px;
     font-size: 0.75rem;
 }
 #builderTable th,
@@ -2530,6 +2331,18 @@ $(document).ready(function () {
 #builderTable input[type="number"] {
     min-width: 86px;
 }
+#builderTable th:nth-child(3),
+#builderTable td:nth-child(3) {
+    min-width: 320px;
+    width: 320px;
+}
+.program-classification-wrap .builder-input {
+    width: 100%;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 .program-classification-wrap {
     position: relative;
 }
@@ -2538,7 +2351,6 @@ $(document).ready(function () {
     color: #475569;
     cursor: default;
 }
-
 .personnel-multiselect {
     position: relative;
     min-width: 210px;

@@ -2,10 +2,9 @@
 @section('content')
 @php
     $selectedStaff = $staffs->firstWhere('id', $staffId);
-
-    // Preserve the actual office_name of the selected Work Plan /
-    // Financial Plan. This is important because one staff_id can
-    // have multiple office names such as ICTS and ICT NEP.
+    // Preserve the actual office_name of the selected Work Plan /*
+    // Financial Plan. This is important because one staff_id can*
+    // have multiple office names such as ICTS and ICT NEP.*
     $selectedOfficeName =
         $plan?->office_name
         ?? request('office_name')
@@ -23,7 +22,8 @@
         <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
             <a href="{{ route('work-plans.index', [
                     'fiscal_year' => $fiscalYear,
-                    'staff_id' => $staffId
+                    'staff_id' => $staffId,
+                    'office_name' => $selectedOfficeName
                 ]) }}" class="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50">
                 <i class="fa fa-arrow-left"></i> Back to Work Plan
             </a>
@@ -54,26 +54,22 @@
                             class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
                             Name of Office/Staff
                         </label>
-
                         <select
                             id="planScope"
                             class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
                         >
                             <option value="">Select Office/Staff</option>
-
                             @foreach($financialPlanScopes as $scope)
                                 @php
                                     $scopeStaff = $staffs->firstWhere(
                                         'id',
                                         (int) $scope->staff_id
                                     );
-
                                     $isSelected =
                                         (int) $staffId === (int) $scope->staff_id
                                         && trim((string) $selectedOfficeName)
                                             === trim((string) $scope->office_name);
                                 @endphp
-
                                 <option
                                     value="{{ $scope->staff_id }}|{{ $scope->office_name }}"
                                     data-staff-id="{{ $scope->staff_id }}"
@@ -84,13 +80,11 @@
                                 </option>
                             @endforeach
                         </select>
-
                         <input
                             type="hidden"
                             id="staffId"
                             value="{{ $staffId }}"
                         >
-
                         <input
                             type="hidden"
                             id="officeName"
@@ -422,7 +416,6 @@
 .add-row-button:hover:not(:disabled) {
     background: #f8fafc;
 }
-
 .sync-button {
     display: inline-flex;
     align-items: center;
@@ -435,16 +428,13 @@
     font-weight: 700;
     color: #0369a1;
 }
-
 .sync-button:hover:not(:disabled) {
     background: #e0f2fe;
 }
-
 .sync-button:disabled {
     cursor: not-allowed;
     opacity: .5;
 }
-
 .save-button {
     display: inline-flex;
     align-items: center;
@@ -496,7 +486,6 @@
     background: #e0f2fe;
     color: #0369a1;
 }
-
 .fp-readonly-value {
     min-height: 36px;
     border: 1px solid #e2e8f0;
@@ -539,13 +528,11 @@ $(document).ready(function () {
     let isLoading = false;
     let hasUnsavedChanges = false;
     let rowCounter = 0;
-
     function getOfficeName() {
         return String(
             $('#officeName').val() || ''
         ).trim();
     }
-
     function esc(value) {
         return String(value ?? '')
             .replace(/&/g, '&amp;')
@@ -554,12 +541,10 @@ $(document).ready(function () {
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#039;');
     }
-
     function newRowKey() {
         rowCounter += 1;
         return 'row-' + Date.now() + '-' + rowCounter;
     }
-
     function showMessage(message, type = 'success') {
         $('#builderMessage').html(`
             <div class="alert alert-${type} alert-dismissible fade show" role="alert">
@@ -569,7 +554,6 @@ $(document).ready(function () {
         `);
         window.scrollTo({top:0,behavior:'smooth'});
     }
-
     function getErrorMessage(xhr, fallback = 'Something went wrong.') {
         if (xhr?.responseJSON?.message) return xhr.responseJSON.message;
         if (xhr?.responseJSON?.errors) {
@@ -578,24 +562,20 @@ $(document).ready(function () {
         }
         return fallback;
     }
-
     function setDirty(value = true) {
         hasUnsavedChanges = value;
         $('#unsavedBadge').toggleClass('hidden', !value);
     }
-
     function setLoading(value) {
         isLoading = value;
         $('#builderLoadingNote').toggleClass('hidden', !value);
         $('#btnLoadPlan').prop('disabled', value);
         $('.builder-write-control').prop('disabled', value || isLocked);
     }
-
     function statusLabel(status) {
         if (!status) return 'Draft';
         return status.charAt(0).toUpperCase() + status.slice(1);
     }
-
     function applyLockState() {
         const status = currentPlan?.status || 'draft';
         const finalized = currentPlan?.finalized === 'yes';
@@ -615,7 +595,6 @@ $(document).ready(function () {
         $('.builder-write-input, #builderBody .builder-input, #builderBody .add-target, #builderBody .target-delete, #builderBody .target-month-checkbox, #builderBody .target-month-action, #builderBody .delete-row').prop('disabled', isLocked);
         $('#builderBody .drag-handle').toggleClass('locked', isLocked);
     }
-
     function classificationOptions(selectedValue = '') {
         const selected = Number(selectedValue || 0);
         const byParent = new Map();
@@ -638,13 +617,11 @@ $(document).ready(function () {
         appendChildren(0, 0);
         return html.join('');
     }
-
     function autoResizeTextarea(element) {
         if (!element) return;
         element.style.height = 'auto';
         element.style.height = Math.max(element.scrollHeight, 110) + 'px';
     }
-
     function targetMonths(target = {}) {
         if (Array.isArray(target.months) && target.months.length) {
             return target.months
@@ -654,7 +631,6 @@ $(document).ready(function () {
         const legacyMonth = Number(target.month || 0);
         return legacyMonth >= 1 && legacyMonth <= 12 ? [legacyMonth] : [];
     }
-
     function targetEntry(target = {}) {
         const selectedMonths = targetMonths(target);
         const monthOptions = Object.entries(MONTHS).map(([monthNumber, monthName]) => {
@@ -681,7 +657,6 @@ $(document).ready(function () {
             </div>
         `;
     }
-
     function itemRow(item = {}) {
         const rowKey = item.row_key || newRowKey();
         const targets = Array.isArray(item.targets)
@@ -718,7 +693,6 @@ $(document).ready(function () {
             </tr>
         `;
     }
-
     function structuralRow(item = {}, type = 'header') {
         const rowKey = item.row_key || newRowKey();
         const isHeader = type === 'header';
@@ -734,7 +708,6 @@ $(document).ready(function () {
             </tr>
         `;
     }
-
     function renderRows(items = []) {
         const $body = $('#builderBody').empty();
         items.slice().sort(function (a,b) {
@@ -751,7 +724,6 @@ $(document).ready(function () {
         });
         applyLockState();
     }
-
     function financialPlanRows() {
         return FINANCIAL_PLAN_ACTIVITIES.map(function (activity, index) {
             return {
@@ -768,23 +740,19 @@ $(document).ready(function () {
             };
         });
     }
-
     function addRow(type) {
         if (isLocked || isLoading) return;
         if (!['header', 'subheader'].includes(type)) return;
-
         $('#builderBody').append(
             structuralRow({
                 row_type: type,
                 title: ''
             }, type)
         );
-
         $('#emptyBuilderState').addClass('hidden');
         setDirty(true);
         $('#builderBody > tr').last().find('.builder-input').first().trigger('focus');
     }
-
     function enableRowDragging() {
         let dragSource = null;
         $('#builderBody').on('mousedown', '.drag-handle', function () {
@@ -834,7 +802,6 @@ $(document).ready(function () {
             if (!$row.hasClass('dragging')) $row.removeAttr('draggable');
         });
     }
-
     function collectSignatory() {
         return {
             prepared_by: String($('#preparedBy').val() || '').trim(),
@@ -847,7 +814,6 @@ $(document).ready(function () {
             approved_by_position: String($('#approvedByPosition').val() || '').trim()
         };
     }
-
     function renderSignatory(signatory = null) {
         const data = signatory || {};
         $('#preparedBy').val(data.prepared_by || '');
@@ -859,7 +825,6 @@ $(document).ready(function () {
         $('#approvedBy').val(data.approved_by || '');
         $('#approvedByPosition').val(data.approved_by_position || '');
     }
-
     function collectItems() {
         const items = [];
         let lastHeaderKey = null;
@@ -921,29 +886,23 @@ $(document).ready(function () {
         });
         return items;
     }
-
     function validateBeforeSave(items) {
         if (!$('#staffId').val()) {
             showMessage(
                 'Select an Office/Staff first.',
                 'danger'
             );
-
             return false;
         }
-
         if (!getOfficeName()) {
             showMessage(
                 'The Office/Staff name could not be determined.',
                 'danger'
             );
-
             return false;
         }
-
         for (let index = 0; index < items.length; index++) {
             const item = items[index];
-
             if (
                 item.row_type === 'header' ||
                 item.row_type === 'subheader'
@@ -955,13 +914,10 @@ $(document).ready(function () {
                             : 'Sub Header'} ${index + 1} requires a title.`,
                         'danger'
                     );
-
                     return false;
                 }
-
                 continue;
             }
-
             if (
                 !item.financial_plan_id ||
                 !item.program_classification
@@ -970,26 +926,21 @@ $(document).ready(function () {
                     `Financial Plan source is missing for Budget Line ${index + 1}.`,
                     'danger'
                 );
-
                 return false;
             }
-
             if (!item.specific_activity) {
                 showMessage(
                     `Specific Activity is missing for Budget Line ${index + 1}.`,
                     'danger'
                 );
-
                 return false;
             }
-
             for (
                 let targetIndex = 0;
                 targetIndex < item.targets.length;
                 targetIndex++
             ) {
                 const target = item.targets[targetIndex];
-
                 if (
                     !Array.isArray(target.months) ||
                     target.months.length === 0
@@ -998,34 +949,25 @@ $(document).ready(function () {
                         `Select at least one month for Target Output ${targetIndex + 1} in Budget Line ${index + 1}.`,
                         'danger'
                     );
-
                     return false;
                 }
             }
         }
-
         return true;
     }
-
     function savePlan() {
         if (isLocked || isLoading) {
             return;
         }
-
         const items = collectItems();
-
         if (!validateBeforeSave(items)) {
             return;
         }
-
         const officeName = getOfficeName();
-
         setLoading(true);
-
         $.ajax({
             url: '{{ route("work-plans.save") }}',
             method: 'POST',
-
             data: {
                 _token: csrfToken,
                 fiscal_year: Number($('#fiscalYear').val()),
@@ -1034,60 +976,46 @@ $(document).ready(function () {
                 signatory: collectSignatory(),
                 items: items
             }
-
         }).done(function (response) {
-
             currentPlan = response.data || null;
-
             if (currentPlan) {
                 $('#officeName').val(
                     currentPlan.office_name || officeName
                 );
-
                 renderSignatory(
                     currentPlan.signatory || null
                 );
-
                 renderRows(
                     currentPlan.items || []
                 );
             }
-
             setDirty(false);
             applyLockState();
-
             showMessage(
                 response.message ||
                 'Work Plan saved successfully.'
             );
-
             const url = new URL(
                 window.location.href
             );
-
             url.searchParams.set(
                 'fiscal_year',
                 $('#fiscalYear').val()
             );
-
             url.searchParams.set(
                 'staff_id',
                 $('#staffId').val()
             );
-
             url.searchParams.set(
                 'office_name',
                 currentPlan?.office_name || officeName
             );
-
             window.history.replaceState(
                 {},
                 '',
                 url.toString()
             );
-
         }).fail(function (xhr) {
-
             showMessage(
                 getErrorMessage(
                     xhr,
@@ -1095,30 +1023,21 @@ $(document).ready(function () {
                 ),
                 'danger'
             );
-
         }).always(function () {
-
             setLoading(false);
-
         });
     }
-
     function syncFinancialPlan() {
         if (isLocked || isLoading || !currentPlan?.id) return;
-
         if (hasUnsavedChanges) {
             showMessage('Save your current Work Plan changes before synchronizing with the Financial Plan.', 'warning');
             return;
         }
-
         if (!window.confirm('Check the Financial Plan and add any new activities to this Work Plan? Existing Target Outputs and months will not be changed.')) {
             return;
         }
-
         setLoading(true);
-
         const syncUrl = '{{ $plan ? route("work-plans.sync-financial-plan", $plan) : "" }}';
-
         $.ajax({
             url: syncUrl,
             method: 'POST',
@@ -1127,13 +1046,11 @@ $(document).ready(function () {
             }
         }).done(function (response) {
             const addedCount = Number(response.added_count || 0);
-
             if (addedCount > 0) {
                 hasUnsavedChanges = false;
                 window.location.reload();
                 return;
             }
-
             showMessage(
                 response.message || 'Work Plan is already synchronized with the Financial Plan.'
             );
@@ -1146,36 +1063,28 @@ $(document).ready(function () {
             setLoading(false);
         });
     }
-
     function loadPlan() {
         const fiscalYear = Number(
             $('#fiscalYear').val()
         );
-
         const staffId = Number(
             $('#staffId').val()
         );
-
         const officeName = getOfficeName();
-
         if (!staffId) {
             showMessage(
                 'Select an Office/Staff first.',
                 'danger'
             );
-
             return;
         }
-
         if (!officeName) {
             showMessage(
                 'The Office/Staff name could not be determined.',
                 'danger'
             );
-
             return;
         }
-
         if (
             hasUnsavedChanges &&
             !window.confirm(
@@ -1184,38 +1093,29 @@ $(document).ready(function () {
         ) {
             return;
         }
-
         const url = new URL(
             '{{ route("work-plans.builder") }}',
             window.location.origin
         );
-
         url.searchParams.set(
             'fiscal_year',
             fiscalYear
         );
-
         url.searchParams.set(
             'staff_id',
             staffId
         );
-
         url.searchParams.set(
             'office_name',
             officeName
         );
-
         window.location.href = url.toString();
     }
-
     $('.add-row-button').on('click', function () {
         addRow(String($(this).data('row-type') || 'item'));
     });
-
     $('#btnSavePlan, #btnSavePlanBottom').on('click', savePlan);
-
     $('#btnSyncFinancialPlan, #btnSyncFinancialPlanBottom').on('click', syncFinancialPlan);
-
     $('#btnLoadPlan').on('click', loadPlan);
     $('#builderBody').on('click', '.add-target', function () {
         if (isLocked) return;
@@ -1265,28 +1165,6 @@ $(document).ready(function () {
             setDirty(true);
         }
     });
-
-    $('#staffId').on('change', function () {
-        const $selected =
-            $('#staffId option:selected');
-
-        const officeName = String(
-            $selected.data('office-name') ||
-            $selected.text() ||
-            ''
-        ).trim();
-
-        $('#officeName').val(
-            officeName === 'Select Office/Staff'
-                ? ''
-                : officeName
-        );
-
-        if (currentPlan) {
-            setDirty(true);
-        }
-    });
-
     window.addEventListener('beforeunload', function (event) {
         if (!hasUnsavedChanges) return;
         event.preventDefault();
@@ -1300,26 +1178,20 @@ $(document).ready(function () {
         renderRows(financialPlanRows());
     }
     applyLockState();
-
     $('#planScope').on('change', function () {
-
         const $selected = $(this).find('option:selected');
-
         const staffId = Number(
             $selected.data('staff-id') || 0
         );
-
         const officeName = String(
             $selected.data('office-name') || ''
         ).trim();
-
         $('#staffId').val(
             staffId > 0 ? staffId : ''
         );
-
         $('#officeName').val(officeName);
+        loadPlan();
     });
-
 });
 </script>
 @endpush

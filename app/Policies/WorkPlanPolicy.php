@@ -9,69 +9,60 @@ class WorkPlanPolicy
 {
     private const MODULE_NAME = 'Work Plan';
 
-    // Check if user can open the Work Plan module
     public function viewAny(User $user): bool
     {
         return $this->isAdministrator($user)
             || $this->hasPermission($user, 'view');
     }
 
-    // Check if user can create a Work Plan
     public function create(User $user): bool
     {
         return $this->isAdministrator($user)
             || ($user->staff_id !== null && $this->hasPermission($user, 'add'));
     }
 
-    // Check if user can view a Work Plan
     public function view(User $user, WorkPlan $plan): bool
     {
         return $this->isAdministrator($user)
             || ($this->ownsStaff($user, $plan) && $this->hasPermission($user, 'view'));
     }
 
-    // Check if user can update a Work Plan
     public function update(User $user, WorkPlan $plan): bool
     {
         return $this->isAdministrator($user)
             || ($this->ownsStaff($user, $plan) && $this->hasPermission($user, 'edit'));
     }
 
-    // Only administrators can delete a Work Plan
     public function delete(User $user, WorkPlan $plan): bool
     {
-        return $this->isAdministrator($user);
+        return $this->isAdministrator($user)
+            && $plan->isEditable();
     }
 
-    // Check if user can submit a Work Plan
     public function submit(User $user, WorkPlan $plan): bool
     {
         return $this->isAdministrator($user)
             || ($this->ownsStaff($user, $plan) && $this->hasPermission($user, 'submit'));
     }
 
-    // Check if user can approve a Work Plan
     public function approve(User $user, WorkPlan $plan): bool
     {
         return $this->isAdministrator($user)
             || ($this->ownsStaff($user, $plan) && $this->hasPermission($user, 'approve'));
     }
 
-    // Check if user can return a Work Plan for revision
     public function return(User $user, WorkPlan $plan): bool
     {
         return $this->isAdministrator($user)
             || ($this->ownsStaff($user, $plan) && $this->hasPermission($user, 'return'));
     }
 
-    // Check if user can finalize a Work Plan
     public function finalize(User $user, WorkPlan $plan): bool
     {
         return $this->isAdministrator($user)
             || ($this->ownsStaff($user, $plan) && $this->hasPermission($user, 'finalize'));
     }
 
-    // Check if user can reopen a finalized Work Plan
     public function reopen(User $user, WorkPlan $plan): bool
     {
         return $this->isAdministrator($user)

@@ -30,6 +30,7 @@ class WorkPlan extends Model
         'fiscal_year' => 'integer',
         'staff_id' => 'integer',
         'division_id' => 'integer',
+        'finalized' => 'string',
         'submitted_at' => 'datetime',
         'approved_at' => 'datetime',
         'finalized_at' => 'datetime',
@@ -87,6 +88,14 @@ class WorkPlan extends Model
         return $this->belongsTo(User::class, 'finalized_by');
     }
 
+    public function division(): BelongsTo
+    {
+        return $this->belongsTo(
+            Division::class,
+            'division_id'
+        );
+    }
+
     public function isDraft(): bool
     {
         return $this->status === 'draft';
@@ -117,13 +126,5 @@ class WorkPlan extends Model
     {
         return in_array($this->status, ['draft', 'returned'], true)
             && $this->finalized !== 'yes';
-    }
-
-    public function division(): BelongsTo
-    {
-        return $this->belongsTo(
-            Division::class,
-            'division_id'
-        );
     }
 }

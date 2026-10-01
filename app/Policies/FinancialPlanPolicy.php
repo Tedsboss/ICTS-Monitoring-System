@@ -78,13 +78,13 @@ class FinancialPlanPolicy
             || ($this->ownsStaff($user, $plan) && $this->hasPermission($user, 'reopen'));
     }
 
-    // Temporary administrator bypass while legacy System Admin role still exists
+    // Super Admin is role_id 1 in the current role structure
     private function isAdministrator(User $user): bool
     {
-        return in_array((int) $user->role_id, [1, 29], true);
+        return (int) $user->role_id === 1;
     }
 
-    // Check if the Financial Plan belongs to the user's staff/office
+    // Check if the Financial Plan belongs to the user's staff
     private function ownsStaff(User $user, FinancialPlan $plan): bool
     {
         if ($user->staff_id === null || $plan->staff_id === null) {

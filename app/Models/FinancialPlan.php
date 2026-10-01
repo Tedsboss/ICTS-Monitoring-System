@@ -23,7 +23,6 @@ class FinancialPlan extends Model
         'row_type',
         'program_classification',
         'prexc_code',
-        'allocation_type',
         'staff_unit_project',
         'specific_activity',
         'procurement_status',
@@ -41,7 +40,6 @@ class FinancialPlan extends Model
         'allocation_id' => 'integer',
         'staff_id' => 'integer',
         'division_id' => 'integer',
-        'allocation_type' => 'string',
         'mooe' => 'decimal:2',
         'capital_outlay' => 'decimal:2',
         'contract_amount' => 'decimal:2',
@@ -52,6 +50,7 @@ class FinancialPlan extends Model
     {
         return $this->belongsTo(Allocation::class, 'allocation_id');
     }
+
     // Parent row
     public function parent(): BelongsTo
     {
