@@ -139,30 +139,38 @@
                 </div>
                 <div class="wfp-selector-field wfp-office-field">
                     <label
-                        for="filterOffice"
+                        for="filterPlanScope"
                         class="mb-1.5 block text-xs font-semibold uppercase
                                tracking-wide text-slate-600"
                     >
                         Office/Staff
                     </label>
-                    <input
-                        type="text"
-                        id="filterOffice"
-                        list="filterOfficeSuggestions"
-                        value="{{ $officeName }}"
-                        maxlength="150"
-                        placeholder="Type an office name"
+                    <select
+                        id="filterPlanScope"
                         class="block w-full rounded-lg border border-slate-300
                                bg-white px-3 py-2 text-sm text-slate-700
                                shadow-sm outline-none transition
-                               placeholder:text-slate-400 focus:border-sky-500
-                               focus:ring-2 focus:ring-sky-100 sm:w-[300px]"
+                               focus:border-sky-500 focus:ring-2 focus:ring-sky-100
+                               sm:w-[360px]"
                     >
-                    <datalist id="filterOfficeSuggestions">
-                        @foreach ($offices as $office)
-                            <option value="{{ $office }}"></option>
+                        <option value="">Select Office/Staff</option>
+                        @foreach(collect($planScopes ?? [])->where('fiscal_year', (int) $fiscalYear) as $scope)
+                            @php
+                                $scopeStaffId = (int) ($scope['staff_id'] ?? 0);
+                                $scopeOfficeName = trim((string) ($scope['office_name'] ?? ''));
+                                $scopeSelected = (int) ($staffId ?? 0) === $scopeStaffId
+                                    && trim((string) ($officeName ?? '')) === $scopeOfficeName;
+                            @endphp
+                            <option
+                                value="{{ $scopeStaffId }}::{{ $scopeOfficeName }}"
+                                data-staff-id="{{ $scopeStaffId }}"
+                                data-office-name="{{ $scopeOfficeName }}"
+                                @selected($scopeSelected)
+                            >
+                                {{ $scopeOfficeName }} — Staff #{{ $scopeStaffId }}
+                            </option>
                         @endforeach
-                    </datalist>
+                    </select>
                 </div>
                 <button
                     type="button"
@@ -237,6 +245,39 @@
                     —
                 </p>
             </div>
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Reopen remarks
+                </p>
+                <p
+                    id="reopenRemarksOut"
+                    class="mt-2 break-words text-sm font-semibold text-slate-900"
+                    style="white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word;"
+                >
+                    —
+                </p>
+            </div>
+        </div>
+    </section>
+    {{-- Workflow History --}}
+    <section
+        id="workflowHistorySection"
+        class="d-none mb-5 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+    >
+        <div class="border-b border-slate-200 px-5 py-4">
+            <h2 class="m-0 text-base font-bold text-slate-900">
+                Workflow History
+            </h2>
+            <p class="mb-0 mt-1 text-xs text-slate-500">
+                Submission, approval, return, finalization and reopening history.
+            </p>
+        </div>
+        <div id="workflowHistoryList" class="divide-y divide-slate-100"></div>
+        <div
+            id="workflowHistoryEmpty"
+            class="hidden px-5 py-8 text-center text-sm text-slate-500"
+        >
+            No Financial Plan workflow history has been recorded yet.
         </div>
     </section>
     {{-- Main Financial Plan --}}
@@ -283,7 +324,7 @@
                                 <th>Other Plans</th>
                                 <th>This Plan</th>
                                 <th>Total Programmed</th>
-                                <th>Remaining Balance</th>
+                                <th>Available</th>
                             </tr>
                         </thead>
                         <tbody id="allocationSummaryBody">
@@ -562,6 +603,55 @@
     }
 </style>
 @endpush
+{{-- Return Financial Plan Modal --}}
+<div id="returnFinancialPlanModal" class="fixed inset-0 z-[1055] hidden items-center justify-center bg-slate-900/55 px-4 py-6" role="dialog" aria-modal="true" aria-labelledby="returnFinancialPlanTitle">
+    <div class="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <div class="flex items-start justify-between border-b border-slate-100 px-6 py-5">
+            <div>
+                <h3 id="returnFinancialPlanTitle" class="text-lg font-bold text-slate-900">Return Financial Plan</h3>
+                <p class="mt-1 text-sm text-slate-500">Provide the reason for returning this Financial Plan for revision.</p>
+            </div>
+            <button type="button" id="btnCloseReturnModal" class="ml-4 inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700" aria-label="Close">
+                <i class="fa fa-times"></i>
+            </button>
+        </div>
+        <div class="px-6 py-5">
+            <label for="returnFinancialPlanRemarks" class="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-600">
+                Reason <span class="text-rose-600">*</span>
+            </label>
+            <textarea id="returnFinancialPlanRemarks" rows="4" maxlength="5000" placeholder="Enter return reason..." class="block w-full resize-y rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 shadow-sm outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-100"></textarea>
+            <p id="returnFinancialPlanError" class="mt-2 hidden text-xs font-semibold text-rose-600">Return reason is required.</p>
+        </div>
+        <div class="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4">
+            <button type="button" id="btnCancelReturnModal" class="inline-flex h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100">Cancel</button>
+            <button type="button" id="btnConfirmReturnPlan" class="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-amber-600 px-5 text-sm font-semibold text-white transition hover:bg-amber-700 disabled:opacity-60">
+                <i class="fa fa-undo"></i><span>Return for Revision</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+{{-- Reopen Financial Plan Modal --}}
+<div id="reopenFinancialPlanModal" class="fixed inset-0 z-[1055] hidden items-center justify-center bg-slate-900/55 px-4 py-6" role="dialog" aria-modal="true" aria-labelledby="reopenFinancialPlanTitle">
+    <div class="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <div class="flex items-start justify-between border-b border-slate-100 px-6 py-5">
+            <div>
+                <h3 id="reopenFinancialPlanTitle" class="text-lg font-bold text-slate-900">Reopen Financial Plan</h3>
+                <p class="mt-1 text-sm text-slate-500">Provide the reason for reopening this finalized Financial Plan.</p>
+            </div>
+            <button type="button" id="btnCloseReopenModal" class="ml-4 inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700" aria-label="Close"><i class="fa fa-times"></i></button>
+        </div>
+        <div class="px-6 py-5">
+            <label for="reopenFinancialPlanRemarks" class="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-600">Reason <span class="text-rose-600">*</span></label>
+            <textarea id="reopenFinancialPlanRemarks" rows="4" maxlength="5000" placeholder="Enter reopening reason..." class="block w-full resize-y rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 shadow-sm outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100"></textarea>
+            <p id="reopenFinancialPlanError" class="mt-2 hidden text-xs font-semibold text-rose-600">Reopen reason is required.</p>
+        </div>
+        <div class="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4">
+            <button type="button" id="btnCancelReopenModal" class="inline-flex h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100">Cancel</button>
+            <button type="button" id="btnConfirmReopenPlan" class="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-sky-600 px-5 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:opacity-60"><i class="fa fa-unlock"></i><span>Reopen Financial Plan</span></button>
+        </div>
+    </div>
+</div>
 @push('js')
 <script>
 $(document).ready(function () {
@@ -665,9 +755,24 @@ $(document).ready(function () {
         return fallback;
     }
     // Get selected plan identity
-    let PLAN_STAFF_ID = Number(@json(request()->input('staff_id') ?? 0)) || null;
+    const PLAN_SCOPES = @json(collect($planScopes ?? [])->values());
+    let PLAN_STAFF_ID = Number(@json($staffId ?? 0)) || null;
+    function selectedScopeOption() {
+        return $('#filterPlanScope').find('option:selected');
+    }
+    function selectedPlan() {
+        const $scope = selectedScopeOption();
+        const staffId = Number($scope.data('staff-id') || 0) || null;
+        const officeName = String($scope.data('office-name') || '').trim();
+        PLAN_STAFF_ID = staffId;
+        return {
+            fiscalYear: Number($('#filterFiscalYear').val() || 0),
+            staffId,
+            officeName
+        };
+    }
     function rememberResolvedStaffId(rows) {
-        if (PLAN_STAFF_ID || !Array.isArray(rows) || !rows.length) {
+        if (!Array.isArray(rows) || !rows.length) {
             return;
         }
         const resolvedRow = rows.find(row => Number(row?.staff_id || 0) > 0);
@@ -676,16 +781,60 @@ $(document).ready(function () {
             return;
         }
         PLAN_STAFF_ID = resolvedStaffId;
-        const url = new URL(window.location.href);
-        url.searchParams.set('staff_id', String(resolvedStaffId));
-        window.history.replaceState({}, '', url.toString());
     }
-    function selectedPlan() {
-        return {
-            fiscalYear: $('#filterFiscalYear').val(),
-            staffId: PLAN_STAFF_ID,
-            officeName: $('#filterOffice').val().trim()
-        };
+    function refreshPlanScopeOptions() {
+        const fiscalYear = Number($('#filterFiscalYear').val() || 0);
+        const current = selectedPlan();
+        const $selector = $('#filterPlanScope');
+        const scopes = PLAN_SCOPES.filter(scope =>
+            Number(scope.fiscal_year || 0) === fiscalYear
+        );
+        $selector.empty().append(
+            $('<option>', {
+                value: '',
+                text: 'Select Office/Staff'
+            })
+        );
+        scopes.forEach(scope => {
+            const staffId = Number(scope.staff_id || 0);
+            const officeName = String(scope.office_name || '').trim();
+            const value = `${staffId}::${officeName}`;
+            const $option = $('<option>', {
+                value,
+                text: `${officeName} — Staff #${staffId}`
+            })
+                .attr('data-staff-id', staffId)
+                .attr('data-office-name', officeName);
+            if (
+                current.staffId === staffId
+                && current.officeName === officeName
+            ) {
+                $option.prop('selected', true);
+            }
+            $selector.append($option);
+        });
+        if (!$selector.val() && scopes.length) {
+            const preferred = scopes.find(scope =>
+                Number(scope.staff_id || 0) === Number(@json($staffId ?? 0))
+                && String(scope.office_name || '').trim() === String(@json($officeName ?? '')).trim()
+            ) || scopes[0];
+            const preferredValue = `${Number(preferred.staff_id || 0)}::${String(preferred.office_name || '').trim()}`;
+            $selector.val(preferredValue);
+        }
+        const selected = selectedPlan();
+        const url = new URL(window.location.href);
+        url.searchParams.set('fiscal_year', String(fiscalYear));
+        if (selected.staffId) {
+            url.searchParams.set('staff_id', String(selected.staffId));
+        } else {
+            url.searchParams.delete('staff_id');
+        }
+        if (selected.officeName) {
+            url.searchParams.set('office_name', selected.officeName);
+        } else {
+            url.searchParams.delete('office_name');
+        }
+        window.history.replaceState({}, '', url.toString());
     }
     // Validate selected plan identity
     function validateSelection() {
@@ -705,9 +854,9 @@ $(document).ready(function () {
             );
             return false;
         }
-        if (!officeName) {
+        if (!staffId || !officeName) {
             showMessage(
-                'Name of Office/Staff is required.',
+                'Please select an exact Office/Staff scope.',
                 'danger'
             );
             return false;
@@ -766,7 +915,67 @@ $(document).ready(function () {
                     ${esc(row.staff_unit_project || '—')}
                 </td>
                 <td class="wrap-cell">
-                    ${esc(row.specific_activity || '—')}
+                    <div>${esc(row.specific_activity || '—')}</div>
+                    ${
+                        row.work_plan_usage?.used
+                            ? `
+                                <div class="mt-2 flex flex-wrap items-center gap-2">
+                                    <span
+                                        class="inline-flex items-center gap-1 rounded-full
+                                               bg-emerald-100 px-2.5 py-1 text-[10px]
+                                               font-bold text-emerald-700"
+                                        title="${esc(
+                                            row.work_plan_usage.count === 1
+                                                ? 'This Financial Plan activity is already used by a Work Plan.'
+                                                : `This Financial Plan activity is used by ${row.work_plan_usage.count} Work Plans.`
+                                        )}"
+                                    >
+                                        <i class="fa fa-link"></i>
+                                        ${
+                                            row.work_plan_usage.count === 1
+                                                ? 'Used in Work Plan'
+                                                : `Used in ${row.work_plan_usage.count} Work Plans`
+                                        }
+                                    </span>
+                                    <a
+                                        href="${esc(row.work_plan_usage.view_url || '#')}"
+                                        class="inline-flex items-center gap-1 rounded-lg border
+                                               border-sky-200 bg-sky-50 px-2.5 py-1
+                                               text-[10px] font-bold text-sky-700 transition
+                                               hover:bg-sky-100"
+                                        title="Open the Work Plan for this exact Fiscal Year, Staff and Office scope."
+                                    >
+                                        <i class="fa fa-external-link"></i>
+                                        View Work Plan
+                                    </a>
+                                </div>
+                            `
+                            : `
+                                <div class="mt-2 flex flex-wrap items-center gap-2">
+                                    <span
+                                        class="inline-flex items-center gap-1 rounded-full
+                                               bg-slate-100 px-2.5 py-1 text-[10px]
+                                               font-bold text-slate-600"
+                                        title="This Financial Plan activity has not yet been imported into a Work Plan."
+                                    >
+                                        <i class="fa fa-circle-o"></i>
+                                        Not yet used in Work Plan
+                                    </span>
+                                    <a
+                                        href="${esc(row.work_plan_usage?.builder_url || '#')}"
+                                        class="inline-flex items-center gap-1 rounded-lg border
+                                               border-slate-200 bg-white px-2.5 py-1
+                                               text-[10px] font-bold text-slate-700 transition
+                                               hover:border-sky-200 hover:bg-sky-50
+                                               hover:text-sky-700"
+                                        title="Open the Work Plan Builder for this exact Fiscal Year, Staff and Office scope."
+                                    >
+                                        <i class="fa fa-plus-circle"></i>
+                                        Open Work Plan Builder
+                                    </a>
+                                </div>
+                            `
+                    }
                 </td>
                 <td class="text-center wrap-cell">
                     ${esc(row.expense_item || '—')}
@@ -1199,6 +1408,108 @@ $(document).ready(function () {
             );
         });
     }
+    function workflowActionMeta(action) {
+        const meta = {
+            submit: {
+                label: 'Submitted',
+                badge: 'bg-cyan-100 text-cyan-700'
+            },
+            approve: {
+                label: 'Approved',
+                badge: 'bg-sky-100 text-sky-700'
+            },
+            return: {
+                label: 'Returned',
+                badge: 'bg-amber-100 text-amber-700'
+            },
+            finalize: {
+                label: 'Finalized',
+                badge: 'bg-emerald-100 text-emerald-700'
+            },
+            reopen: {
+                label: 'Reopened',
+                badge: 'bg-violet-100 text-violet-700'
+            }
+        };
+        return meta[action] || {
+            label: action
+                ? action.charAt(0).toUpperCase() + action.slice(1)
+                : 'Updated',
+            badge: 'bg-slate-100 text-slate-700'
+        };
+    }
+
+    function renderWorkflowHistory(history) {
+        const events = Array.isArray(history) ? history : [];
+        const $section = $('#workflowHistorySection');
+        const $list = $('#workflowHistoryList');
+        const $empty = $('#workflowHistoryEmpty');
+
+        $list.empty();
+
+        if (!events.length) {
+            $section.removeClass('d-none');
+            $empty.removeClass('hidden');
+            return;
+        }
+
+        $empty.addClass('hidden');
+
+        events.forEach(function (event) {
+            const meta = workflowActionMeta(event.action);
+            const fromStatus = event.from_status
+                ? esc(
+                    event.from_status.charAt(0).toUpperCase() +
+                    event.from_status.slice(1)
+                )
+                : '';
+            const toStatus = event.to_status
+                ? esc(
+                    event.to_status.charAt(0).toUpperCase() +
+                    event.to_status.slice(1)
+                )
+                : '';
+            const transition = fromStatus
+                ? `${fromStatus} <i class="fa fa-arrow-right mx-1"></i> ${toStatus}`
+                : toStatus;
+            const actor = esc(event.acted_by || '—');
+            const actedAt = esc(formatDate(event.acted_at));
+            const remarks = event.remarks
+                ? `
+                    <div
+                        class="mt-3 max-w-full rounded-lg border border-amber-200
+                               bg-amber-50 px-3 py-2 text-xs text-amber-800"
+                        style="white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word;"
+                    ><span class="font-bold">Remarks:</span> ${esc(event.remarks)}</div>
+                `
+                : '';
+
+            $list.append(`
+                <div class="flex flex-col gap-2 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div class="min-w-0 flex-1">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="rounded-full px-2.5 py-1 text-[11px] font-bold ${meta.badge}">
+                                ${esc(meta.label)}
+                            </span>
+                            <span class="text-xs text-slate-500">
+                                ${transition}
+                            </span>
+                        </div>
+                        <div class="mt-2 text-xs text-slate-600">
+                            By <span class="font-semibold text-slate-800">${actor}</span>
+                        </div>
+                        ${remarks}
+                    </div>
+                    <div class="shrink-0 whitespace-nowrap text-xs text-slate-500">
+                        ${actedAt}
+                    </div>
+                </div>
+            `);
+        });
+
+        $section.removeClass('d-none');
+    }
+
     // Apply workflow status
     function applyPlanStatus(response) {
         const status =
@@ -1320,18 +1631,25 @@ $(document).ready(function () {
                 response.return_remarks ||
                 '—'
             );
+        $('#reopenRemarksOut')
+            .text(
+                response.reopen_remarks ||
+                '—'
+            );
         const hasWorkflowInfo =
             Boolean(
                 response.submitted_by ||
                 response.approved_by ||
                 response.finalized_by ||
-                response.return_remarks
+                response.return_remarks ||
+                response.reopen_remarks
             );
         $('#workflowInfo')
             .toggleClass(
                 'd-none',
                 !hasWorkflowInfo
             );
+        renderWorkflowHistory(response.workflow_history || []);
     }
     // Load workflow status
     function loadPlanStatus() {
@@ -1615,41 +1933,94 @@ $(document).ready(function () {
         );
     });
     // Return
+    function openReturnFinancialPlanModal() {
+        $('#returnFinancialPlanRemarks').val('');
+        $('#returnFinancialPlanError').addClass('hidden');
+        $('#returnFinancialPlanModal').removeClass('hidden').addClass('flex');
+        setTimeout(function () {
+            $('#returnFinancialPlanRemarks').trigger('focus');
+        }, 50);
+    }
+    function closeReturnFinancialPlanModal() {
+        $('#returnFinancialPlanModal').addClass('hidden').removeClass('flex');
+        $('#returnFinancialPlanRemarks').val('');
+        $('#returnFinancialPlanError').addClass('hidden');
+    }
     $('#btnReturn').on('click', function () {
+        if (!validateSelection()) return;
+        openReturnFinancialPlanModal();
+    });
+    $('#btnCloseReturnModal, #btnCancelReturnModal').on(
+        'click',
+        closeReturnFinancialPlanModal
+    );
+    $('#returnFinancialPlanModal').on('click', function (event) {
+        if (event.target === this) {
+            closeReturnFinancialPlanModal();
+        }
+    });
+    $('#returnFinancialPlanRemarks').on('input', function () {
+        if ($(this).val().trim()) {
+            $('#returnFinancialPlanError').addClass('hidden');
+        }
+    });
+    $('#btnConfirmReturnPlan').on('click', function () {
+        const remarks = $('#returnFinancialPlanRemarks').val().trim();
+        if (!remarks) {
+            $('#returnFinancialPlanError').removeClass('hidden');
+            $('#returnFinancialPlanRemarks').trigger('focus');
+            return;
+        }
         if (!validateSelection()) {
+            closeReturnFinancialPlanModal();
             return;
         }
-        const remarks =
-            prompt(
-                'Enter return remarks for the encoder:'
-            );
-        if (remarks === null) {
-            return;
-        }
-        if (!remarks.trim()) {
-            showMessage(
-                'Return remarks are required.',
-                'warning'
-            );
-            return;
-        }
+        const $button = $(this);
         const {
             fiscalYear,
             staffId,
             officeName
         } = selectedPlan();
-        workflowRequest(
-            $(this),
-            '{{ route("financial-plans.return") }}',
-            {
+        const originalHtml = $button.html();
+        $button
+            .prop('disabled', true)
+            .html(
+                '<i class="fa fa-spinner fa-spin"></i>' +
+                '<span> Returning...</span>'
+            );
+        $.ajax({
+            url: '{{ route("financial-plans.return") }}',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
                 fiscal_year: fiscalYear,
                 staff_id: staffId,
                 office_name: officeName,
-                return_remarks: remarks.trim()
-            },
-            'Returning...',
-            'Plan returned for revision.'
-        );
+                return_remarks: remarks
+            }),
+            headers: {
+                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+            }
+        }).done(function (response) {
+            closeReturnFinancialPlanModal();
+            showMessage(
+                response.message ||
+                'Financial Plan returned for revision.'
+            );
+            loadPlanStatus();
+        }).fail(function (xhr) {
+            showMessage(
+                getErrorMessage(
+                    xhr,
+                    'Failed to return Financial Plan.'
+                ),
+                'danger'
+            );
+        }).always(function () {
+            $button
+                .prop('disabled', false)
+                .html(originalHtml);
+        });
     });
     // Finalize
     $('#btnFinalize').on('click', function () {
@@ -1716,67 +2087,75 @@ $(document).ready(function () {
         });
     });
     // Reopen
+    function openReopenFinancialPlanModal() {
+        $('#reopenFinancialPlanRemarks').val('');
+        $('#reopenFinancialPlanError').addClass('hidden');
+        $('#reopenFinancialPlanModal').removeClass('hidden').addClass('flex');
+        setTimeout(function () {
+            $('#reopenFinancialPlanRemarks').trigger('focus');
+        }, 50);
+    }
+    function closeReopenFinancialPlanModal() {
+        $('#reopenFinancialPlanModal').addClass('hidden').removeClass('flex');
+        $('#reopenFinancialPlanRemarks').val('');
+        $('#reopenFinancialPlanError').addClass('hidden');
+    }
     $('#btnReopen').on('click', function () {
+        if (!validateSelection()) return;
+        openReopenFinancialPlanModal();
+    });
+    $('#btnCloseReopenModal, #btnCancelReopenModal').on('click', closeReopenFinancialPlanModal);
+    $('#reopenFinancialPlanModal').on('click', function (event) {
+        if (event.target === this) closeReopenFinancialPlanModal();
+    });
+    $(document).on('keydown', function (event) {
+        if (event.key !== 'Escape') {
+            return;
+        }
+        if (!$('#returnFinancialPlanModal').hasClass('hidden')) {
+            closeReturnFinancialPlanModal();
+        }
+        if (!$('#reopenFinancialPlanModal').hasClass('hidden')) {
+            closeReopenFinancialPlanModal();
+        }
+    });
+    $('#reopenFinancialPlanRemarks').on('input', function () {
+        if ($(this).val().trim()) $('#reopenFinancialPlanError').addClass('hidden');
+    });
+    $('#btnConfirmReopenPlan').on('click', function () {
+        const remarks = $('#reopenFinancialPlanRemarks').val().trim();
+        if (!remarks) {
+            $('#reopenFinancialPlanError').removeClass('hidden');
+            $('#reopenFinancialPlanRemarks').trigger('focus');
+            return;
+        }
         if (!validateSelection()) {
+            closeReopenFinancialPlanModal();
             return;
         }
-        if (
-            !confirm(
-                'Reopen this plan for editing?'
-            )
-        ) {
-            return;
-        }
-        const $button =
-            $(this);
-        const {
-            fiscalYear,
-            staffId,
-            officeName
-        } = selectedPlan();
-        const originalHtml =
-            $button.html();
-        $button
-            .prop('disabled', true)
-            .html(
-                '<i class="fa fa-spinner fa-spin"></i>' +
-                '<span> Reopening...</span>'
-            );
+        const $button = $(this);
+        const { fiscalYear, staffId, officeName } = selectedPlan();
+        const originalHtml = $button.html();
+        $button.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i><span> Reopening...</span>');
         $.ajax({
-            url:
-                '{{ route("financial-plans.reopen") }}',
-            type:
-                'POST',
-            contentType:
-                'application/json',
-            data:
-                JSON.stringify({
-                    fiscal_year: fiscalYear,
-                    staff_id: staffId,
-                    office_name: officeName
-                }),
-            headers: {
-                'X-CSRF-TOKEN':
-                    '{{ csrf_token() }}'
-            }
+            url: '{{ route("financial-plans.reopen") }}',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                fiscal_year: fiscalYear,
+                staff_id: staffId,
+                office_name: officeName,
+                reopen_remarks: remarks
+            }),
+            headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' }
         }).done(function (response) {
-            showMessage(
-                response.message ||
-                'Plan reopened successfully.'
-            );
+            closeReopenFinancialPlanModal();
+            showMessage(response.message || 'Financial Plan reopened successfully.');
             loadPlanStatus();
         }).fail(function (xhr) {
-            showMessage(
-                getErrorMessage(
-                    xhr,
-                    'Failed to reopen plan.'
-                ),
-                'danger'
-            );
+            showMessage(getErrorMessage(xhr, 'Failed to reopen Financial Plan.'), 'danger');
         }).always(function () {
-            $button
-                .prop('disabled', false)
-                .html(originalHtml);
+            $button.prop('disabled', false).html(originalHtml);
         });
     });
     // Load
@@ -1784,13 +2163,34 @@ $(document).ready(function () {
         'click',
         loadSelectedPlan
     );
+    $('#filterPlanScope').on('change', function () {
+        const selected = selectedPlan();
+        const url = new URL(window.location.href);
+        if (selected.staffId) {
+            url.searchParams.set('staff_id', String(selected.staffId));
+        } else {
+            url.searchParams.delete('staff_id');
+        }
+        if (selected.officeName) {
+            url.searchParams.set('office_name', selected.officeName);
+        } else {
+            url.searchParams.delete('office_name');
+        }
+        window.history.replaceState({}, '', url.toString());
+        updateHeading();
+    });
+    $('#filterFiscalYear').on('change', function () {
+        refreshPlanScopeOptions();
+        updateHeading();
+    });
     // Enter key
-    $('#filterFiscalYear, #filterOffice')
+    $('#filterFiscalYear')
         .on(
             'keydown',
             function (event) {
                 if (event.key === 'Enter') {
                     event.preventDefault();
+                    refreshPlanScopeOptions();
                     loadSelectedPlan();
                 }
             }
@@ -1802,6 +2202,7 @@ $(document).ready(function () {
         $('[data-bs-toggle="tooltip"]').tooltip();
     }
     // Initial load
+    refreshPlanScopeOptions();
     loadSelectedPlan();
 });
 </script>

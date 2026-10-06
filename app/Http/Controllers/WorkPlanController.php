@@ -36,6 +36,34 @@ class WorkPlanController extends Controller
         12 => 'December',
     ];
 
+    private const WORKFLOW_TRANSITIONS = [
+        'submit' => [
+            'from' => ['draft', 'returned'],
+            'to' => 'submitted',
+            'message' => 'Only draft or returned Work Plans can be submitted.',
+        ],
+        'approve' => [
+            'from' => ['submitted'],
+            'to' => 'approved',
+            'message' => 'Only submitted Work Plans can be approved.',
+        ],
+        'return' => [
+            'from' => ['submitted', 'approved'],
+            'to' => 'returned',
+            'message' => 'Only submitted or approved Work Plans can be returned.',
+        ],
+        'finalize' => [
+            'from' => ['approved'],
+            'to' => 'finalized',
+            'message' => 'Only approved Work Plans can be finalized.',
+        ],
+        'reopen' => [
+            'from' => ['finalized'],
+            'to' => 'draft',
+            'message' => 'Only finalized Work Plans can be reopened.',
+        ],
+    ];
+
     private function cachedClassifications(int $fiscalYear)
     {
         return Cache::remember(
@@ -826,11 +854,8 @@ class WorkPlanController extends Controller
     public function submit(WorkPlan $workPlan): JsonResponse
     {
         $this->authorize('submit', $workPlan);
-        if (! $workPlan->isEditable()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Only draft or returned Work Plans can be submitted.',
-            ], 422);
+        if ($error = $this->workflowTransitionError($workPlan, 'submit')) {
+            return $error;
         }
         $this->validateForSubmit($workPlan);
         DB::transaction(function () use ($workPlan) {
@@ -862,11 +887,8 @@ class WorkPlanController extends Controller
     public function approve(WorkPlan $workPlan): JsonResponse
     {
         $this->authorize('approve', $workPlan);
-        if ($workPlan->status !== 'submitted') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Only submitted Work Plans can be approved.',
-            ], 422);
+        if ($error = $this->workflowTransitionError($workPlan, 'approve')) {
+            return $error;
         }
         DB::transaction(function () use ($workPlan) {
             $workPlan->update([
@@ -896,15 +918,8 @@ class WorkPlanController extends Controller
         $validated = $request->validate([
             'remarks' => ['required', 'string', 'max:5000'],
         ]);
-        if (! in_array(
-            $workPlan->status,
-            ['submitted', 'approved'],
-            true
-        )) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Only submitted or approved Work Plans can be returned.',
-            ], 422);
+        if ($error = $this->workflowTransitionError($workPlan, 'return')) {
+            return $error;
         }
         DB::transaction(function () use (
             $workPlan,
@@ -937,11 +952,8 @@ class WorkPlanController extends Controller
     public function finalize(WorkPlan $workPlan): JsonResponse
     {
         $this->authorize('finalize', $workPlan);
-        if ($workPlan->status !== 'approved') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Only approved Work Plans can be finalized.',
-            ], 422);
+        if ($error = $this->workflowTransitionError($workPlan, 'finalize')) {
+            return $error;
         }
         DB::transaction(function () use ($workPlan) {
             $workPlan->update([
@@ -972,11 +984,8 @@ class WorkPlanController extends Controller
         $validated = $request->validate([
             'remarks' => ['required', 'string', 'max:5000'],
         ]);
-        if (! $workPlan->isFinalized()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Only finalized Work Plans can be reopened.',
-            ], 422);
+        if ($error = $this->workflowTransitionError($workPlan, 'reopen')) {
+            return $error;
         }
         DB::transaction(function () use (
             $workPlan,
@@ -1005,6 +1014,41 @@ class WorkPlanController extends Controller
             'success' => true,
             'message' => 'Work Plan reopened as draft.',
         ]);
+    }
+
+    private function workflowTransitionError(
+        WorkPlan $workPlan,
+        string $action
+    ): ?JsonResponse {
+        $transition = self::WORKFLOW_TRANSITIONS[$action] ?? null;
+
+        if ($transition === null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unsupported Work Plan workflow action.',
+            ], 422);
+        }
+
+        $currentStatus = (string) $workPlan->status;
+
+        if (! in_array($currentStatus, $transition['from'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => $transition['message'],
+            ], 422);
+        }
+
+        if (
+            $action === 'reopen'
+            && ! $workPlan->isFinalized()
+        ) {
+            return response()->json([
+                'success' => false,
+                'message' => $transition['message'],
+            ], 422);
+        }
+
+        return null;
     }
 
     private function saveSignatory(

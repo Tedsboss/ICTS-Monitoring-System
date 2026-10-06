@@ -23,6 +23,7 @@ class FinancialPlanSubmission extends Model
         'finalized_by',
         'finalized_at',
         'return_remarks',
+        'reopen_remarks',
     ];
 
     protected $casts = [

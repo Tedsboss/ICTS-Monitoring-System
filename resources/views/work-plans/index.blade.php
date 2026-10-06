@@ -484,7 +484,7 @@
                                 };
                             @endphp
                             <div class="flex flex-col gap-2 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
-                                <div>
+                                <div class="min-w-0 flex-1">
                                     <div class="flex flex-wrap items-center gap-2">
                                         <span class="rounded-full px-2.5 py-1 text-[11px] font-bold {{ $actionClass }}">
                                             {{ $actionLabel }}
@@ -501,13 +501,13 @@
                                         By {{ $submission->actor?->name ?? 'User' }}
                                     </div>
                                     @if($submission->remarks)
-                                        <div class="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                                        <div class="mt-2 w-full max-w-full rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800" style="white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word;">
                                             <span class="font-bold">Remarks:</span>
                                             {!! nl2br(e($submission->remarks)) !!}
                                         </div>
                                     @endif
                                 </div>
-                                <div class="whitespace-nowrap text-xs text-slate-500">
+                                <div class="shrink-0 whitespace-nowrap text-xs text-slate-500">
                                     {{ $submission->acted_at?->format('M d, Y h:i A') ?? '—' }}
                                 </div>
                             </div>

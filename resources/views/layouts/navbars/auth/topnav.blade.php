@@ -1,122 +1,55 @@
-{{-- ============================================================= --}}
-{{-- DIREK Authenticated Top Navigation                            --}}
-{{-- ============================================================= --}}
+@php
+    $authNavTitle = $title ?? 'Dashboard';
+    $authNavCurrent = $subtitle ?? $authNavTitle;
+    $authNavLinks = $links ?? [];
+    $authNavHasTrail = count($authNavLinks) > 0 || !request()->routeIs('home') || !empty($subtitle);
+@endphp
 
-<div class="flex min-w-0 items-center gap-4">
-
-    {{-- ========================================================= --}}
-    {{-- SIDEBAR TOGGLER                                          --}}
-    {{-- ========================================================= --}}
-
-    <div class="sidenav-toggler sidenav-toggler-inner d-xl-block d-none pe-2">
-        <a
-            href="javascript:;"
-            class="nav-link p-0"
-            aria-label="Toggle sidebar"
-            title="Toggle sidebar"
-        >
-            <div class="sidenav-toggler-inner">
-                <i class="sidenav-toggler-line bg-white"></i>
-                <i class="sidenav-toggler-line bg-white"></i>
-                <i class="sidenav-toggler-line bg-white"></i>
-            </div>
-        </a>
+{{-- Title-area partial: the existing parent navbar and date/time component remain in control. --}}
+<div class="!flex !min-w-0 !flex-1 !items-center !gap-3 !rounded-xl !bg-[#142d45] !px-4 !py-3 !text-white md:!gap-4">
+    {{-- Preserve Argon's desktop toggle hooks and its 1200px sidebar breakpoint. --}}
+    <div class="sidenav-toggler !hidden !h-11 !w-11 !min-w-[44px] !shrink-0 !items-center !justify-center !p-0 min-[1200px]:!flex">
+        <button type="button" class="nav-link !m-0 !grid !h-11 !w-11 !min-w-[44px] !shrink-0 !place-items-center !rounded-lg !border !border-solid !border-white/15 !bg-white/5 !p-0 !shadow-none hover:!bg-white/15 focus-visible:!outline-none focus-visible:!ring-2 focus-visible:!ring-[#e4cf9d]" aria-label="Toggle sidebar" aria-controls="sidenav-main" title="Toggle sidebar">
+            <span class="sidenav-toggler-inner !flex !h-4 !w-5 !flex-col !justify-between" aria-hidden="true">
+                <i class="sidenav-toggler-line !m-0 !block !h-[2px] !w-full !transform-none !rounded-full !bg-[#e4cf9d]"></i>
+                <i class="sidenav-toggler-line !m-0 !block !h-[2px] !w-full !transform-none !rounded-full !bg-[#e4cf9d]"></i>
+                <i class="sidenav-toggler-line !m-0 !block !h-[2px] !w-full !transform-none !rounded-full !bg-[#e4cf9d]"></i>
+            </span>
+        </button>
     </div>
 
-    {{-- ========================================================= --}}
-    {{-- BREADCRUMB / PAGE TITLE                                  --}}
-    {{-- ========================================================= --}}
-
-    <nav
-        aria-label="breadcrumb"
-        class="min-w-0"
-    >
-        {{-- Breadcrumb --}}
-        <ol
-            class="mb-1 flex flex-wrap items-center gap-1
-                   bg-transparent p-0 text-xs text-white/70"
-        >
-            {{-- Home --}}
-            <li class="flex items-center">
-                <a
-                    href="{{ route('home') }}"
-                    class="inline-flex items-center text-white/70
-                           transition hover:text-white"
-                    title="Home"
-                >
-                    <i
-                        class="fa fa-home"
-                        aria-hidden="true"
-                    ></i>
-
-                    <span class="sr-only">
-                        Home
-                    </span>
-                </a>
-            </li>
-
-            {{-- Additional Breadcrumb Links --}}
-            @foreach (($links ?? []) as $link)
-                <li class="flex min-w-0 items-center gap-1">
-
-                    <span
-                        class="text-white/40"
-                        aria-hidden="true"
-                    >
-                        /
-                    </span>
-
-                    @if (!empty($link['url']))
-                        <a
-                            href="{{ $link['url'] }}"
-                            class="max-w-[180px] truncate
-                                   text-white/70 transition
-                                   hover:text-white"
-                        >
-                            {{ $link['name'] ?? '' }}
+    <div class="!min-w-0 !flex-1">
+        <nav aria-label="Breadcrumb" class="!min-w-0">
+            <ol class="!m-0 !mb-1.5 !flex !list-none !flex-wrap !items-center !gap-x-2 !gap-y-1 !bg-transparent !p-0 !text-xs !leading-5">
+                <li class="!flex !items-center" @if (!$authNavHasTrail) aria-current="page" @endif>
+                    @if ($authNavHasTrail)
+                        <a href="{{ route('home') }}" class="!inline-flex !items-center !gap-1.5 !rounded !text-slate-300 !no-underline !transition-colors hover:!text-white focus-visible:!outline-none focus-visible:!ring-2 focus-visible:!ring-[#e4cf9d] motion-reduce:!transition-none">
+                            <i class="fa fa-home" aria-hidden="true"></i><span>Home</span>
                         </a>
                     @else
-                        <span
-                            class="max-w-[180px] truncate
-                                   text-white/70"
-                        >
-                            {{ $link['name'] ?? '' }}
-                        </span>
+                        <span class="!inline-flex !items-center !gap-1.5 !text-[#e4cf9d]"><i class="fa fa-home" aria-hidden="true"></i><span>Home</span></span>
                     @endif
-
                 </li>
-            @endforeach
 
-            {{-- Current Page --}}
-            <li
-                class="flex min-w-0 items-center gap-1"
-                aria-current="page"
-            >
-                <span
-                    class="text-white/40"
-                    aria-hidden="true"
-                >
-                    /
-                </span>
+                @foreach ($authNavLinks as $link)
+                    <li class="!flex !min-w-0 !max-w-full !items-center !gap-2">
+                        <i class="fa fa-angle-right !shrink-0 !text-slate-400" aria-hidden="true"></i>
+                        @if (!empty($link['url']))
+                            <a href="{{ $link['url'] }}" class="!min-w-0 !break-words !rounded !text-slate-300 !no-underline !transition-colors hover:!text-white focus-visible:!outline-none focus-visible:!ring-2 focus-visible:!ring-[#e4cf9d] motion-reduce:!transition-none">{{ $link['name'] ?? '' }}</a>
+                        @else
+                            <span class="!min-w-0 !break-words !text-slate-300">{{ $link['name'] ?? '' }}</span>
+                        @endif
+                    </li>
+                @endforeach
 
-                <span
-                    class="max-w-[220px] truncate
-                           font-medium text-white"
-                    title="{{ $subtitle ?? $title ?? 'Dashboard' }}"
-                >
-                    {{ $subtitle ?? $title ?? 'Dashboard' }}
-                </span>
-            </li>
-        </ol>
-
-        {{-- Page Title --}}
-        <h1
-            class="mb-0 truncate text-lg font-bold
-                   leading-tight text-white"
-            title="{{ $title ?? 'Dashboard' }}"
-        >
-            {{ $title ?? 'Dashboard' }}
-        </h1>
-    </nav>
-
+                @if ($authNavHasTrail)
+                    <li class="!flex !min-w-0 !max-w-full !items-center !gap-2" aria-current="page">
+                        <i class="fa fa-angle-right !shrink-0 !text-slate-400" aria-hidden="true"></i>
+                        <span class="!min-w-0 !break-words !font-medium !text-[#e4cf9d]">{{ $authNavCurrent }}</span>
+                    </li>
+                @endif
+            </ol>
+        </nav>
+        <h1 class="!m-0 !break-words !text-lg !font-semibold !leading-7 !tracking-tight !text-white md:!text-xl">{{ $authNavTitle }}</h1>
+    </div>
 </div>

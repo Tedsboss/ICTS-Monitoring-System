@@ -12,4 +12,12 @@ mix.js('resources/js/app.js', 'public/assets/js/argon-dashboard.js')
             require('tailwindcss'),
             require('autoprefixer'),
         ]
+    )
+    .postCss(
+        'resources/css/direk-login-tailwind.css',
+        'public/assets/css/direk-login-tailwind.css',
+        [
+            require('tailwindcss'),
+            require('autoprefixer'),
+        ]
     );
