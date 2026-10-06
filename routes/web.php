@@ -405,16 +405,28 @@ Route::group(['middleware' => 'check.restricted.ips'], function () {
             Route::resource('procurements', ProcurementController::class);
 
             Route::get('financial-plans/all', [FinancialPlanController::class, 'plans'])
+                ->middleware('performance')
                 ->name('financial-plans.plans');
 
             Route::get('financial-plans', [FinancialPlanController::class, 'index'])
+                ->middleware('performance')
                 ->name('financial-plans.index');
 
             Route::get('financial-plans/data', [FinancialPlanController::class, 'data'])
+                ->middleware('performance')
                 ->name('financial-plans.data');
 
             Route::get('financial-plans/builder', [FinancialPlanController::class, 'builder'])
+                ->middleware('performance')
                 ->name('financial-plans.builder');
+
+            Route::post('financial-plans/save', [FinancialPlanController::class, 'save'])
+                ->middleware('performance')
+                ->name('financial-plans.save');
+
+            Route::post('financial-plans/submit', [FinancialPlanController::class, 'submitForApproval'])
+                ->middleware('performance')
+                ->name('financial-plans.submit');
 
         Route::prefix('expense-items')
             ->name('expense-items.')
@@ -471,22 +483,32 @@ Route::group(['middleware' => 'check.restricted.ips'], function () {
 
             // Work Plan
             Route::get('work-plans/all', [WorkPlanController::class, 'plans'])
+                ->middleware('performance')
                 ->name('work-plans.plans');
 
             Route::get('work-plans', [WorkPlanController::class, 'index'])
+                ->middleware('performance')
                 ->name('work-plans.index');
 
             Route::get('work-plans/data', [WorkPlanController::class, 'data'])
+                ->middleware('performance')
                 ->name('work-plans.data');
 
             Route::get('work-plans/builder', [WorkPlanController::class, 'builder'])
+                ->middleware('performance')
                 ->name('work-plans.builder');
 
             Route::post('work-plans/save', [WorkPlanController::class, 'save'])
+                ->middleware('performance')
                 ->name('work-plans.save');
 
             Route::post('work-plans/{workPlan}/sync-financial-plan', [WorkPlanController::class, 'syncFinancialPlan'])
+                ->middleware('performance')
                 ->name('work-plans.sync-financial-plan');
+
+            Route::post('work-plans/{workPlan}/submit', [WorkPlanController::class, 'submit'])
+                ->middleware('performance')
+                ->name('work-plans.submit');
 
             Route::get('work-plans/{workPlan}/export-pdf', [WorkPlanController::class, 'exportPdf'])
                 ->name('work-plans.export-pdf');

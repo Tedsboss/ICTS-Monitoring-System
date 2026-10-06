@@ -36,17 +36,17 @@
     <link href="/assets/css/nucleo-svg.css" rel="stylesheet" />
     {{-- <script src="https://kit.fontawesome.com/42d5adcbca.js" crossorigin="anonymous"></script> --}}
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/latest/css/font-awesome.min.css">
-    <link href="/assets/css/nucleo-svg.css" rel="stylesheet" />
     {{-- <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/v/ju/dt-1.11.5/datatables.min.css"/> --}}
     {{-- <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.11.5/css/jquery.dataTables.css"> --}}
     {{-- <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css"> --}}
     <link id="pagestyle" href="/assets/css/argon-dashboard.css?v=1.0.8" rel="stylesheet" />
     <link href="{{ asset('assets/css/tailwind.css') }}" rel="stylesheet" />
-    <link rel="stylesheet"
-        href="https://cdn.jsdelivr.net/npm/bootstrap-select@1.13.1/dist/css/bootstrap-select.min.css">
-    <link href="{{ asset('assets') }}/css/plugins/datatables.min.css?v=1.0.2" rel="stylesheet" />
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-    <link id="pagestyle" href="/assets/css/plugins/tom-select.css?v=1.0.9" rel="stylesheet" />
+    @if (!request()->routeIs(['financial-plans.plans', 'work-plans.plans']))
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-select\@1.13.1/dist/css/bootstrap-select.min.css">
+        <link href="{{ asset('assets') }}/css/plugins/datatables.min.css?v=1.0.2" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+        <link id="tom-select-style" href="/assets/css/plugins/tom-select.css?v=1.0.9" rel="stylesheet" />
+    @endif
     @stack('css')
     <style>
         .sticky {
@@ -117,21 +117,23 @@
     <script src="/assets/js/core/jquery.min.js"></script>
     <script src="/assets/js/core/popper.min.js"></script>
     <script src="/assets/js/core/bootstrap.min.js"></script>
-    {{-- <script src="https://cdn.jsdelivr.net/npm/bootstrap-select@1.13.1/dist/js/bootstrap-select.min.js"></script> --}}
+    {{-- <script src="https://cdn.jsdelivr.net/npm/bootstrap-select\@1.13.1/dist/js/bootstrap-select.min.js"></script> --}}
     {{-- <script src="/assets/js/core/bootstrap.bundle.min.js"></script> --}}
     <script src="/assets/js/plugins/perfect-scrollbar.min.js"></script>
     <script src="/assets/js/plugins/smooth-scrollbar.min.js"></script>
-    <script src="/assets/js/plugins/fullcalendar.min.js"></script>
-    <script src="{{ asset('assets/js/plugins/flatpickr.min.js') }}"></script>
-    {{-- <script src="/assets/js/plugins/jquery.dataTables.min.js"></script> --}}
-    <script src="{{ asset('assets') }}/js/plugins/datatables.min.js?v=1.0.2"></script>
-    <script src="/assets/js/plugins/choices.min.js"></script>
-    {{-- <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script> --}}
+    @if (!request()->routeIs(['financial-plans.plans', 'work-plans.plans']))
+        <script src="/assets/js/plugins/fullcalendar.min.js"></script>
+        <script src="{{ asset('assets/js/plugins/flatpickr.min.js') }}"></script>
+        {{-- <script src="/assets/js/plugins/jquery.dataTables.min.js"></script> --}}
+        <script src="{{ asset('assets') }}/js/plugins/datatables.min.js?v=1.0.2"></script>
+        <script src="/assets/js/plugins/choices.min.js"></script>
+        {{-- <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script> --}}
+        <script src="/assets/js/plugins/quill.min.js"></script>
+        {{-- <script src="https://cdn.jsdelivr.net/npm/quill\@2.0.3/dist/quill.js"></script> --}}
+        {{-- <script src="https://cdn.jsdelivr.net/npm/tom-select\@2.4.3/dist/js/tom-select.complete.min.js"></script> --}}
+        <script src="/assets/js/plugins/tom-select.complete.min.js"></script>
+    @endif
     <script src="/assets/js/plugins/bootstrap-notify.js?v=1.0.1"></script>
-    <script src="/assets/js/plugins/quill.min.js"></script>
-    {{-- <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script> --}}
-    {{-- <script src="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.min.js"></script> --}}
-    <script src="/assets/js/plugins/tom-select.complete.min.js"></script>
     <script src="/assets/js/plugins/sweetalert.min.js"></script>
     @include('components.scripts.main')
     <script>
@@ -148,7 +150,6 @@
     </script>
     @yield('scripts')
     @stack('js')
-    <script async defer src="https://buttons.github.io/buttons.js"></script>
     <script src="/assets/js/argon-dashboard.js?v=1.0.4"></script>
     <script type="text/javascript" id="gwt-pst">
         if (document.getElementById("pst-time")) {

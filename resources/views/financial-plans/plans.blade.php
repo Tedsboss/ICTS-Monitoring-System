@@ -21,140 +21,63 @@
     {{-- Page Message --}}
     <div id="pageMessage"></div>
     {{-- Filters --}}
-    <section
-        class="mb-5 rounded-2xl border border-slate-200
-               bg-white p-5 shadow-sm"
-   >
-        <div
-            class="flex flex-col gap-5 xl:flex-row
-                   xl:items-end xl:justify-between"
-       >
-            <div class="flex flex-wrap items-end gap-3">
-                {{-- Fiscal Year --}}
+    <section class="mb-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div class="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+            <form method="GET" action="{{ route('financial-plans.plans') }}" class="flex flex-wrap items-end gap-3">
                 <div>
-                    <label
-                        for="filterFiscalYear"
-                        class="mb-1.5 block text-xs font-semibold
-                               uppercase tracking-wide text-slate-600"
-                   >
+                    <label for="filterFiscalYear" class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-600">
                         Fiscal Year
                     </label>
-                    <select
-                        id="filterFiscalYear"
-                        class="block min-w-[150px] rounded-lg
-                               border border-slate-300 bg-white
-                               px-3 py-2 text-sm text-slate-700
-                               shadow-sm outline-none transition
-                               focus:border-sky-500 focus:ring-2
-                               focus:ring-sky-100"
-                   >
-                        <option value="">
-                            All Fiscal Years
-                        </option>
+                    <select id="filterFiscalYear" name="fiscal_year" class="block min-w-[150px] rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100">
+                        <option value="">All Fiscal Years</option>
                         @foreach ($fiscalYears as $year)
-                            <option value="{{ $year }}">
+                            <option value="{{ $year }}" {{ (string) $selectedFiscalYear === (string) $year ? 'selected' : '' }}>
                                 {{ $year }}
                             </option>
                         @endforeach
                     </select>
                 </div>
-                {{-- Office --}}
                 <div class="w-full sm:w-auto">
-                    <label
-                        for="filterOffice"
-                        class="mb-1.5 block text-xs font-semibold
-                               uppercase tracking-wide text-slate-600"
-                   >
+                    <label for="filterOffice" class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-600">
                         Office/Staff
                     </label>
-                    <select
-                        id="filterOffice"
-                        class="block w-full rounded-lg border
-                               border-slate-300 bg-white px-3 py-2
-                               text-sm text-slate-700 shadow-sm
-                               outline-none transition
-                               focus:border-sky-500 focus:ring-2
-                               focus:ring-sky-100 sm:min-w-[300px]"
-                   >
-                        <option value="">
-                            All Offices
-                        </option>
+                    <select id="filterOffice" name="office_name" class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100 sm:min-w-[300px]">
+                        <option value="">All Offices</option>
                         @foreach ($offices as $office)
-                            <option value="{{ $office }}">
+                            <option value="{{ $office }}" {{ $selectedOffice === $office ? 'selected' : '' }}>
                                 {{ $office }}
                             </option>
                         @endforeach
                     </select>
                 </div>
-                {{-- Status --}}
                 <div>
-                    <label
-                        for="filterStatus"
-                        class="mb-1.5 block text-xs font-semibold
-                               uppercase tracking-wide text-slate-600"
-                   >
+                    <label for="filterStatus" class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-600">
                         Status
                     </label>
-                    <select
-                        id="filterStatus"
-                        class="block min-w-[170px] rounded-lg
-                               border border-slate-300 bg-white
-                               px-3 py-2 text-sm text-slate-700
-                               shadow-sm outline-none transition
-                               focus:border-sky-500 focus:ring-2
-                               focus:ring-sky-100"
-                   >
-                        <option value="">
-                            All Status
-                        </option>
-                        <option value="draft">
-                            Draft
-                        </option>
-                        <option value="submitted">
-                            Submitted
-                        </option>
-                        <option value="returned">
-                            Returned
-                        </option>
-                        <option value="approved">
-                            Approved
-                        </option>
-                        <option value="finalized">
-                            Finalized
-                        </option>
+                    <select id="filterStatus" name="status" class="block min-w-[170px] rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100">
+                        <option value="">All Status</option>
+                        <option value="draft" {{ $selectedStatus === 'draft' ? 'selected' : '' }}>Draft</option>
+                        <option value="submitted" {{ $selectedStatus === 'submitted' ? 'selected' : '' }}>Submitted</option>
+                        <option value="returned" {{ $selectedStatus === 'returned' ? 'selected' : '' }}>Returned</option>
+                        <option value="approved" {{ $selectedStatus === 'approved' ? 'selected' : '' }}>Approved</option>
+                        <option value="finalized" {{ $selectedStatus === 'finalized' ? 'selected' : '' }}>Finalized</option>
                     </select>
                 </div>
-                {{-- Reset --}}
-                <button
-                    type="button"
-                    id="btnResetFilters"
-                    class="inline-flex h-[38px] items-center gap-2
-                           rounded-lg border border-slate-300
-                           bg-white px-4 text-sm font-semibold
-                           text-slate-700 shadow-sm transition
-                           hover:bg-slate-50"
-               >
-                    <i class="fa fa-refresh"></i>
-                    <span>
-                        Reset
-                    </span>
+                <button type="submit" class="inline-flex h-[38px] items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-4 text-sm font-semibold text-sky-700 shadow-sm transition hover:bg-sky-100">
+                    <i class="fa fa-filter"></i>
+                    <span>Filter</span>
                 </button>
-            </div>
-            {{-- New Plan --}}
+                <a href="{{ route('financial-plans.plans') }}" class="inline-flex h-[38px] items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50">
+                    <i class="fa fa-refresh"></i>
+                    <span>Reset</span>
+                </a>
+            </form>
             <div>
                 @can('create', \App\Models\FinancialPlan::class)
-                <a
-                    href="{{ route('financial-plans.builder') }}"
-                    class="inline-flex items-center gap-2 rounded-lg
-                           bg-sky-600 px-4 py-2.5 text-sm
-                           font-semibold text-white shadow-sm
-                           transition hover:bg-sky-700"
-               >
-                    <i class="fa fa-plus"></i>
-                    <span>
-                        New Financial Plan
-                    </span>
-                </a>
+                    <a href="{{ route('financial-plans.builder') }}" class="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700">
+                        <i class="fa fa-plus"></i>
+                        <span>New Financial Plan</span>
+                    </a>
                 @endcan
             </div>
         </div>
@@ -184,8 +107,8 @@
                        bg-slate-100 px-3 py-1.5 text-xs
                        font-semibold text-slate-700"
            >
-                {{ $plans->count() }}
-                plan{{ $plans->count() === 1 ? '' : 's' }}
+                {{ $plans->total() }}
+                plan{{ $plans->total() === 1 ? '' : 's' }}
             </span>
         </div>
         {{-- Table --}}
@@ -273,7 +196,7 @@
                         <tr
                             class="plan-row transition hover:bg-slate-50"
                             data-fiscal-year="{{ $plan->fiscal_year }}"
-                                        data-staff-id="{{ $plan->staff_id }}"
+                            data-staff-id="{{ $plan->staff_id }}"
                             data-office="{{ strtolower($plan->office_name) }}"
                             data-status="{{ $statusKey }}"
                        >
@@ -424,6 +347,7 @@
                                                disabled:bg-slate-100
                                                disabled:text-slate-400"
                                         data-fiscal-year="{{ $plan->fiscal_year }}"
+                                        data-staff-id="{{ $plan->staff_id }}"
                                         data-office="{{ $plan->office_name }}"
                                         {{ $isFinalized ? 'disabled' : '' }}
                                         title="{{ $isFinalized
@@ -454,12 +378,16 @@
                                     class="mt-3 text-sm font-semibold
                                            text-slate-600"
                                >
-                                    No financial plans have been filed yet.
+                                    {{ request()->hasAny(['fiscal_year', 'office_name', 'status'])
+                                        ? 'No financial plans match the selected filters.'
+                                        : 'No financial plans have been filed yet.' }}
                                 </p>
                                 <p
                                     class="mt-1 text-xs text-slate-400"
                                >
-                                    Create a new Work and Financial Plan to get started.
+                                    {{ request()->hasAny(['fiscal_year', 'office_name', 'status'])
+                                        ? 'Try changing or resetting the filters.'
+                                        : 'Create a new Work and Financial Plan to get started.' }}
                                 </p>
                             </td>
                         </tr>
@@ -467,26 +395,8 @@
                 </tbody>
             </table>
         </div>
-        {{-- No Filter Results --}}
-        <div
-            id="noFilterResults"
-            class="hidden px-6 py-14 text-center"
-       >
-            <div
-                class="mx-auto flex h-12 w-12 items-center
-                       justify-center rounded-full bg-slate-100
-                       text-xl text-slate-400"
-           >
-                <i class="fa fa-search"></i>
-            </div>
-            <p
-                class="mt-3 text-sm font-semibold text-slate-600"
-           >
-                No financial plans match the selected filters.
-            </p>
-            <p class="mt-1 text-xs text-slate-400">
-                Try changing or resetting the filters.
-            </p>
+        <div class="border-t border-slate-200 px-5 py-4">
+            {{ $plans->links() }}
         </div>
     </section>
     {{-- Footer --}}
@@ -543,7 +453,7 @@ $(document).ready(function () {
                            text-current opacity-60 hover:opacity-100"
                     aria-label="Close"
                >
-                    &times;
+                    ×
                 </button>
             </div>
         `);
@@ -573,82 +483,6 @@ $(document).ready(function () {
         }
         return fallback;
     }
-    function applyFilters() {
-        const fiscalYear =
-            String(
-                $('#filterFiscalYear').val() || ''
-            );
-        const office =
-            String(
-                $('#filterOffice').val() || ''
-            ).toLowerCase();
-        const status =
-            String(
-                $('#filterStatus').val() || ''
-            );
-        let visibleCount = 0;
-        $('.plan-row').each(function () {
-            const $row =
-                $(this);
-            const rowFiscalYear =
-                String(
-                    $row.data('fiscal-year')
-                );
-            const rowOffice =
-                String(
-                    $row.data('office') || ''
-                ).toLowerCase();
-            const rowStatus =
-                String(
-                    $row.data('status') || ''
-                );
-            const matchesFiscalYear =
-                !fiscalYear ||
-                rowFiscalYear === fiscalYear;
-            const matchesOffice =
-                !office ||
-                rowOffice === office;
-            const matchesStatus =
-                !status ||
-                rowStatus === status;
-            const visible =
-                matchesFiscalYear &&
-                matchesOffice &&
-                matchesStatus;
-            $row.toggle(visible);
-            if (visible) {
-                visibleCount++;
-            }
-        });
-        $('#visibleCountBadge')
-            .text(
-                `${visibleCount} plan${visibleCount === 1 ? '' : 's'}`
-            );
-        const hasPlans =
-            $('.plan-row').length > 0;
-        $('#noFilterResults')
-            .toggleClass(
-                'hidden',
-                !hasPlans || visibleCount > 0
-            );
-    }
-    $('#filterFiscalYear, #filterOffice, #filterStatus')
-        .on(
-            'change',
-            applyFilters
-        );
-    $('#btnResetFilters').on(
-        'click',
-        function () {
-            $('#filterFiscalYear')
-                .val('');
-            $('#filterOffice')
-                .val('');
-            $('#filterStatus')
-                .val('');
-            applyFilters();
-        }
-    );
     $('.btn-delete-plan').on(
         'click',
         function () {
@@ -660,7 +494,7 @@ $(document).ready(function () {
             const fiscalYear =
                 $button.data('fiscal-year');
             const staffId = Number($button.data('staff-id') || 0) || null;
-        const officeName =
+            const officeName =
                 $button.data('office');
             if (
                 !confirm(
@@ -714,12 +548,7 @@ $(document).ready(function () {
                         200,
                         function () {
                             $(this).remove();
-                            applyFilters();
-                            if (
-                                $('.plan-row').length === 0
-                            ) {
-                                window.location.reload();
-                            }
+                            window.location.reload();
                         }
                     );
             }).fail(function (xhr) {
@@ -736,7 +565,6 @@ $(document).ready(function () {
             });
         }
     );
-    applyFilters();
 });
 </script>
 @endpush

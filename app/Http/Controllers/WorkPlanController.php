@@ -13,6 +13,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -35,113 +36,162 @@ class WorkPlanController extends Controller
         12 => 'December',
     ];
 
+    private function cachedClassifications(int $fiscalYear)
+    {
+        return Cache::remember(
+            "work-plans:classifications:{$fiscalYear}:v1",
+            now()->addMinutes(10),
+            function () use ($fiscalYear) {
+                return WorkPlanClassification::query()
+                    ->forFiscalYear($fiscalYear)
+                    ->active()
+                    ->ordered()
+                    ->get();
+            }
+        );
+    }
+
     public function plans(Request $request): View
     {
         $this->authorize('viewAny', WorkPlan::class);
-        $fiscalYear = (int) $request->input(
-            'fiscal_year',
-            now()->year
-        );
+
+        $fiscalYear = (int) $request->input('fiscal_year', now()->year);
         $staffId = $request->filled('staff_id')
             ? (int) $request->input('staff_id')
             : null;
+
         if ($staffId !== null) {
             $this->ensureStaffAccess($staffId);
         }
-        $financialPlanQuery = FinancialPlan::query()
+
+        $financialPlanScopesQuery = FinancialPlan::query()
             ->where('fiscal_year', $fiscalYear)
             ->whereNotNull('staff_id')
             ->whereNotNull('office_name')
             ->where('office_name', '!=', '');
+
         if (! auth()->user()->isAdministrator()) {
-            $financialPlanQuery->where(
+            $financialPlanScopesQuery->where(
                 'staff_id',
                 (int) auth()->user()->staff_id
             );
         }
+
         if ($staffId !== null) {
-            $financialPlanQuery->where(
-                'staff_id',
-                $staffId
-            );
+            $financialPlanScopesQuery->where('staff_id', $staffId);
         }
-        $financialPlanScopes = $financialPlanQuery
+
+        $plans = $financialPlanScopesQuery
             ->select([
                 'fiscal_year',
                 'staff_id',
                 'office_name',
             ])
-            ->distinct()
+            ->groupBy(
+                'fiscal_year',
+                'staff_id',
+                'office_name'
+            )
             ->orderBy('staff_id')
             ->orderBy('office_name')
-            ->get();
-        $workPlanQuery = WorkPlan::query()
-            ->with('staff')
-            ->withCount('items')
-            ->where('fiscal_year', $fiscalYear);
-        $this->applyStaffScope($workPlanQuery);
-        if ($staffId !== null) {
-            $workPlanQuery->where(
-                'staff_id',
-                $staffId
+            ->paginate(20)
+            ->withQueryString();
+
+        $pageScopes = collect($plans->items());
+
+        if ($pageScopes->isNotEmpty()) {
+            $pageStaffIds = $pageScopes
+                ->pluck('staff_id')
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values();
+
+            $pageOfficeNames = $pageScopes
+                ->pluck('office_name')
+                ->map(fn ($office) => trim((string) $office))
+                ->filter()
+                ->unique()
+                ->values();
+
+            $workPlanQuery = WorkPlan::query()
+                ->withCount('items')
+                ->where('fiscal_year', $fiscalYear)
+                ->whereIn('staff_id', $pageStaffIds->all())
+                ->whereIn('office_name', $pageOfficeNames->all());
+
+            $this->applyStaffScope($workPlanQuery);
+
+            $existingWorkPlans = $workPlanQuery
+                ->get()
+                ->keyBy(function (WorkPlan $plan) {
+                    return implode('|', [
+                        (int) $plan->fiscal_year,
+                        (int) $plan->staff_id,
+                        trim((string) $plan->office_name),
+                    ]);
+                });
+
+            $staffsById = Staff::query()
+                ->whereIn('id', $pageStaffIds->all())
+                ->get(['id', 'name', 'abbreviation'])
+                ->keyBy('id');
+
+            $plans->setCollection(
+                $pageScopes->map(function ($scope) use (
+                    $existingWorkPlans,
+                    $staffsById
+                ) {
+                    $key = implode('|', [
+                        (int) $scope->fiscal_year,
+                        (int) $scope->staff_id,
+                        trim((string) $scope->office_name),
+                    ]);
+
+                    $existing = $existingWorkPlans->get($key);
+
+                    if ($existing) {
+                        $existing->setRelation(
+                            'staff',
+                            $staffsById->get((int) $existing->staff_id)
+                        );
+
+                        return $existing;
+                    }
+
+                    $plan = new WorkPlan();
+                    $plan->fiscal_year = (int) $scope->fiscal_year;
+                    $plan->staff_id = (int) $scope->staff_id;
+                    $plan->office_name = trim((string) $scope->office_name);
+                    $plan->status = 'draft';
+                    $plan->finalized = 'no';
+                    $plan->setRelation(
+                        'staff',
+                        $staffsById->get((int) $scope->staff_id)
+                    );
+                    $plan->setAttribute('items_count', 0);
+
+                    return $plan;
+                })
             );
         }
-        $existingWorkPlans = $workPlanQuery
-            ->get()
-            ->keyBy(function (WorkPlan $plan) {
-                return implode('|', [
-                    (int) $plan->fiscal_year,
-                    (int) $plan->staff_id,
-                    trim((string) $plan->office_name),
-                ]);
-            });
-        $plans = $financialPlanScopes
-            ->map(function ($scope) use ($existingWorkPlans) {
-                $key = implode('|', [
-                    (int) $scope->fiscal_year,
-                    (int) $scope->staff_id,
-                    trim((string) $scope->office_name),
-                ]);
-                $existing = $existingWorkPlans->get($key);
-                if ($existing) {
-                    return $existing;
-                }
-                $plan = new WorkPlan();
-                $plan->fiscal_year =
-                    (int) $scope->fiscal_year;
-                $plan->staff_id =
-                    (int) $scope->staff_id;
-                $plan->office_name =
-                    trim((string) $scope->office_name);
-                $plan->status = 'draft';
-                $plan->finalized = 'no';
-                $plan->setRelation(
-                    'staff',
-                    Staff::query()->find(
-                        (int) $scope->staff_id
-                    )
-                );
-                $plan->setAttribute(
-                    'items_count',
-                    0
-                );
-                return $plan;
-            })
-            ->values();
+
         $fiscalYearsQuery = FinancialPlan::query()
             ->whereNotNull('staff_id')
             ->whereNotNull('office_name')
             ->where('office_name', '!=', '');
+
         if (! auth()->user()->isAdministrator()) {
             $fiscalYearsQuery->where(
                 'staff_id',
                 (int) auth()->user()->staff_id
             );
         }
+
         $fiscalYears = $fiscalYearsQuery
             ->distinct()
             ->orderByDesc('fiscal_year')
             ->pluck('fiscal_year');
+
         return view('work-plans.plans', [
             'plans' => $plans,
             'fiscalYear' => $fiscalYear,
@@ -240,11 +290,7 @@ class WorkPlanController extends Controller
                 WorkPlan::class
             );
         }
-        $classifications = WorkPlanClassification::query()
-            ->forFiscalYear($fiscalYear)
-            ->active()
-            ->ordered()
-            ->get();
+        $classifications = $this->cachedClassifications($fiscalYear);
         $financialPlanActivities = collect();
         if ($staffId !== null) {
             $financialPlanActivities = $this->financialPlanActivities(
@@ -253,6 +299,18 @@ class WorkPlanController extends Controller
                 $officeName
             );
         }
+        if ($plan) {
+            $this->markFinancialPlanSourceStatus(
+                $plan,
+                $financialPlanActivities
+            );
+        }
+        $financialPlanSyncStatus = $plan
+            ? $this->financialPlanSyncStatus(
+                $plan,
+                $financialPlanActivities
+            )
+            : null;
         $financialPlanScopesQuery = FinancialPlan::query()
                 ->where('fiscal_year', $fiscalYear)
                 ->whereNotNull('staff_id')
@@ -281,6 +339,7 @@ class WorkPlanController extends Controller
             'financialPlanScopes' => $financialPlanScopes,
             'classifications' => $classifications,
             'financialPlanActivities' => $financialPlanActivities,
+            'financialPlanSyncStatus' => $financialPlanSyncStatus,
             'months' => self::MONTHS,
         ]);
     }
@@ -331,6 +390,15 @@ class WorkPlanController extends Controller
             'items.targets.months',
             'submissions.actor',
         ]);
+        $financialPlanActivities = $this->financialPlanActivities(
+            $fiscalYear,
+            $staffId,
+            $officeName
+        );
+        $this->markFinancialPlanSourceStatus(
+            $plan,
+            $financialPlanActivities
+        );
         return response()->json([
             'success' => true,
             'data' => $plan,
@@ -466,25 +534,52 @@ class WorkPlanController extends Controller
                 $plan,
                 $validated['signatory'] ?? []
             );
+            $existingItems = WorkPlanItem::query()
+                ->where('work_plan_id', $plan->id)
+                ->get()
+                ->keyBy('id');
+
+            $existingItemIds = $existingItems
+                ->keys()
+                ->map(fn ($id) => (int) $id)
+                ->flip();
+
+            $existingTargetsByItem = collect();
+            if ($existingItemIds->isNotEmpty()) {
+                $existingTargetsByItem = WorkPlanTarget::query()
+                    ->whereIn(
+                        'work_plan_item_id',
+                        $existingItemIds->keys()->all()
+                    )
+                    ->get()
+                    ->groupBy('work_plan_item_id');
+            }
+
             $keepItemIds = [];
             $savedRowKeys = [];
+            $structuralItemIds = [];
+
             foreach ($items as $itemIndex => $itemData) {
                 $item = null;
+
                 if (! empty($itemData['id'])) {
-                    $item = WorkPlanItem::query()
-                        ->where('id', (int) $itemData['id'])
-                        ->where('work_plan_id', $plan->id)
-                        ->first();
+                    $item = $existingItems->get(
+                        (int) $itemData['id']
+                    );
                 }
+
                 if (! $item) {
                     $item = new WorkPlanItem();
                     $item->work_plan_id = $plan->id;
                 }
+
                 $rowType = $itemData['row_type'];
+
                 $parentId = $this->resolveParentId(
                     $plan,
                     $itemData,
-                    $savedRowKeys
+                    $savedRowKeys,
+                    $existingItemIds
                 );
                 $item->parent_id = $parentId;
                 $item->row_type = $rowType;
@@ -560,14 +655,26 @@ class WorkPlanController extends Controller
                 if ($rowType === 'item') {
                     $this->saveTargets(
                         $item,
-                        $itemData['targets'] ?? []
+                        $itemData['targets'] ?? [],
+                        $existingTargetsByItem->get(
+                            (int) $item->id,
+                            collect()
+                        )
                     );
                 } else {
-                    WorkPlanTarget::query()
-                        ->where('work_plan_item_id', $item->id)
-                        ->delete();
+                    $structuralItemIds[] = (int) $item->id;
                 }
             }
+
+            if (! empty($structuralItemIds)) {
+                WorkPlanTarget::query()
+                    ->whereIn(
+                        'work_plan_item_id',
+                        $structuralItemIds
+                    )
+                    ->delete();
+            }
+
             $itemDeleteQuery = WorkPlanItem::query()
                 ->where('work_plan_id', $plan->id);
             if (! empty($keepItemIds)) {
@@ -613,58 +720,11 @@ class WorkPlanController extends Controller
                 'added_count' => 0,
             ]);
         }
-        $existingItems = WorkPlanItem::query()
-            ->where('work_plan_id', $workPlan->id)
-            ->where('row_type', 'item')
-            ->get([
-                'financial_plan_id',
-                'program_classification',
-                'prexc_code',
-                'specific_activity',
-            ]);
-        $existingSourceIds = $existingItems
-            ->pluck('financial_plan_id')
-            ->filter()
-            ->map(fn ($id) => (int) $id)
-            ->unique();
-        // FP-derived rows are matched by financial_plan_id.
-        // Text-key matching is kept only for legacy rows that predate
-        // financial_plan_id, so synchronization remains backward compatible
-        // without altering or reinterpreting existing FP-linked rows.
-        $existingLegacyKeys = $existingItems
-            ->filter(fn ($item) => empty($item->financial_plan_id))
-            ->map(function ($item) {
-                return $this->financialPlanActivityKey(
-                    $item->program_classification,
-                    $item->prexc_code,
-                    $item->specific_activity
-                );
-            })
-            ->filter()
-            ->unique();
-        $missingActivities = $financialPlanActivities
-            ->filter(function ($activity) use (
-                $existingSourceIds,
-                $existingLegacyKeys
-            ) {
-                $financialPlanId = (int) (
-                    $activity['financial_plan_id'] ?? 0
-                );
-                if (
-                    $financialPlanId > 0
-                    && $existingSourceIds->contains($financialPlanId)
-                ) {
-                    return false;
-                }
-                $key = $this->financialPlanActivityKey(
-                    $activity['program_classification'] ?? null,
-                    $activity['prexc_code'] ?? null,
-                    $activity['specific_activity'] ?? null
-                );
-                return $key !== null
-                    && ! $existingLegacyKeys->contains($key);
-            })
-            ->values();
+        $syncStatus = $this->financialPlanSyncStatus(
+            $workPlan,
+            $financialPlanActivities
+        );
+        $missingActivities = $syncStatus['missing_activities'];
         if ($missingActivities->isEmpty()) {
             return response()->json([
                 'success' => true,
@@ -679,10 +739,14 @@ class WorkPlanController extends Controller
             $maxSortOrder = (int) WorkPlanItem::query()
                 ->where('work_plan_id', $workPlan->id)
                 ->max('sort_order');
-            $addedCount = 0;
+
+            $now = now();
+            $insertRows = [];
+
             foreach ($missingActivities as $activity) {
                 $maxSortOrder += 10;
-                WorkPlanItem::create([
+
+                $insertRows[] = [
                     'work_plan_id' => $workPlan->id,
                     'financial_plan_id' => (int) $activity['financial_plan_id'],
                     'parent_id' => null,
@@ -699,12 +763,21 @@ class WorkPlanController extends Controller
                         $activity['specific_activity'] ?? null
                     ),
                     'sort_order' => $maxSortOrder,
-                ]);
-                $addedCount++;
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
             }
+
+            if (! empty($insertRows)) {
+                WorkPlanItem::query()->insert(
+                    $insertRows
+                );
+            }
+
             $workPlan->updated_by = auth()->id();
             $workPlan->save();
-            return $addedCount;
+
+            return count($insertRows);
         });
         return response()->json([
             'success' => true,
@@ -891,16 +964,24 @@ class WorkPlanController extends Controller
         ]);
     }
 
-    public function reopen(WorkPlan $workPlan): JsonResponse
-    {
+    public function reopen(
+        Request $request,
+        WorkPlan $workPlan
+    ): JsonResponse {
         $this->authorize('reopen', $workPlan);
+        $validated = $request->validate([
+            'remarks' => ['required', 'string', 'max:5000'],
+        ]);
         if (! $workPlan->isFinalized()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Only finalized Work Plans can be reopened.',
             ], 422);
         }
-        DB::transaction(function () use ($workPlan) {
+        DB::transaction(function () use (
+            $workPlan,
+            $validated
+        ) {
             $workPlan->update([
                 'status' => 'draft',
                 'finalized' => 'no',
@@ -916,7 +997,8 @@ class WorkPlanController extends Controller
                 $workPlan,
                 'reopen',
                 'finalized',
-                'draft'
+                'draft',
+                $validated['remarks']
             );
         });
         return response()->json([
@@ -953,30 +1035,52 @@ class WorkPlanController extends Controller
 
     private function saveTargets(
         WorkPlanItem $item,
-        array $targets
+        array $targets,
+        $existingTargets = null
     ): void {
+        $existingTargets = collect($existingTargets ?? [])
+            ->keyBy('id');
+
         $keepTargetIds = [];
+        $targetMonthUpserts = [];
+        $targetMonthsByTarget = [];
+        $now = now();
+
         foreach ($targets as $targetIndex => $targetData) {
             $target = null;
+
             if (! empty($targetData['id'])) {
-                $target = WorkPlanTarget::query()
-                    ->where('id', (int) $targetData['id'])
-                    ->where('work_plan_item_id', $item->id)
-                    ->first();
+                $target = $existingTargets->get(
+                    (int) $targetData['id']
+                );
             }
+
             if (! $target) {
                 $target = new WorkPlanTarget();
                 $target->work_plan_item_id = $item->id;
             }
-            $months = collect($targetData['months'] ?? [])
+
+            $months = collect(
+                $targetData['months'] ?? []
+            )
                 ->map(fn ($month) => (int) $month)
-                ->filter(fn ($month) => $month >= 1 && $month <= 12)
+                ->filter(
+                    fn ($month) =>
+                        $month >= 1 && $month <= 12
+                )
                 ->unique()
                 ->sort()
                 ->values();
-            if ($months->isEmpty() && ! empty($targetData['month'])) {
-                $months = collect([(int) $targetData['month']]);
+
+            if (
+                $months->isEmpty()
+                && ! empty($targetData['month'])
+            ) {
+                $months = collect([
+                    (int) $targetData['month'],
+                ]);
             }
+
             $target->month = $months->first();
             $target->target_output = trim(
                 $targetData['target_output']
@@ -986,36 +1090,71 @@ class WorkPlanController extends Controller
                 ?? (($targetIndex + 1) * 10)
             );
             $target->save();
-            WorkPlanTargetMonth::query()
-                ->where('work_plan_target_id', $target->id)
-                ->whereNotIn('month', $months->all())
-                ->delete();
+
+            $targetId = (int) $target->id;
+            $keepTargetIds[] = $targetId;
+            $targetMonthsByTarget[$targetId] =
+                $months->all();
+
             foreach ($months as $month) {
-                WorkPlanTargetMonth::updateOrCreate(
-                    [
-                        'work_plan_target_id' => $target->id,
-                        'month' => $month,
-                    ],
-                    []
-                );
+                $targetMonthUpserts[] = [
+                    'work_plan_target_id' => $targetId,
+                    'month' => (int) $month,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
             }
-            $keepTargetIds[] = $target->id;
         }
+
+        $touchedTargetIds = array_keys(
+            $targetMonthsByTarget
+        );
+
+        if (! empty($touchedTargetIds)) {
+            WorkPlanTargetMonth::query()
+                ->whereIn(
+                    'work_plan_target_id',
+                    $touchedTargetIds
+                )
+                ->delete();
+        }
+
+        if (! empty($targetMonthUpserts)) {
+            WorkPlanTargetMonth::upsert(
+                $targetMonthUpserts,
+                [
+                    'work_plan_target_id',
+                    'month',
+                ],
+                ['updated_at']
+            );
+        }
+
         $deleteQuery = WorkPlanTarget::query()
-            ->where('work_plan_item_id', $item->id);
+            ->where(
+                'work_plan_item_id',
+                $item->id
+            );
+
         if (! empty($keepTargetIds)) {
-            $deleteQuery->whereNotIn('id', $keepTargetIds);
+            $deleteQuery->whereNotIn(
+                'id',
+                $keepTargetIds
+            );
         }
+
         $deleteQuery->delete();
     }
 
     private function resolveParentId(
         WorkPlan $plan,
         array $itemData,
-        array $savedRowKeys
+        array $savedRowKeys,
+        $existingItemIds
     ): ?int {
         if (! empty($itemData['parent_key'])) {
             $parentKey = $itemData['parent_key'];
+
             if (! isset($savedRowKeys[$parentKey])) {
                 throw ValidationException::withMessages([
                     'items' => [
@@ -1023,23 +1162,24 @@ class WorkPlanController extends Controller
                     ],
                 ]);
             }
+
             return (int) $savedRowKeys[$parentKey];
         }
+
         if (! empty($itemData['parent_id'])) {
             $parentId = (int) $itemData['parent_id'];
-            $exists = WorkPlanItem::query()
-                ->where('id', $parentId)
-                ->where('work_plan_id', $plan->id)
-                ->exists();
-            if (! $exists) {
+
+            if (! $existingItemIds->has($parentId)) {
                 throw ValidationException::withMessages([
                     'items' => [
                         'A Work Plan row references an invalid parent item.',
                     ],
                 ]);
             }
+
             return $parentId;
         }
+
         return null;
     }
 
@@ -1108,13 +1248,17 @@ class WorkPlanController extends Controller
     {
         $query = Staff::query()
             ->orderBy('name');
+
         if (! auth()->user()->isAdministrator()) {
             $staffId = auth()->user()->staff_id;
+
             if ($staffId === null) {
                 return collect();
             }
+
             $query->where('id', (int) $staffId);
         }
+
         return $query->get([
             'id',
             'name',
@@ -1440,6 +1584,111 @@ class WorkPlanController extends Controller
             $prexcCode,
             $specificActivity,
         ]);
+    }
+
+    private function markFinancialPlanSourceStatus(
+        WorkPlan $workPlan,
+        $financialPlanActivities
+    ): void {
+        if (! $workPlan->relationLoaded('items')) {
+            return;
+        }
+
+        $activeSourceIds = collect($financialPlanActivities)
+            ->pluck('financial_plan_id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique();
+
+        $workPlan->items
+            ->where('row_type', 'item')
+            ->each(function (WorkPlanItem $item) use ($activeSourceIds) {
+                $sourceId = $item->financial_plan_id
+                    ? (int) $item->financial_plan_id
+                    : null;
+
+                if ($sourceId !== null && $activeSourceIds->contains($sourceId)) {
+                    $item->setAttribute(
+                        'financial_plan_source_status',
+                        'active'
+                    );
+                    return;
+                }
+
+                $item->setAttribute(
+                    'financial_plan_source_status',
+                    $sourceId === null ? 'snapshot' : 'missing'
+                );
+            });
+    }
+
+    private function financialPlanSyncStatus(
+        WorkPlan $workPlan,
+        $financialPlanActivities
+    ): array {
+        $existingItems = $workPlan->relationLoaded('items')
+            ? $workPlan->items->where('row_type', 'item')
+            : WorkPlanItem::query()
+                ->where('work_plan_id', $workPlan->id)
+                ->where('row_type', 'item')
+                ->get([
+                    'financial_plan_id',
+                    'program_classification',
+                    'prexc_code',
+                    'specific_activity',
+                ]);
+
+        $existingSourceIds = $existingItems
+            ->pluck('financial_plan_id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique();
+
+        $existingLegacyKeys = $existingItems
+            ->filter(fn ($item) => empty($item->financial_plan_id))
+            ->map(function ($item) {
+                return $this->financialPlanActivityKey(
+                    $item->program_classification,
+                    $item->prexc_code,
+                    $item->specific_activity
+                );
+            })
+            ->filter()
+            ->unique();
+
+        $missingActivities = $financialPlanActivities
+            ->filter(function ($activity) use (
+                $existingSourceIds,
+                $existingLegacyKeys
+            ) {
+                $financialPlanId = (int) (
+                    $activity['financial_plan_id'] ?? 0
+                );
+
+                if (
+                    $financialPlanId > 0
+                    && $existingSourceIds->contains($financialPlanId)
+                ) {
+                    return false;
+                }
+
+                $key = $this->financialPlanActivityKey(
+                    $activity['program_classification'] ?? null,
+                    $activity['prexc_code'] ?? null,
+                    $activity['specific_activity'] ?? null
+                );
+
+                return $key !== null
+                    && ! $existingLegacyKeys->contains($key);
+            })
+            ->values();
+
+        return [
+            'is_up_to_date' => $missingActivities->isEmpty(),
+            'missing_count' => $missingActivities->count(),
+            'source_count' => $financialPlanActivities->count(),
+            'missing_activities' => $missingActivities,
+        ];
     }
 
     private function financialPlanActivities(

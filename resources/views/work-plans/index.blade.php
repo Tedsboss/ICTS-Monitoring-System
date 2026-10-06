@@ -163,9 +163,8 @@
                             @can('reopen', $plan)
                                 @if($isFinalized)
                                     <button type="button"
-                                            class="workflow-action inline-flex items-center gap-2 rounded-lg border border-sky-300 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-700 transition hover:bg-sky-100"
-                                            data-url="{{ route('work-plans.reopen', $plan) }}"
-                                            data-action="reopen">
+                                            id="btnReopenPlan"
+                                            class="inline-flex items-center gap-2 rounded-lg border border-sky-300 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-700 transition hover:bg-sky-100">
                                         <i class="fa fa-unlock"></i>
                                         Reopen
                                     </button>
@@ -566,6 +565,30 @@
             </div>
         </div>
     @endcan
+    @can('reopen', $plan)
+        <div id="reopenPlanModal" class="fixed inset-0 z-[9999] hidden items-center justify-center bg-slate-900/50 p-4">
+            <div class="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
+                <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+                    <div>
+                        <h3 class="m-0 text-base font-bold text-slate-900">Reopen Work Plan</h3>
+                        <p class="mb-0 mt-1 text-xs text-slate-500">Provide the reason for reopening this finalized Work Plan.</p>
+                    </div>
+                    <button type="button" id="btnCloseReopenModal" class="rounded-lg border border-slate-200 px-2.5 py-1.5 text-slate-500 hover:bg-slate-50">
+                        <i class="fa fa-times"></i>
+                    </button>
+                </div>
+                <div class="p-5">
+                    <label for="reopenRemarks" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-600">Reason</label>
+                    <textarea id="reopenRemarks" rows="5" maxlength="5000" placeholder="Enter reopening reason..." class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"></textarea>
+                    <div id="reopenRemarksError" class="mt-1 hidden text-xs text-rose-600"></div>
+                </div>
+                <div class="flex justify-end gap-2 border-t border-slate-200 px-5 py-4">
+                    <button type="button" id="btnCancelReopen" class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
+                    <button type="button" id="btnConfirmReopen" data-url="{{ route('work-plans.reopen', $plan) }}" class="rounded-lg bg-sky-600 px-4 py-2 text-xs font-bold text-white hover:bg-sky-700">Reopen Work Plan</button>
+                </div>
+            </div>
+        </div>
+    @endcan
 @endif
 <style>
     .work-plan-table{width:100%;table-layout:fixed;border-collapse:collapse}
@@ -653,10 +676,56 @@ $(document).ready(function () {
         const messages = {
             submit: 'Submit this Work Plan for approval?',
             approve: 'Approve this Work Plan?',
-            finalize: 'Finalize and lock this Work Plan?',
-            reopen: 'Reopen this Work Plan as a draft?'
+            finalize: 'Finalize and lock this Work Plan?'
         };
         postWorkflow(url, {}, messages[action] || null);
+    });
+    $('#btnReopenPlan').on('click', function () {
+        $('#reopenRemarks').val('');
+        $('#reopenRemarksError').addClass('hidden').text('');
+        $('#reopenPlanModal').removeClass('hidden').addClass('flex');
+    });
+    function closeReopenModal() {
+        $('#reopenPlanModal').addClass('hidden').removeClass('flex');
+    }
+    $('#btnCloseReopenModal, #btnCancelReopen').on('click', function () {
+        closeReopenModal();
+    });
+    $('#btnConfirmReopen').on('click', function () {
+        const remarks = String($('#reopenRemarks').val() || '').trim();
+        if (!remarks) {
+            $('#reopenRemarksError')
+                .removeClass('hidden')
+                .text('Reopening reason is required.');
+            return;
+        }
+        $('#reopenRemarksError').addClass('hidden').text('');
+        const $button = $(this);
+        $button.prop('disabled', true);
+        $.ajax({
+            url: $button.data('url'),
+            method: 'POST',
+            data: {
+                _token: csrfToken,
+                remarks: remarks
+            }
+        }).done(function (response) {
+            closeReopenModal();
+            showMessage(response?.message || 'Work Plan reopened successfully.');
+            window.setTimeout(function () {
+                window.location.reload();
+            }, 500);
+        }).fail(function (xhr) {
+            $('#reopenRemarksError')
+                .removeClass('hidden')
+                .text(getErrorMessage(xhr, 'Unable to reopen the Work Plan.'));
+            $button.prop('disabled', false);
+        });
+    });
+    $('#reopenPlanModal').on('click', function (event) {
+        if (event.target === this) {
+            closeReopenModal();
+        }
     });
     $('#btnReturnPlan').on('click', function () {
         $('#returnRemarks').val('');

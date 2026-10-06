@@ -80,7 +80,7 @@
                 </p>
             </div>
             <span class="inline-flex w-fit items-center rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700">
-                {{ $plans->count() }} plan{{ $plans->count() === 1 ? '' : 's' }}
+                {{ $plans->total() }} plan{{ $plans->total() === 1 ? '' : 's' }}
             </span>
         </div>
         <div class="overflow-x-auto">
@@ -259,6 +259,11 @@
             </table>
         </div>
     </section>
+    @if ($plans->hasPages())
+        <div class="mt-4">
+            {{ $plans->links() }}
+        </div>
+    @endif
     <div class="mt-6">
         @include('layouts.footers.auth.footer')
     </div>

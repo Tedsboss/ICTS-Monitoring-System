@@ -144,8 +144,14 @@
                         <button type="button" class="builder-write-control add-row-button" data-row-type="header"><i class="fa fa-plus"></i> Section Header</button>
                         <button type="button" class="builder-write-control add-row-button" data-row-type="subheader"><i class="fa fa-plus"></i> Sub Header</button>
                         @if($plan)
+                            @php($syncMissingCount = (int) data_get($financialPlanSyncStatus, 'missing_count', 0))
+                            <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold {{ $syncMissingCount > 0 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-700' }}">
+                                <i class="fa {{ $syncMissingCount > 0 ? 'fa-exclamation-circle' : 'fa-check-circle' }} mr-1"></i>
+                                {{ $syncMissingCount > 0 ? $syncMissingCount . ' new FP ' . ($syncMissingCount === 1 ? 'activity' : 'activities') . ' available' : 'FP up to date' }}
+                            </span>
                             <button type="button" id="btnSyncFinancialPlan" class="builder-write-control sync-button">
-                                <i class="fa fa-sync-alt"></i> Sync New FP Activities
+                                <i class="fa fa-sync-alt"></i>
+                                {{ $syncMissingCount > 0 ? 'Sync ' . $syncMissingCount . ' New FP ' . ($syncMissingCount === 1 ? 'Activity' : 'Activities') : 'Check FP for Updates' }}
                             </button>
                         @endif
                         <button type="button" id="btnSavePlan" class="builder-write-control save-button"><i class="fa fa-save"></i> Save Entire Plan</button>
@@ -175,7 +181,8 @@
                     <button type="button" class="builder-write-control add-row-button" data-row-type="subheader"><i class="fa fa-plus"></i> Sub Header</button>
                     @if($plan)
                         <button type="button" id="btnSyncFinancialPlanBottom" class="builder-write-control sync-button">
-                            <i class="fa fa-sync-alt"></i> Sync New FP Activities
+                            <i class="fa fa-sync-alt"></i>
+                            {{ $syncMissingCount > 0 ? 'Sync ' . $syncMissingCount . ' New FP ' . ($syncMissingCount === 1 ? 'Activity' : 'Activities') : 'Check FP for Updates' }}
                         </button>
                     @endif
                     <button type="button" id="btnSavePlanBottom" class="builder-write-control save-button ml-auto"><i class="fa fa-save"></i> Save Entire Plan</button>
@@ -512,6 +519,14 @@
     font-size: 9px;
     font-weight: 700;
 }
+.fp-source-badge.snapshot {
+    background: #fef3c7;
+    color: #92400e;
+}
+.fp-source-badge.missing {
+    background: #fee2e2;
+    color: #b91c1c;
+}
 </style>
 @endsection
 @push('js')
@@ -656,6 +671,23 @@ $(document).ready(function () {
             </div>
         `;
     }
+    function financialPlanSourceBadge(item = {}) {
+        const status = String(
+            item.financial_plan_source_status ||
+            (item.financial_plan_id ? 'active' : 'snapshot')
+        );
+
+        if (status === 'missing') {
+            return '<span class="fp-source-badge missing" title="The original Financial Plan source is no longer available in this Work Plan scope.">FP source missing</span>';
+        }
+
+        if (status === 'snapshot') {
+            return '<span class="fp-source-badge snapshot" title="This row is preserved as a historical FP snapshot, but its original source record is unavailable or predates source tracking.">FP snapshot</span>';
+        }
+
+        return '<span class="fp-source-badge" title="Source: Financial Plan">FP</span>';
+    }
+
     function itemRow(item = {}) {
         const rowKey = item.row_key || newRowKey();
         const targets = Array.isArray(item.targets)
@@ -687,7 +719,7 @@ $(document).ready(function () {
                     <button type="button" class="add-target" ${isLocked ? 'disabled' : ''}><i class="fa fa-plus"></i> Add Target Output</button>
                 </td>
                 <td class="text-center align-middle">
-                    <span class="fp-source-badge" title="Source: Financial Plan">FP</span>
+                    ${financialPlanSourceBadge(item)}
                 </td>
             </tr>
         `;
