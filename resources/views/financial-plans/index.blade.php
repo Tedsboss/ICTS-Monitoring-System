@@ -1,5 +1,6 @@
 @extends('layouts.app')
 @section('content')
+@php $fpModernDark = session('user_settings.class_theme', '') === 'dark'; @endphp
 <nav
     class="navbar navbar-main navbar-expand-lg px-0 mx-4 shadow-none border-radius-xl z-index-sticky"
     id="navbarBlur"
@@ -10,7 +11,8 @@
         @include('layouts.navbars.auth.topnav-withdatetime')
     </div>
 </nav>
-<div class="px-4 pb-8 pt-4">
+<div id="fp-report" class="fp-modern px-4 pb-8 pt-4" data-theme="{{ $fpModernDark ? 'dark' : 'light' }}">
+<header class="fp-modern-heading"><div><span class="fp-modern-eyebrow">Financial workspace / Plan overview</span><h2>Your financial plan, in view.</h2><p>Review the funding schedule, linked work plans, and approval progress.</p></div><span class="fp-modern-context">Fiscal Year {{ $fiscalYear }}</span></header>
     {{-- Back --}}
     <div class="mb-4">
         <a
@@ -604,7 +606,7 @@
 </style>
 @endpush
 {{-- Return Financial Plan Modal --}}
-<div id="returnFinancialPlanModal" class="fixed inset-0 z-[1055] hidden items-center justify-center bg-slate-900/55 px-4 py-6" role="dialog" aria-modal="true" aria-labelledby="returnFinancialPlanTitle">
+<div id="returnFinancialPlanModal" data-theme="{{ $fpModernDark ? 'dark' : 'light' }}" class="fp-modern fixed inset-0 z-[1055] hidden items-center justify-center bg-slate-900/55 px-4 py-6" role="dialog" aria-modal="true" aria-labelledby="returnFinancialPlanTitle">
     <div class="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
         <div class="flex items-start justify-between border-b border-slate-100 px-6 py-5">
             <div>
@@ -632,7 +634,7 @@
 </div>
 
 {{-- Reopen Financial Plan Modal --}}
-<div id="reopenFinancialPlanModal" class="fixed inset-0 z-[1055] hidden items-center justify-center bg-slate-900/55 px-4 py-6" role="dialog" aria-modal="true" aria-labelledby="reopenFinancialPlanTitle">
+<div id="reopenFinancialPlanModal" data-theme="{{ $fpModernDark ? 'dark' : 'light' }}" class="fp-modern fixed inset-0 z-[1055] hidden items-center justify-center bg-slate-900/55 px-4 py-6" role="dialog" aria-modal="true" aria-labelledby="reopenFinancialPlanTitle">
     <div class="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
         <div class="flex items-start justify-between border-b border-slate-100 px-6 py-5">
             <div>
@@ -2207,3 +2209,5 @@ $(document).ready(function () {
 });
 </script>
 @endpush
+
+@include('financial-plans.modern-styles')

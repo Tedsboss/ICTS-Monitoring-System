@@ -1,7 +1,5 @@
 <?php
-
 namespace App\Http\Controllers;
-
 use App\Http\Requests\UserRequest;
 use App\Models\Agency;
 use App\Models\Division;
@@ -9,386 +7,197 @@ use App\Models\Position;
 use App\Models\Role;
 use App\Models\Staff;
 use App\Models\User;
-use Illuminate\Database\Query\Builder;
-use Illuminate\Validation\Rule;
 use App\Traits\TracksHistoryTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Yajra\DataTables\DataTables;
-
 class UserController extends Controller
 {
     use TracksHistoryTrait;
-
-    /**
-     * Display the DIREK User Management page.
-     */
     public function index()
     {
         $this->authorize('viewAny', User::class);
-
-        // DIREK roles only.
-        // Legacy roles remain in the database until existing users are reassigned.
-        $roles = Role::query()
-            ->where('name', '!=', 'Super Admin')
-            ->orderBy('name')
-            ->get();
-
+        $roles = Role::query()->where('name', '!=', 'Super Admin')->orderBy('name')->get();
         $agencies = auth()->user()->isSuperAdmin()
             ? Agency::orderBy('UACS_AGY_DSC')->get()
             : Agency::where('id', auth()->user()->agency_id)->get();
-
-        $staffs = Staff::query()
-            ->orderBy('office_id', 'asc')
-            ->orderBy('name', 'asc')
-            ->get();
-
-        $divisions = Division::query()
-            ->orderBy('name')
-            ->get();
-
-        $positions = Position::query()
-            ->orderBy('name')
-            ->get();
-
+        $staffs = Staff::query()->orderBy('office_id')->orderBy('name')->get();
+        $divisions = Division::query()->orderBy('name')->get();
+        $positions = Position::query()->orderBy('name')->get();
         $depDevAgencyIds = Agency::depDevIds();
-
-        return view(
-            'users.index',
-            compact(
-                'roles',
-                'agencies',
-                'staffs',
-                'divisions',
-                'positions',
-                'depDevAgencyIds'
-            )
-        );
+        return view('users.index', compact('roles', 'agencies', 'staffs', 'divisions', 'positions', 'depDevAgencyIds'));
     }
-
-    /**
-     * Show the form for creating a new resource.
-     *
-     * User Management uses the modal in users.index.
-     */
     public function create()
-    {
-        //
-    }
-
-    /**
-     * Store a new DIREK user.
-     */
-    public function store(UserRequest $request)
     {
         $this->authorize('create', User::class);
 
+        return redirect()->route('users.index');
+    }
+    public function store(UserRequest $request)
+    {
+        $this->authorize('create', User::class);
         $user = new User();
-
         $user->firstname = $request->firstname;
         $user->middlename = $request->middlename;
         $user->lastname = $request->lastname;
         $user->email = $request->email;
-
-        // DIREK organizational assignment.
         $user->agency_id = $request->agency_id;
-
-        $user->staff_id = Agency::isDepDevId($request->agency_id)
-            ? $request->staff_id
-            : null;
-
-        $user->division_id = Agency::isDepDevId($request->agency_id)
-            ? $request->division_id
-            : null;
-
+        $isDepDev = Agency::isDepDevId($request->agency_id);
+        $user->staff_id = $isDepDev ? $request->staff_id : null;
+        $user->division_id = $isDepDev ? $request->division_id : null;
         $user->position_id = $request->position_id;
-
-        // DIREK access role.
         $user->role_id = $request->role_id;
-
-        // Preserve existing application defaults for new accounts.
         $user->enabledark = 'N';
         $user->emailnotif = 'Y';
         $user->twofactor = 'Y';
-
+        $user->twofactortype = 'Email';
         if ($request->filled('new-password')) {
             $user->password = $request->get('new-password');
         }
-
         $user->first_login = 'Y';
         $user->save();
-
-        return redirect()
-            ->route('users.index')
-            ->with('succes', 'User succesfully saved');
+        return redirect()->route('users.index')->with('succes', 'User successfully saved');
     }
-
-    /**
-     * Display the specified resource.
-     */
     public function show(string $id)
     {
-        //
-    }
+        $this->authorize('viewAny', User::class);
+        User::findOrFail($id);
 
-    /**
-     * Show the form for editing the specified resource.
-     *
-     * User Management uses the modal in users.index.
-     */
+        return redirect()->route('users.index');
+    }
     public function edit(string $id)
     {
-        //
-    }
+        $user = User::findOrFail($id);
+        $this->authorize('edit', [User::class, $user]);
 
-    /**
-     * Update an existing DIREK user.
-     */
+        return redirect()->route('users.index');
+    }
     public function update(UserRequest $request, User $user)
     {
         $this->authorize('edit', [User::class, $user]);
-
         $this->storeAllOldRelationshipValues($user);
-
         DB::transaction(function () use ($request, &$user) {
-            $user = User::whereKey($user->id)
-                ->lockForUpdate()
-                ->firstOrFail();
-
+            $user = User::whereKey($user->id)->lockForUpdate()->firstOrFail();
             $user->firstname = $request->firstname;
             $user->middlename = $request->middlename;
             $user->lastname = $request->lastname;
             $user->email = $request->email;
-
-            // DIREK organizational assignment.
             $user->agency_id = $request->agency_id;
-
-            $user->staff_id = Agency::isDepDevId($request->agency_id)
-                ? $request->staff_id
-                : null;
-
-            $user->division_id = Agency::isDepDevId($request->agency_id)
-                ? $request->division_id
-                : null;
-
+            $isDepDev = Agency::isDepDevId($request->agency_id);
+            $user->staff_id = $isDepDev ? $request->staff_id : null;
+            $user->division_id = $isDepDev ? $request->division_id : null;
             $user->position_id = $request->position_id;
-
-            // DIREK access role.
             $user->role_id = $request->role_id;
-
-            // Leave password unchanged when no new password is provided.
             if ($request->filled('new-password')) {
                 $user->password = $request->get('new-password');
             }
-
             $user->save();
         });
-
-        return redirect()
-            ->route('users.index')
-            ->with('succes', 'User succesfully updated');
+        return redirect()->route('users.index')->with('succes', 'User successfully updated');
     }
-
-    /**
-     * Delete a user.
-     */
     public function destroy(User $user)
     {
         $this->authorize('delete', [User::class, $user]);
-
         $user->delete();
-
-        return redirect()
-            ->route('users.index')
-            ->with('succes', 'User succesfully deleted');
+        return redirect()->route('users.index')->with('succes', 'User successfully deleted');
     }
-
-    /**
-     * DataTables source for DIREK User Management.
-     */
     public function getusers(Request $request)
     {
         $this->authorize('viewAny', User::class);
-
+        $fullNameExpression = "TRIM(CONCAT_WS(' ', users.firstname, users.middlename, users.lastname))";
         $users = User::query()
             ->select([
-                'users.id',
-                'users.firstname',
-                'users.middlename',
-                'users.lastname',
-                'users.email',
-                'users.agency_id',
-                'users.staff_id',
-                'users.division_id',
-                'users.position_id',
-                'users.role_id',
-                DB::raw(
-                    "TRIM(CONCAT_WS(' ', users.firstname, users.middlename, users.lastname)) as fullname"
-                ),
+                'users.id', 'users.firstname', 'users.middlename', 'users.lastname',
+                'users.email', 'users.agency_id', 'users.staff_id', 'users.division_id',
+                'users.position_id', 'users.role_id', DB::raw($fullNameExpression . ' as fullname'),
             ])
             ->with([
-                'staff:id,name,abbreviation',
-                'division:id,staff_id,name',
-                'role:id,name',
-                'agency:id,UACS_AGY_DSC,Abbreviation',
-                'position:id,name',
+                'staff:id,name,abbreviation', 'division:id,staff_id,name', 'role:id,name',
+                'agency:id,UACS_AGY_DSC,Abbreviation', 'position:id,name',
             ]);
-
         return DataTables::of($users)
-
-            ->editColumn('designation', function (User $user) {
-                return optional($user->position)->name;
-            })
-
-            ->editColumn('staff', function (User $user) {
-                return optional($user->staff)->name;
-            })
-
-            ->addColumn('division', function (User $user) {
-                return optional($user->division)->name;
-            })
-
-            ->addColumn('agency', function (User $user) {
-                return optional($user->agency)->display_name;
-            })
-
+            ->addColumn('designation', fn (User $user) => optional($user->position)->name)
+            ->editColumn('staff', fn (User $user) => optional($user->staff)->name)
+            ->addColumn('division', fn (User $user) => optional($user->division)->name)
+            ->addColumn('agency', fn (User $user) => optional($user->agency)->display_name)
             ->addColumn('role', function (User $user) {
                 if ($user->role === null) {
                     return null;
                 }
-
                 if (auth()->user()->can('edit', [Role::class, $user->role])) {
-                    return '<div class="btn-group" role="group">'
-                        . '<a data-bs-toggle="tooltip" '
-                        . 'data-bs-original-title="Update Role" '
-                        . 'class="border-0 bg-transparent mx-0" '
-                        . 'href="' . route('roles.edit', $user->role_id) . '">'
-                        . e($user->role->name)
-                        . '</a>'
-                        . '</div>';
+                    return '<a class="direk-role-link" data-bs-toggle="tooltip" data-bs-original-title="Update Role" href="'
+                        . e(route('roles.edit', $user->role_id)) . '">' . e($user->role->name) . '</a>';
                 }
-
                 return e($user->role->name);
             })
-
             ->addColumn('actions', function (User $user) {
-                $delete = '';
-                $edit = '';
-
-                if (auth()->user()->can('delete', [User::class, $user])) {
-                    $delete = '<form action="'
-                        . route('users.destroy', $user->id)
-                        . '" method="post" class="d-inline">'
-                        . '<input type="hidden" name="_method" value="DELETE">'
-                        . '<input type="hidden" name="_token" value="'
-                        . csrf_token()
-                        . '">'
-                        . '<button type="submit" '
-                        . 'onclick="return confirm(\'Are you sure you want to delete this user?\')" '
-                        . 'data-bs-toggle="tooltip" '
-                        . 'data-bs-original-title="Delete" '
-                        . 'class="border-0 bg-transparent px-2">'
-                        . '<i class="fa fa-times text-danger"></i>'
-                        . '</button>'
-                        . '</form>';
-                }
-
+                $actions = '';
+                $accountName = trim(($user->firstname ?? '') . ' ' . ($user->lastname ?? '')) ?: 'user';
                 if (auth()->user()->can('edit', [User::class, $user])) {
-                    $edit = '<button type="button" '
-                        . 'data-bs-toggle="tooltip" '
-                        . 'data-bs-original-title="Edit" '
-                        . 'class="border-0 bg-transparent px-2" '
-                        . 'onclick=\'showUser('
-                        . json_encode(
-                            $user,
-                            JSON_HEX_APOS
-                            | JSON_HEX_QUOT
-                            | JSON_HEX_AMP
-                            | JSON_HEX_TAG
-                        )
-                        . ', "'
-                        . route('users.update', $user->id)
-                        . '")\'>'
-                        . '<i class="fa fa-pencil text-info"></i>'
-                        . '</button>';
+                    // Only send the fields consumed by the edit modal.
+                    $payload = json_encode([
+                        'id' => $user->id,
+                        'firstname' => $user->firstname,
+                        'middlename' => $user->middlename,
+                        'lastname' => $user->lastname,
+                        'email' => $user->email,
+                        'agency_id' => $user->agency_id,
+                        'staff_id' => $user->staff_id,
+                        'division_id' => $user->division_id,
+                        'position_id' => $user->position_id,
+                        'role_id' => $user->role_id,
+                    ], JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_HEX_TAG | JSON_THROW_ON_ERROR);
+                    $updateUrl = json_encode(route('users.update', $user->id), JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_HEX_TAG | JSON_THROW_ON_ERROR);
+                    $handler = 'showUser(' . $payload . ', ' . $updateUrl . ')';
+                    $actions .= '<button type="button" class="border-0 bg-transparent px-2" data-bs-toggle="tooltip" data-bs-original-title="Edit" title="Edit user" aria-label="'
+                        . e('Edit ' . $accountName) . '" onclick="' . e($handler) . '"><i class="fa fa-pencil text-info" aria-hidden="true"></i></button>';
                 } elseif (auth()->id() == $user->id) {
-                    $edit = '<a '
-                        . 'data-bs-toggle="tooltip" '
-                        . 'data-bs-original-title="My Profile" '
-                        . 'class="border-0 bg-transparent px-2" '
-                        . 'href="'
-                        . route('user-profile')
-                        . '">'
-                        . '<i class="fa fa-user text-success"></i>'
-                        . '</a>';
+                    $actions .= '<a class="border-0 bg-transparent px-2" data-bs-toggle="tooltip" data-bs-original-title="My Profile" title="My Profile" aria-label="My Profile" href="'
+                        . e(route('user-profile')) . '"><i class="fa fa-user text-success" aria-hidden="true"></i></a>';
                 }
-
-                return '<div class="btn-group" role="group">'
-                    . $edit
-                    . $delete
-                    . '</div>';
+                if (auth()->user()->can('delete', [User::class, $user])) {
+                    $actions .= '<form action="' . e(route('users.destroy', $user->id)) . '" method="post" class="d-inline">'
+                        . '<input type="hidden" name="_method" value="DELETE">'
+                        . '<input type="hidden" name="_token" value="' . e(csrf_token()) . '">'
+                        . '<button type="submit" class="border-0 bg-transparent px-2" data-bs-toggle="tooltip" data-bs-original-title="Delete" title="Delete user" aria-label="'
+                        . e('Delete ' . $accountName) . '" onclick="return confirm(\'Are you sure you want to delete this user?\');"><i class="fa fa-times text-danger" aria-hidden="true"></i></button></form>';
+                }
+                return $actions === '' ? '<span aria-label="No actions available">—</span>' : '<div class="direk-user-actions" role="group" aria-label="User actions">' . $actions . '</div>';
             })
-
+            ->orderColumn('fullname', function ($query, $direction) use ($fullNameExpression) {
+                $direction = strtolower((string) $direction) === 'desc' ? 'desc' : 'asc';
+                $query->orderByRaw($fullNameExpression . ' ' . $direction);
+            })
             ->filterColumn('fullname', function ($query, $keyword) {
                 $query->where(function ($query) use ($keyword) {
-                    $query
-                        ->whereRaw(
-                            "CONCAT_WS(' ', users.firstname, users.lastname) like ?",
-                            ["%{$keyword}%"]
-                        )
-                        ->orWhereRaw(
-                            "CONCAT_WS(' ', users.firstname, users.middlename, users.lastname) like ?",
-                            ["%{$keyword}%"]
-                        )
-                        ->orWhereRaw(
-                            "CONCAT_WS(' ', users.lastname, users.firstname) like ?",
-                            ["%{$keyword}%"]
-                        )
+                    $query->whereRaw("CONCAT_WS(' ', users.firstname, users.lastname) like ?", ["%{$keyword}%"])
+                        ->orWhereRaw("CONCAT_WS(' ', users.firstname, users.middlename, users.lastname) like ?", ["%{$keyword}%"])
+                        ->orWhereRaw("CONCAT_WS(' ', users.lastname, users.firstname) like ?", ["%{$keyword}%"])
                         ->orWhere('users.firstname', 'like', "%{$keyword}%")
                         ->orWhere('users.middlename', 'like', "%{$keyword}%")
                         ->orWhere('users.lastname', 'like', "%{$keyword}%");
                 });
             })
-
             ->filterColumn('staff.name', function ($query, $keyword) {
                 $query->whereHas('staff', function ($query) use ($keyword) {
-                    $query
-                        ->where('name', 'like', "%{$keyword}%")
-                        ->orWhere('abbreviation', 'like', "%{$keyword}%");
+                    $query->where('name', 'like', "%{$keyword}%")->orWhere('abbreviation', 'like', "%{$keyword}%");
                 });
             })
-
             ->filterColumn('division.name', function ($query, $keyword) {
-                $query->whereHas('division', function ($query) use ($keyword) {
-                    $query->where('name', 'like', "%{$keyword}%");
-                });
+                $query->whereHas('division', fn ($query) => $query->where('name', 'like', "%{$keyword}%"));
             })
-
             ->filterColumn('agency.UACS_AGY_DSC', function ($query, $keyword) {
                 $query->whereHas('agency', function ($query) use ($keyword) {
-                    $query
-                        ->where('UACS_AGY_DSC', 'like', "%{$keyword}%")
-                        ->orWhere('Abbreviation', 'like', "%{$keyword}%");
+                    $query->where('UACS_AGY_DSC', 'like', "%{$keyword}%")->orWhere('Abbreviation', 'like', "%{$keyword}%");
                 });
             })
-
             ->filterColumn('position.name', function ($query, $keyword) {
-                $query->whereHas('position', function ($query) use ($keyword) {
-                    $query->where('name', 'like', "%{$keyword}%");
-                });
+                $query->whereHas('position', fn ($query) => $query->where('name', 'like', "%{$keyword}%"));
             })
-
             ->filterColumn('role.name', function ($query, $keyword) {
-                $query->whereHas('role', function ($query) use ($keyword) {
-                    $query->where('name', 'like', "%{$keyword}%");
-                });
+                $query->whereHas('role', fn ($query) => $query->where('name', 'like', "%{$keyword}%"));
             })
-
-            ->rawColumns([
-                'role',
-                'actions',
-            ])
-
+            ->rawColumns(['role', 'actions'])
             ->toJson();
     }
 }

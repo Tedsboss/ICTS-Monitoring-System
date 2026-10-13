@@ -1,13 +1,15 @@
 @extends('layouts.app')
 @section('content')
+@php $fpModernDark = session('user_settings.class_theme', '') === 'dark'; @endphp
 <nav class="navbar navbar-main navbar-expand-lg px-0 mx-4 shadow-none border-radius-xl z-index-sticky">
     <div class="container-fluid py-2 px-3">
         @include('layouts.navbars.auth.topnav', ['title' => 'Financial Plan Builder'])
         @include('layouts.navbars.auth.topnav-withdatetime')
     </div>
 </nav>
-<div class="px-4 pb-8 pt-4">
+<div id="fp-builder" class="fp-modern px-4 pb-8 pt-4" data-theme="{{ $fpModernDark ? 'dark' : 'light' }}">
     <div class="mx-auto max-w-[1800px]">
+<header class="fp-modern-heading"><div><span class="fp-modern-eyebrow">Financial workspace / Builder</span><h2>Build a plan with clear direction.</h2><p>Connect program budgets, activities, people, and monthly financial targets.</p></div><span class="fp-modern-context">Fiscal Year {{ $fiscalYear }}</span></header>
         <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
             <a href="{{ route('financial-plans.index', ['fiscal_year' => $fiscalYear, 'office_name' => $officeName]) }}"
                class="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50">
@@ -283,7 +285,7 @@
         cursor: not-allowed;
     }
 </style>
-<div id="targetDistributionModal" class="fixed inset-0 z-[9999] hidden items-center justify-center bg-slate-900/50 p-4">
+<div id="targetDistributionModal" data-theme="{{ $fpModernDark ? 'dark' : 'light' }}" class="fp-modern fixed inset-0 z-[9999] hidden items-center justify-center bg-slate-900/50 p-4">
     <div class="w-full max-w-2xl rounded-2xl bg-white shadow-2xl">
         <div class="flex items-start justify-between border-b border-slate-200 px-5 py-4">
             <div>
@@ -881,23 +883,52 @@ $(document).ready(function () {
     }
     // Show a Bootstrap message
     function showMessage(message, type = 'success') {
-        $('#builderMessage').html(`
-            <div class="alert alert-${type} alert-dismissible fade show" role="alert">
-                ${esc(message)}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        const allowedTypes = ['success', 'danger', 'warning', 'info'];
+        const alertType = allowedTypes.includes(type) ? type : 'info';
+        const $container = $('#builderMessage');
+        $container.html(`
+            <div class="alert alert-${alertType} alert-dismissible fade show"
+                role="alert"
+                tabindex="-1">
+                <div style="white-space:pre-line;">${esc(message)}</div>
+                <button type="button"
+                        class="btn-close"
+                        data-bs-dismiss="alert"
+                        aria-label="Close"></button>
             </div>
         `);
-    }
-    // Read the best available server error message
-    function getErrorMessage(xhr, fallback = 'Something went wrong.') {
-        if (xhr?.responseJSON?.message) {
-            return xhr.responseJSON.message;
-        }
-        if (xhr?.responseJSON?.errors) {
-            const messages = Object.values(xhr.responseJSON.errors).flat();
-            if (messages.length) {
-                return messages.join('\n');
+        if (alertType === 'danger' || alertType === 'warning') {
+            const alert = $container.find('[role="alert"]').get(0);
+            if (alert) {
+                alert.scrollIntoView({
+                    behavior: 'auto',
+                    block: 'center'
+                });
+                alert.focus({ preventScroll: true });
             }
+        }
+    }
+    function getErrorMessage(xhr, fallback = 'Something went wrong.') {
+        let response = xhr?.responseJSON;
+        if (!response && xhr?.responseText) {
+            try {
+                response = JSON.parse(xhr.responseText);
+            } catch {
+                response = null;
+            }
+        }
+        if (response?.errors && typeof response.errors === 'object') {
+            const messages = Object.values(response.errors)
+                .flat()
+                .filter(message => typeof message === 'string')
+                .map(message => message.trim())
+                .filter(Boolean);
+            if (messages.length) {
+                return [...new Set(messages)].join('\n');
+            }
+        }
+        if (typeof response?.message === 'string' && response.message.trim()) {
+            return response.message;
         }
         return fallback;
     }
@@ -1634,6 +1665,70 @@ $(document).ready(function () {
         });
         return warnings;
     }
+    function checkExpenseAllocationRows(rows) {
+        const issues = [];
+        const groups = new Map();
+        rows.forEach(row => {
+            const name = String(row.name || '').trim();
+            if (!name) return;
+            const allocation = row.allocation;
+            const id = Number(allocation?.allocation_id || allocation?.id || 0);
+            const key = JSON.stringify([id, name]);
+            if (!groups.has(key)) {
+                groups.set(key, { name, allocation, mooe: 0, capital_outlay: 0 });
+            }
+            const group = groups.get(key);
+            group.mooe += Math.round(Number(row.mooe || 0) * 100);
+            group.capital_outlay += Math.round(Number(row.capital_outlay || 0) * 100);
+        });
+        groups.forEach(group => {
+            const { name, allocation } = group;
+            const expenses = (Array.isArray(allocation?.expenses) ? allocation.expenses : [])
+                .filter(item => String(item.name ?? item.description ?? '').trim() === name);
+            if (!allocation || !expenses.length) {
+                issues.push({ type: 'error', message: `${name}: no matching Allocation expense is available.` });
+                return;
+            }
+            if (!Object.prototype.hasOwnProperty.call(allocation, 'expense_usage')
+                || expenses.some(item => item.cost === null || item.cost === undefined
+                    || !Number.isFinite(Number(item.cost)))) {
+                issues.push({ type: 'error', message: `${name}: expense budget information is unavailable. Refresh the builder after updating the controller.` });
+                return;
+            }
+            const ceilings = { mooe: 0, capital_outlay: 0 };
+            expenses.forEach(item => {
+                const type = normalizeExpenseType(item.type);
+                const category = type === 'MOOE' ? 'mooe' : type === 'CO' ? 'capital_outlay' : null;
+                if (category) ceilings[category] += Math.round(Number(item.cost) * 100);
+            });
+            ['mooe', 'capital_outlay'].forEach(category => {
+                if (group[category] <= 0) return;
+                const used = Number(allocation.expense_usage?.[name]?.[category] || 0);
+                const combined = group[category] + used;
+                const ceiling = ceilings[category];
+                if (combined <= ceiling) return;
+                const label = category === 'mooe' ? 'MOOE' : 'Capital Outlay';
+                issues.push({
+                    type: 'error',
+                    message: `${name} (${label}): allocated budget is ₱${fmtNum(ceiling / 100)}, combined programmed amount is ₱${fmtNum(combined / 100)}, exceeding the allocation by ₱${fmtNum((combined - ceiling) / 100)}. Other plans use ₱${fmtNum(used / 100)}.`
+                });
+            });
+        });
+        return issues;
+    }
+    function getExpenseAllocationIssues() {
+        const rows = [];
+        $('#builderBody tr[data-row-type="item"]').each(function () {
+            const $tr = $(this);
+            rows.push({
+                allocation: getRowAllocation($tr),
+                name: $tr.find('[data-field="expense_item"]').val(),
+                mooe: $tr.find('[data-field="mooe"]').val(),
+                capital_outlay: $tr.find('[data-field="capital_outlay"]').val()
+            });
+        });
+        return checkExpenseAllocationRows(rows);
+    }
     function getProgramAllocationIssues() {
         const issues = [];
         const current = {};
@@ -1674,7 +1769,7 @@ $(document).ready(function () {
                 issues.push({ type: 'error', message: `${allocation.program_name}: combined Contract Amount exceeds the Program Allocation budget by ${fmtNum(Number(allocation.other_contract || 0) + totals.contract - Number(allocation.total_budget || 0))}.` });
             }
         });
-        return issues;
+        return issues.concat(getExpenseAllocationIssues());
     }
     // Build a client-side preview of the server Submit validation.
     // Laravel remains the authoritative validation when the plan is submitted.
@@ -2539,3 +2634,5 @@ $(document).ready(function () {
     }
 }
 </style>
+
+@include('financial-plans.modern-styles')

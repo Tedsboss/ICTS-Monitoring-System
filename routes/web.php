@@ -1,7 +1,4 @@
 <?php
-
-use Illuminate\Support\Facades\Route;
-
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\ResetPassword;
 use App\Http\Controllers\Auth\ChangePassword;
@@ -10,6 +7,7 @@ use App\Http\Controllers\ApiClientController;
 use App\Http\Controllers\DivisionController;
 use App\Http\Controllers\FinancialPlanController;
 use App\Http\Controllers\WorkPlanController;
+use App\Http\Controllers\MonthlyDisbursementProgramController;
 use App\Http\Controllers\FinancialPlanAllocationTypeController;
 use App\Http\Controllers\AllocationController;
 use App\Http\Controllers\GoogleAuthController;
@@ -36,506 +34,363 @@ use App\Http\Controllers\UpliftSubmissionController;
 use App\Http\Controllers\StaffPersonnelController;
 use App\Http\Controllers\ExpenseItemController;
 use App\Http\Controllers\FiscalYearController;
-use App\Http\Controllers\LevelController; 
-use App\Http\Controllers\ExpenseTypeController; 
+use App\Http\Controllers\LevelController;
+use App\Http\Controllers\ExpenseTypeController;
 use App\Http\Controllers\ProgramClassificationController;
+use Illuminate\Support\Facades\Route;
 
-/*
-|--------------------------------------------------------------------------
-| Web Routes
-|--------------------------------------------------------------------------
-*/
-
+// --------------------------------------------------------------------------
+// Web Routes
+// --------------------------------------------------------------------------
 Route::get('/', function () {
     return redirect()->route('saebs.index');
 });
 
 Route::get('/login', [LoginController::class, 'show'])
-  ->middleware(['guest', 'check.restricted.ips'])
-  ->name('login');
-
+    ->middleware(['guest', 'check.restricted.ips'])
+    ->name('login');
 Route::get('/login/unknownuser', [LoginController::class, 'unknownuser'])
-  ->middleware('guest')
-  ->name('login.unknownuser');
-
+    ->middleware('guest')
+    ->name('login.unknownuser');
 Route::get('/blocked', [RestrictedIpController::class, 'blocked'])
-  ->name('blocked');
-
+    ->name('blocked');
 Route::group(['middleware' => 'check.restricted.ips'], function () {
-  Route::post('/login', [LoginController::class, 'login'])
-    ->middleware('login.ip.throttle')
-    ->name('login.perform');
-
-  Route::group(['middleware' => 'guest'], function () {
-    Route::get('/login/azure', [AppAzure::class, 'azure'])
-      ->name('azure.login');
-
-    Route::get('/login/azurecallback', [AppAzure::class, 'azurecallback'])
-      ->name('azure.callback');
-
-    Route::get('/auth/google/redirect', [GoogleAuthController::class, 'redirect'])
-      ->name('auth.google.redirect');
-
-    Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback'])
-      ->name('auth.google.callback');
-
-    Route::get('/reset-password', [ResetPassword::class, 'show'])
-      ->name('reset');
-
-    Route::post('/reset-password', [ResetPassword::class, 'send'])
-      ->middleware('reset.ip.throttle')
-      ->name('reset.perform');
-
-    Route::get('/change-password', [ChangePassword::class, 'show'])
-      ->middleware('guest')
-      ->name('change.password');
-
-    Route::post('/change-password', [ChangePassword::class, 'update'])
-      ->middleware('guest')
-      ->name('change.perform');
-
-    Route::get('/guest/contact-us', [InquiryController::class, 'create'])
-      ->name('guest.contactus.create');
-
-    Route::post('/guest/contact-us', [InquiryController::class, 'store'])
-      ->middleware('message.ip.throttle')
-      ->name('guest.contactus.store');
-  });
-
-  Route::group(['middleware' => 'auth'], function () {
-    Route::get('/2fa/challenge', [TwoFactorController::class, 'show'])
-      ->name('2fa.challenge.show');
-
-    Route::post('/2fa/verify', [TwoFactorController::class, 'verify'])
-      ->name('2fa.verify');
-
-    Route::post('/2fa/resend', [TwoFactorController::class, 'resend'])
-      ->name('2fa.resend');
-
-    Route::group(['middleware' => 'two.factor'], function () {
-      Route::get('/user-profile', [ProfileController::class, 'show'])
-        ->name('user-profile');
-
-      Route::post('/user-profile', [ProfileController::class, 'update'])
-        ->name('user-profile.perform');
-
-      Route::get('/user-profile/{trusteddevice}', [ProfileController::class, 'revoke'])
-        ->name('user-profile.revoke');
-
-      Route::get('/auth/contact-us', [InquiryController::class, 'create'])
-        ->name('auth.contactus.create');
-
-      Route::post('/auth/contact-us', [InquiryController::class, 'store'])
-        ->middleware('message.ip.throttle')
-        ->name('auth.contactus.store');
-
-      Route::group(['middleware' => 'first.login'], function () {
-        Route::get('home', [HomeController::class, 'index'])
-          ->name('home');
-
-        Route::get('saeb-summary', [SaebSummaryController::class, 'index'])
-          ->name('saeb.index');
-
-        /*
-        |--------------------------------------------------------------------------
-        | Submissions
-        |--------------------------------------------------------------------------
-        */
-
-        Route::resource('submissions', FormSubmissionController::class, [
-          'except' => ['destroy'],
-          'parameters' => ['submissions' => 'form_submission'],
-        ]);
-
-        Route::post('submissions/{form_submission}/submit', [FormSubmissionController::class, 'submit'])
-          ->name('submissions.submit');
-
-        Route::post('submissions/{form_submission}/approve', [FormSubmissionController::class, 'approve'])
-          ->name('submissions.approve');
-
-        Route::post('submissions/{form_submission}/return', [FormSubmissionController::class, 'return'])
-          ->name('submissions.return');
-
-        Route::post('submissions/{form_submission}/reject', [FormSubmissionController::class, 'reject'])
-          ->name('submissions.reject');
-
-        Route::resource('uplift-submissions', UpliftSubmissionController::class, [
-          'except' => ['destroy'],
-          'parameters' => ['uplift-submissions' => 'uplift_submission'],
-        ]);
-
-        Route::post('uplift-submissions/{uplift_submission}/submit', [UpliftSubmissionController::class, 'submit'])
-          ->name('uplift-submissions.submit');
-
-        Route::post('uplift-submissions/{uplift_submission}/approve', [UpliftSubmissionController::class, 'approve'])
-          ->name('uplift-submissions.approve');
-
-        Route::post('uplift-submissions/{uplift_submission}/return', [UpliftSubmissionController::class, 'return'])
-          ->name('uplift-submissions.return');
-
-        Route::post('uplift-submissions/{uplift_submission}/reject', [UpliftSubmissionController::class, 'reject'])
-          ->name('uplift-submissions.reject');
-
-        Route::get('notifications/submissions', [SubmissionNotificationController::class, 'index'])
-          ->name('notifications.submissions.index');
-
-        Route::post('notifications/submissions/{notification}/read', [SubmissionNotificationController::class, 'read'])
-          ->name('notifications.submissions.read');
-
-        /*
-        |--------------------------------------------------------------------------
-        | Administrator Basic Resources
-        |--------------------------------------------------------------------------
-        */
-
-        Route::resource('administrator/parameters', ParameterController::class, [
-          'except' => ['show', 'create', 'edit', 'destroy'],
-        ]);
-
-        Route::resource('administrator/agencies', AgencyController::class, [
-          'except' => ['show', 'create', 'store', 'edit', 'destroy'],
-        ]);
-
-        /*
-        |--------------------------------------------------------------------------
-        | Administrator Forms
-        |--------------------------------------------------------------------------
-        */
-
-        Route::get('administrator/forms/agencies/search', [FormController::class, 'searchAgencies'])
-          ->name('forms.agencies.search');
-
-        Route::resource('administrator/forms', FormController::class, [
-          'except' => ['show', 'create', 'destroy'],
-        ]);
-
-        Route::get('administrator/forms/{form}/preview', [FormController::class, 'preview'])
-          ->name('forms.preview');
-
-        Route::post('administrator/forms/{form}/duplicate', [FormController::class, 'duplicate'])
-          ->name('forms.duplicate');
-
-        Route::post('administrator/forms/{form}/fields', [FormController::class, 'storeField'])
-          ->name('forms.fields.store');
-
-        Route::put('administrator/forms/{form}/fields', [FormController::class, 'updateFields'])
-          ->name('forms.fields.update-all');
-
-        Route::put('administrator/forms/{form}/fields/{form_field}', [FormController::class, 'updateField'])
-          ->name('forms.fields.update');
-
-        Route::delete('administrator/forms/{form}/fields/{form_field}', [FormController::class, 'destroyField'])
-          ->name('forms.fields.destroy');
-
-        
-        /*
-        |--------------------------------------------------------------------------
-        | Administrator Resources
-        |--------------------------------------------------------------------------
-        */
-
-        Route::resource('administrator/roles', RoleController::class, [
-          'except' => ['show', 'create'],
-        ]);
-
-        Route::resource('administrator/users', UserController::class, [
-          'except' => ['show', 'create', 'edit'],
-        ]);
-
-        Route::resource('administrator/systemlogs', SystemLogController::class, [
-          'except' => ['create', 'show', 'store', 'edit', 'update', 'destroy'],
-        ]);
-
-        Route::resource('administrator/restrictedips', RestrictedIpController::class, [
-          'except' => ['show', 'create', 'edit', 'update'],
-        ]);
-
-        Route::get('administrator/api-clients', [ApiClientController::class, 'index'])
-          ->name('api-clients.index');
-
-        Route::post('administrator/api-clients', [ApiClientController::class, 'store'])
-          ->name('api-clients.store');
-
-        Route::post('administrator/api-clients/{api_client}/revoke', [ApiClientController::class, 'revoke'])
-          ->name('api-clients.revoke');
-
-        Route::resource('administrator/holidays', HolidayController::class, [
-          'except' => ['show', 'create'],
-        ]);
-
-        Route::resource('administrator/staffs', StaffController::class, [
-          'except' => ['show', 'create', 'store'],
-        ]);
-
-        // Staff Personnel
-        Route::resource('administrator/staff-personnel', StaffPersonnelController::class, [
-        'except' => ['show', 'create', 'edit'],
-        ]);
-
-        Route::get(
-        'administrator/staff-personnel/{staff_personnel}/switchstatus',
-        [StaffPersonnelController::class, 'switchstatus']
-        )->name('staff-personnel.switchstatus');
-
-        Route::resource('administrator/divisions', DivisionController::class, [
-          'except' => ['show', 'create', 'store'],
-        ]);
-
-        Route::get('administrator/restrictedips/{restrictedip}/updatestatus', [RestrictedIpController::class, 'updatestatus'])
-          ->name('restrictedips.updatestatus');
-
-        Route::get('administrator/agencies/{agency}/switchstatus', [AgencyController::class, 'switchstatus'])
-          ->name('agencies.switchstatus');
-
-        Route::get('administrator/divisions/{division}/switchstatus', [DivisionController::class, 'switchstatus'])
-          ->name('divisions.switchstatus');
-
-        Route::get('administrator/staffs/{staff}/switchstatus', [StaffController::class, 'switchstatus'])
-          ->name('staffs.switchstatus');
-
-        /*
-        |--------------------------------------------------------------------------
-        | DataTable / AJAX Routes
-        |--------------------------------------------------------------------------
-        */
-
-        Route::post('administrator/roles/getroles', [RoleController::class, 'getroles'])
-          ->name('getroles');
-
-        Route::post('administrator/users/getusers', [UserController::class, 'getusers'])
-          ->name('getusers');
-
-        Route::post('administrator/systemlogs/getsystemlogs', [SystemLogController::class, 'getsystemlogs'])
-          ->name('getsystemlogs');
-
-        Route::post('administrator/systemlogs/gethistory', [SystemLogController::class, 'gethistory'])
-          ->name('gethistory');
-
-        Route::post('administrator/systemlogs/{tablename}/{rowid}', [SystemLogController::class, 'getmodellogs'])
-          ->name('getmodellogs');
-
-        Route::post('administrator/rectrictedips/getrectrictedips', [RestrictedIpController::class, 'getrestrictedips'])
-          ->name('getrestrictedips');
-
-        Route::post('administrator/parameters/getparameters', [ParameterController::class, 'getparameters'])
-          ->name('getparameters');
-
-        Route::post('administrator/agencies/getagencies', [AgencyController::class, 'getagencies'])
-          ->name('getagencies');
-
-        Route::post('administrator/forms/getforms', [FormController::class, 'getforms'])
-          ->name('getforms');
-
-        Route::post('administrator/inquiries/getinquiries', [InquiryController::class, 'getinquiries'])
-          ->name('getinquiries');
-
-        Route::post('administrator/holidays/getholidays', [HolidayController::class, 'getholidays'])
-          ->name('getholidays');
-
-        Route::post('administrator/staffs/getstaffs', [StaffController::class, 'getstaffs'])
-          ->name('getstaffs');
-
-        Route::post('administrator/divisions/getdivisions', [DivisionController::class, 'getdivisions'])
-          ->name('getdivisions');
-
-        /*
-        |--------------------------------------------------------------------------
-        | Inquiries
-        |--------------------------------------------------------------------------
-        */
-
-        Route::get('administrator/inquiries', [InquiryController::class, 'index'])
-          ->name('inquiries.index');
-
-        Route::put('administrator/inquiries/submit/{inquiry}', [InquiryController::class, 'submit'])
-          ->name('inquiries.submit');
-
-        Route::post('administrator/inquiries/updatestatus', [InquiryController::class, 'updatestatus'])
-          ->name('inquiries.updatestatus');
-
-        Route::prefix('administrator')->group(function () {
-
-            // Financial Plan Allocation Types
-            Route::resource(
-                'financial-plan-allocation-types',
-                FinancialPlanAllocationTypeController::class,
-                [
-                    'except' => ['show', 'create', 'edit'],
-                    'parameters' => [
-                        'financial-plan-allocation-types' => 'financialPlanAllocationType',
-                    ],
-                ]
-            );
-            
-
-            // Allocation Management
-            Route::resource(
-                'allocations',
-                AllocationController::class
-            )->except(['show']);
-            // Fiscal Year Management
-            Route::resource('fiscal-years', FiscalYearController::class)
-                ->except(['show']);
-            // Level Management
-            Route::resource('levels', LevelController::class)->except(['show']);
-            
-            // Program Classification
-            Route::prefix('program-classification')
-                ->name('program-classification.')
-                ->group(function () {
-                    Route::get('headers', [ProgramClassificationController::class, 'headers'])
-                        ->name('headers');
-
-                    Route::get('headers/{header}/sub-headers', [ProgramClassificationController::class, 'subHeaders'])
-                        ->name('sub-headers');
-
-                    Route::get('sub-headers/{subHeader}/programs', [ProgramClassificationController::class, 'programs'])
-                        ->name('programs');
-
-                    Route::get('programs/{program}/expenditures', [ProgramClassificationController::class, 'expenditures'])
-                        ->name('expenditures');
-                });
-                
-            Route::resource('expense-types', ExpenseTypeController::class)->except(['show']);
-
-            Route::get('saebs/data', [SaebController::class, 'data'])->name('saebs.data');
-            Route::resource('saebs', SaebController::class);
-
-            Route::get('procurements/data', [ProcurementController::class, 'data'])->name('procurements.data');
-            Route::resource('procurements', ProcurementController::class);
-
-            Route::get('financial-plans/all', [FinancialPlanController::class, 'plans'])
-                ->middleware('performance')
-                ->name('financial-plans.plans');
-
-            Route::get('financial-plans', [FinancialPlanController::class, 'index'])
-                ->middleware('performance')
-                ->name('financial-plans.index');
-
-            Route::get('financial-plans/data', [FinancialPlanController::class, 'data'])
-                ->middleware('performance')
-                ->name('financial-plans.data');
-
-            Route::get('financial-plans/builder', [FinancialPlanController::class, 'builder'])
-                ->middleware('performance')
-                ->name('financial-plans.builder');
-
-            Route::post('financial-plans/save', [FinancialPlanController::class, 'save'])
-                ->middleware('performance')
-                ->name('financial-plans.save');
-
-            Route::post('financial-plans/submit', [FinancialPlanController::class, 'submitForApproval'])
-                ->middleware('performance')
-                ->name('financial-plans.submit');
-
-        Route::prefix('expense-items')
-            ->name('expense-items.')
-            ->group(function () {
-                Route::get('/', [ExpenseItemController::class, 'index'])
-                    ->name('index');
-
-        Route::post('/', [ExpenseItemController::class, 'store'])
-            ->name('store');
-
-            Route::put('/{expenseItem}', [ExpenseItemController::class, 'update'])
-                ->name('update');
-
-            Route::patch('/{expenseItem}/toggle', [ExpenseItemController::class, 'toggle'])
-                ->name('toggle');
-             });
-
-            Route::post('financial-plans/save', [FinancialPlanController::class, 'save'])
-                ->name('financial-plans.save');
-
-            Route::delete('financial-plans/destroy-plan', [FinancialPlanController::class, 'destroyPlan'])
-                ->name('financial-plans.destroy-plan');
-
-            Route::delete('financial-plans/{financial_plan}', [FinancialPlanController::class, 'destroy'])
-                ->name('financial-plans.destroy');
-
-            Route::get('/financial-plans/export-pdf', [FinancialPlanController::class, 'exportPdf'])
-                ->name('financial-plans.export-pdf');
-
-                Route::get('financial-plans/totals', [FinancialPlanController::class, 'totals'])
-    ->name('financial-plans.totals');
-
-            Route::get('/financial-plans/signatories', [FinancialPlanController::class, 'signatories'])->name('financial-plans.signatories');
-            Route::post('/financial-plans/signatories', [FinancialPlanController::class, 'saveSignatories'])->name('financial-plans.signatories.save');
-
-            // WFP workflow
-            Route::post('financial-plans/submit', [FinancialPlanController::class, 'submitForApproval'])
-                ->name('financial-plans.submit');
-
-            Route::post('financial-plans/approve', [FinancialPlanController::class, 'approve'])
-                ->name('financial-plans.approve');
-
-            Route::post('financial-plans/return', [FinancialPlanController::class, 'returnForRevision'])
-                ->name('financial-plans.return');
-
-            Route::post('financial-plans/finalize', [FinancialPlanController::class, 'finalize'])
-                ->name('financial-plans.finalize');
-
-            Route::post('financial-plans/reopen', [FinancialPlanController::class, 'reopen'])
-                ->name('financial-plans.reopen');
-
-            Route::get('financial-plans/status', [FinancialPlanController::class, 'status'])
-                ->name('financial-plans.status');
-
-            // Work Plan
-            Route::get('work-plans/all', [WorkPlanController::class, 'plans'])
-                ->middleware('performance')
-                ->name('work-plans.plans');
-
-            Route::get('work-plans', [WorkPlanController::class, 'index'])
-                ->middleware('performance')
-                ->name('work-plans.index');
-
-            Route::get('work-plans/data', [WorkPlanController::class, 'data'])
-                ->middleware('performance')
-                ->name('work-plans.data');
-
-            Route::get('work-plans/builder', [WorkPlanController::class, 'builder'])
-                ->middleware('performance')
-                ->name('work-plans.builder');
-
-            Route::post('work-plans/save', [WorkPlanController::class, 'save'])
-                ->middleware('performance')
-                ->name('work-plans.save');
-
-            Route::post('work-plans/{workPlan}/sync-financial-plan', [WorkPlanController::class, 'syncFinancialPlan'])
-                ->middleware('performance')
-                ->name('work-plans.sync-financial-plan');
-
-            Route::post('work-plans/{workPlan}/submit', [WorkPlanController::class, 'submit'])
-                ->middleware('performance')
-                ->name('work-plans.submit');
-
-            Route::get('work-plans/{workPlan}/export-pdf', [WorkPlanController::class, 'exportPdf'])
-                ->name('work-plans.export-pdf');
-
-            Route::delete('work-plans/{workPlan}', [WorkPlanController::class, 'destroy'])
-                ->name('work-plans.destroy');
-
-            Route::post('work-plans/{workPlan}/submit', [WorkPlanController::class, 'submit'])
-                ->name('work-plans.submit');
-
-            Route::post('work-plans/{workPlan}/approve', [WorkPlanController::class, 'approve'])
-                ->name('work-plans.approve');
-
-            Route::post('work-plans/{workPlan}/return', [WorkPlanController::class, 'returnPlan'])
-                ->name('work-plans.return');
-
-            Route::post('work-plans/{workPlan}/finalize', [WorkPlanController::class, 'finalize'])
-                ->name('work-plans.finalize');
-
-            Route::post('work-plans/{workPlan}/reopen', [WorkPlanController::class, 'reopen'])
-                ->name('work-plans.reopen');
-
-        });
-      });
+    Route::post('/login', [LoginController::class, 'login'])
+        ->middleware('login.ip.throttle')
+        ->name('login.perform');
+    Route::group(['middleware' => 'guest'], function () {
+        Route::get('/login/azure', [AppAzure::class, 'azure'])
+            ->name('azure.login');
+        Route::get('/login/azurecallback', [AppAzure::class, 'azurecallback'])
+            ->name('azure.callback');
+        Route::get('/auth/google/redirect', [GoogleAuthController::class, 'redirect'])
+            ->name('auth.google.redirect');
+        Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback'])
+            ->name('auth.google.callback');
+        Route::get('/reset-password', [ResetPassword::class, 'show'])
+            ->name('reset');
+        Route::post('/reset-password', [ResetPassword::class, 'send'])
+            ->middleware('reset.ip.throttle')
+            ->name('reset.perform');
+        Route::get('/change-password', [ChangePassword::class, 'show'])
+            ->middleware('guest')
+            ->name('change.password');
+        Route::post('/change-password', [ChangePassword::class, 'update'])
+            ->middleware('guest')
+            ->name('change.perform');
+        Route::get('/guest/contact-us', [InquiryController::class, 'create'])
+            ->name('guest.contactus.create');
+        Route::post('/guest/contact-us', [InquiryController::class, 'store'])
+            ->middleware('message.ip.throttle')
+            ->name('guest.contactus.store');
     });
-
-    Route::post('logout', [LoginController::class, 'logout'])
-      ->name('logout');
-  });
+    Route::group(['middleware' => 'auth'], function () {
+        Route::get('/2fa/challenge', [TwoFactorController::class, 'show'])
+            ->name('2fa.challenge.show');
+        Route::post('/2fa/verify', [TwoFactorController::class, 'verify'])
+            ->name('2fa.verify');
+        Route::post('/2fa/resend', [TwoFactorController::class, 'resend'])
+            ->name('2fa.resend');
+        Route::group(['middleware' => 'two.factor'], function () {
+            Route::get('/user-profile', [ProfileController::class, 'show'])
+                ->name('user-profile');
+            Route::post('/user-profile', [ProfileController::class, 'update'])
+                ->name('user-profile.perform');
+            Route::get('/user-profile/{trusteddevice}', [ProfileController::class, 'revoke'])
+                ->name('user-profile.revoke');
+            Route::get('/auth/contact-us', [InquiryController::class, 'create'])
+                ->name('auth.contactus.create');
+            Route::post('/auth/contact-us', [InquiryController::class, 'store'])
+                ->middleware('message.ip.throttle')
+                ->name('auth.contactus.store');
+            Route::group(['middleware' => 'first.login'], function () {
+                Route::get('home', [HomeController::class, 'index'])
+                    ->name('home');
+                Route::get('saeb-summary', [SaebSummaryController::class, 'index'])
+                    ->name('saeb.index');
+                // --------------------------------------------------------------------------
+                // Submissions
+                // --------------------------------------------------------------------------
+                Route::resource('submissions', FormSubmissionController::class, [
+                    'except' => ['destroy'],
+                    'parameters' => ['submissions' => 'form_submission'],
+                ]);
+                Route::post('submissions/{form_submission}/submit', [FormSubmissionController::class, 'submit'])
+                    ->name('submissions.submit');
+                Route::post('submissions/{form_submission}/approve', [FormSubmissionController::class, 'approve'])
+                    ->name('submissions.approve');
+                Route::post('submissions/{form_submission}/return', [FormSubmissionController::class, 'return'])
+                    ->name('submissions.return');
+                Route::post('submissions/{form_submission}/reject', [FormSubmissionController::class, 'reject'])
+                    ->name('submissions.reject');
+                Route::resource('uplift-submissions', UpliftSubmissionController::class, [
+                    'except' => ['destroy'],
+                    'parameters' => ['uplift-submissions' => 'uplift_submission'],
+                ]);
+                Route::post('uplift-submissions/{uplift_submission}/submit', [UpliftSubmissionController::class, 'submit'])
+                    ->name('uplift-submissions.submit');
+                Route::post('uplift-submissions/{uplift_submission}/approve', [UpliftSubmissionController::class, 'approve'])
+                    ->name('uplift-submissions.approve');
+                Route::post('uplift-submissions/{uplift_submission}/return', [UpliftSubmissionController::class, 'return'])
+                    ->name('uplift-submissions.return');
+                Route::post('uplift-submissions/{uplift_submission}/reject', [UpliftSubmissionController::class, 'reject'])
+                    ->name('uplift-submissions.reject');
+                Route::get('notifications/submissions', [SubmissionNotificationController::class, 'index'])
+                    ->name('notifications.submissions.index');
+                Route::post('notifications/submissions/{notification}/read', [SubmissionNotificationController::class, 'read'])
+                    ->name('notifications.submissions.read');
+                // --------------------------------------------------------------------------
+                // Administrator Basic Resources
+                // --------------------------------------------------------------------------
+                Route::resource('administrator/parameters', ParameterController::class, [
+                    'except' => ['show', 'create', 'edit', 'destroy'],
+                ]);
+                Route::resource('administrator/agencies', AgencyController::class, [
+                    'except' => ['show', 'create', 'store', 'edit', 'destroy'],
+                ]);
+                // --------------------------------------------------------------------------
+                // Administrator Forms
+                // --------------------------------------------------------------------------
+                Route::get('administrator/forms/agencies/search', [FormController::class, 'searchAgencies'])
+                    ->name('forms.agencies.search');
+                Route::resource('administrator/forms', FormController::class, [
+                    'except' => ['show', 'create', 'destroy'],
+                ]);
+                Route::get('administrator/forms/{form}/preview', [FormController::class, 'preview'])
+                    ->name('forms.preview');
+                Route::post('administrator/forms/{form}/duplicate', [FormController::class, 'duplicate'])
+                    ->name('forms.duplicate');
+                Route::post('administrator/forms/{form}/fields', [FormController::class, 'storeField'])
+                    ->name('forms.fields.store');
+                Route::put('administrator/forms/{form}/fields', [FormController::class, 'updateFields'])
+                    ->name('forms.fields.update-all');
+                Route::put('administrator/forms/{form}/fields/{form_field}', [FormController::class, 'updateField'])
+                    ->name('forms.fields.update');
+                Route::delete('administrator/forms/{form}/fields/{form_field}', [FormController::class, 'destroyField'])
+                    ->name('forms.fields.destroy');
+                // --------------------------------------------------------------------------
+                // Administrator Resources
+                // --------------------------------------------------------------------------
+                Route::resource('administrator/roles', RoleController::class, [
+                    'except' => ['show', 'create'],
+                ]);
+                // User creation and editing are handled by the users.index modal.
+                Route::resource('administrator/users', UserController::class, [
+                    'except' => ['show', 'create', 'edit'],
+                ]);
+                Route::resource('administrator/systemlogs', SystemLogController::class, [
+                    'except' => ['create', 'show', 'store', 'edit', 'update', 'destroy'],
+                ]);
+                Route::resource('administrator/restrictedips', RestrictedIpController::class, [
+                    'except' => ['show', 'create', 'edit', 'update'],
+                ]);
+                Route::get('administrator/api-clients', [ApiClientController::class, 'index'])
+                    ->name('api-clients.index');
+                Route::post('administrator/api-clients', [ApiClientController::class, 'store'])
+                    ->name('api-clients.store');
+                Route::post('administrator/api-clients/{api_client}/revoke', [ApiClientController::class, 'revoke'])
+                    ->name('api-clients.revoke');
+                Route::resource('administrator/holidays', HolidayController::class, [
+                    'except' => ['show', 'create'],
+                ]);
+                Route::resource('administrator/staffs', StaffController::class, [
+                    'except' => ['show', 'create', 'store'],
+                ]);
+                // Staff Personnel
+                Route::resource('administrator/staff-personnel', StaffPersonnelController::class, [
+                    'except' => ['show', 'create', 'edit'],
+                ]);
+                Route::get(
+                    'administrator/staff-personnel/{staff_personnel}/switchstatus',
+                    [StaffPersonnelController::class, 'switchstatus']
+                )->name('staff-personnel.switchstatus');
+                Route::resource('administrator/divisions', DivisionController::class, [
+                    'except' => ['show', 'create', 'store'],
+                ]);
+                Route::get('administrator/restrictedips/{restrictedip}/updatestatus', [RestrictedIpController::class, 'updatestatus'])
+                    ->name('restrictedips.updatestatus');
+                Route::get('administrator/agencies/{agency}/switchstatus', [AgencyController::class, 'switchstatus'])
+                    ->name('agencies.switchstatus');
+                Route::get('administrator/divisions/{division}/switchstatus', [DivisionController::class, 'switchstatus'])
+                    ->name('divisions.switchstatus');
+                Route::get('administrator/staffs/{staff}/switchstatus', [StaffController::class, 'switchstatus'])
+                    ->name('staffs.switchstatus');
+                // --------------------------------------------------------------------------
+                // DataTable / AJAX Routes
+                // --------------------------------------------------------------------------
+                Route::post('administrator/roles/getroles', [RoleController::class, 'getroles'])
+                    ->name('getroles');
+                Route::post('administrator/users/getusers', [UserController::class, 'getusers'])
+                    ->name('getusers');
+                Route::post('administrator/systemlogs/getsystemlogs', [SystemLogController::class, 'getsystemlogs'])
+                    ->name('getsystemlogs');
+                Route::post('administrator/systemlogs/gethistory', [SystemLogController::class, 'gethistory'])
+                    ->name('gethistory');
+                Route::post('administrator/systemlogs/{tablename}/{rowid}', [SystemLogController::class, 'getmodellogs'])
+                    ->name('getmodellogs');
+                Route::post('administrator/rectrictedips/getrectrictedips', [RestrictedIpController::class, 'getrestrictedips'])
+                    ->name('getrestrictedips');
+                Route::post('administrator/parameters/getparameters', [ParameterController::class, 'getparameters'])
+                    ->name('getparameters');
+                Route::post('administrator/agencies/getagencies', [AgencyController::class, 'getagencies'])
+                    ->name('getagencies');
+                Route::post('administrator/forms/getforms', [FormController::class, 'getforms'])
+                    ->name('getforms');
+                Route::post('administrator/inquiries/getinquiries', [InquiryController::class, 'getinquiries'])
+                    ->name('getinquiries');
+                Route::post('administrator/holidays/getholidays', [HolidayController::class, 'getholidays'])
+                    ->name('getholidays');
+                Route::post('administrator/staffs/getstaffs', [StaffController::class, 'getstaffs'])
+                    ->name('getstaffs');
+                Route::post('administrator/divisions/getdivisions', [DivisionController::class, 'getdivisions'])
+                    ->name('getdivisions');
+                // --------------------------------------------------------------------------
+                // Inquiries
+                // --------------------------------------------------------------------------
+                Route::get('administrator/inquiries', [InquiryController::class, 'index'])
+                    ->name('inquiries.index');
+                Route::put('administrator/inquiries/submit/{inquiry}', [InquiryController::class, 'submit'])
+                    ->name('inquiries.submit');
+                Route::post('administrator/inquiries/updatestatus', [InquiryController::class, 'updatestatus'])
+                    ->name('inquiries.updatestatus');
+                Route::prefix('administrator')->group(function () {
+                    // Financial Plan Allocation Types
+                    Route::resource(
+                        'financial-plan-allocation-types',
+                        FinancialPlanAllocationTypeController::class,
+                        [
+                            'except' => ['show', 'create', 'edit'],
+                            'parameters' => [
+                                'financial-plan-allocation-types' => 'financialPlanAllocationType',
+                            ],
+                        ]
+                    );
+                    // Allocation Management
+                    Route::resource(
+                        'allocations',
+                        AllocationController::class
+                    )->except(['show']);
+                    // Fiscal Year Management
+                    Route::resource('fiscal-years', FiscalYearController::class)
+                        ->except(['show']);
+                    // Level Management
+                    Route::resource('levels', LevelController::class)->except(['show']);
+                    // Program Classification
+                    Route::prefix('program-classification')
+                        ->name('program-classification.')
+                        ->group(function () {
+                            Route::get('headers', [ProgramClassificationController::class, 'headers'])
+                                ->name('headers');
+                            Route::get('headers/{header}/sub-headers', [ProgramClassificationController::class, 'subHeaders'])
+                                ->name('sub-headers');
+                            Route::get('sub-headers/{subHeader}/programs', [ProgramClassificationController::class, 'programs'])
+                                ->name('programs');
+                            Route::get('programs/{program}/expenditures', [ProgramClassificationController::class, 'expenditures'])
+                                ->name('expenditures');
+                    });
+                    Route::resource('expense-types', ExpenseTypeController::class)->except(['show']);
+                    Route::get('saebs/data', [SaebController::class, 'data'])->name('saebs.data');
+                    Route::resource('saebs', SaebController::class);
+                    Route::get('procurements/data', [ProcurementController::class, 'data'])->name('procurements.data');
+                    Route::resource('procurements', ProcurementController::class);
+                    Route::get('financial-plans/all', [FinancialPlanController::class, 'plans'])
+                        ->middleware('performance')
+                        ->name('financial-plans.plans');
+                    Route::get('financial-plans', [FinancialPlanController::class, 'index'])
+                        ->middleware('performance')
+                        ->name('financial-plans.index');
+                    Route::get('financial-plans/data', [FinancialPlanController::class, 'data'])
+                        ->middleware('performance')
+                        ->name('financial-plans.data');
+                    Route::get('financial-plans/builder', [FinancialPlanController::class, 'builder'])
+                        ->middleware('performance')
+                        ->name('financial-plans.builder');
+                    Route::post('financial-plans/save', [FinancialPlanController::class, 'save'])
+                        ->middleware('performance')
+                        ->name('financial-plans.save');
+                    Route::post('financial-plans/submit', [FinancialPlanController::class, 'submitForApproval'])
+                        ->middleware('performance')
+                        ->name('financial-plans.submit');
+                    Route::prefix('expense-items')
+                        ->name('expense-items.')
+                        ->group(function () {
+                            Route::get('/', [ExpenseItemController::class, 'index'])
+                                ->name('index');
+                            Route::post('/', [ExpenseItemController::class, 'store'])
+                                ->name('store');
+                            Route::put('/{expenseItem}', [ExpenseItemController::class, 'update'])
+                                ->name('update');
+                            Route::patch('/{expenseItem}/toggle', [ExpenseItemController::class, 'toggle'])
+                                ->name('toggle');
+                    });
+                    Route::delete('financial-plans/destroy-plan', [FinancialPlanController::class, 'destroyPlan'])
+                        ->name('financial-plans.destroy-plan');
+                    Route::delete('financial-plans/{financial_plan}', [FinancialPlanController::class, 'destroy'])
+                        ->name('financial-plans.destroy');
+                    Route::get('/financial-plans/export-pdf', [FinancialPlanController::class, 'exportPdf'])
+                        ->name('financial-plans.export-pdf');
+                    Route::get('financial-plans/totals', [FinancialPlanController::class, 'totals'])
+                        ->name('financial-plans.totals');
+                    Route::get('/financial-plans/signatories', [FinancialPlanController::class, 'signatories'])->name('financial-plans.signatories');
+                    Route::post('/financial-plans/signatories', [FinancialPlanController::class, 'saveSignatories'])->name('financial-plans.signatories.save');
+                    // WFP workflow
+                    Route::post('financial-plans/approve', [FinancialPlanController::class, 'approve'])
+                        ->name('financial-plans.approve');
+                    Route::post('financial-plans/return', [FinancialPlanController::class, 'returnForRevision'])
+                        ->name('financial-plans.return');
+                    Route::post('financial-plans/finalize', [FinancialPlanController::class, 'finalize'])
+                        ->name('financial-plans.finalize');
+                    Route::post('financial-plans/reopen', [FinancialPlanController::class, 'reopen'])
+                        ->name('financial-plans.reopen');
+                    Route::get('financial-plans/status', [FinancialPlanController::class, 'status'])
+                        ->name('financial-plans.status');
+                    // Work Plan
+                    Route::get('work-plans/all', [WorkPlanController::class, 'plans'])
+                        ->middleware('performance')
+                        ->name('work-plans.plans');
+                    Route::get('work-plans', [WorkPlanController::class, 'index'])
+                        ->middleware('performance')
+                        ->name('work-plans.index');
+                    Route::get('work-plans/data', [WorkPlanController::class, 'data'])
+                        ->middleware('performance')
+                        ->name('work-plans.data');
+                    Route::get('work-plans/builder', [WorkPlanController::class, 'builder'])
+                        ->middleware('performance')
+                        ->name('work-plans.builder');
+                    Route::post('work-plans/save', [WorkPlanController::class, 'save'])
+                        ->middleware('performance')
+                        ->name('work-plans.save');
+                    Route::post('work-plans/{workPlan}/sync-financial-plan', [WorkPlanController::class, 'syncFinancialPlan'])
+                        ->middleware('performance')
+                        ->name('work-plans.sync-financial-plan');
+                    Route::post('work-plans/{workPlan}/submit', [WorkPlanController::class, 'submit'])
+                        ->middleware('performance')
+                        ->name('work-plans.submit');
+                    Route::get('work-plans/{workPlan}/export-pdf', [WorkPlanController::class, 'exportPdf'])
+                        ->name('work-plans.export-pdf');
+                    Route::delete('work-plans/{workPlan}', [WorkPlanController::class, 'destroy'])
+                        ->name('work-plans.destroy');
+                    Route::post('work-plans/{workPlan}/approve', [WorkPlanController::class, 'approve'])
+                        ->name('work-plans.approve');
+                    Route::post('work-plans/{workPlan}/return', [WorkPlanController::class, 'returnPlan'])
+                        ->name('work-plans.return');
+                    Route::post('work-plans/{workPlan}/finalize', [WorkPlanController::class, 'finalize'])
+                        ->name('work-plans.finalize');
+                    Route::post('work-plans/{workPlan}/reopen', [WorkPlanController::class, 'reopen'])
+                        ->name('work-plans.reopen');
+                    // Monthly Disbursement Program (MDP)
+                    Route::prefix('monthly-disbursement-program')->name('mdp.')->group(function () {
+                        Route::get('/', [MonthlyDisbursementProgramController::class, 'index'])
+                            ->name('index');
+                        Route::get('/{workPlan}/pdf', [MonthlyDisbursementProgramController::class, 'pdf'])
+                            ->name('pdf');
+                        Route::get('/{workPlan}', [MonthlyDisbursementProgramController::class, 'show'])
+                            ->name('show');
+                    });
+                });
+            });
+        });
+        Route::post('logout', [LoginController::class, 'logout'])
+            ->name('logout');
+    });
 });

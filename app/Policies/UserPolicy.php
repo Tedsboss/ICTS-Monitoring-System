@@ -23,15 +23,9 @@ class UserPolicy
 
     public function edit(User $user, User $model): bool
     {
-        if (! $user->isSuperAdmin()) {
-            return false;
-        }
-
-        if ((int) $user->id === (int) $model->id) {
-            return false;
-        }
-
-        return true;
+        return $user->isSuperAdmin()
+            && (int) $user->id !== (int) $model->id
+            && ! $model->isSuperAdmin();
     }
 
     public function update(User $user, User $model): bool

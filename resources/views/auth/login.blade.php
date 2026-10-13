@@ -53,7 +53,7 @@
                     <label for="email" class="!mb-2 !block !text-xs !font-semibold">Email address</label>
                     <input
                         type="email" id="email" name="email" value="{{ old('email') }}"
-                        placeholder="you@example.gov.ph" autocomplete="username" required
+                        placeholder="you@depdev.gov.ph" autocomplete="username" required
                         class="!font-sans !border-solid !block !h-[50px] !w-full !rounded-md !border !bg-white !px-4 !text-base !text-[#24364a] !shadow-sm !outline-none !transition placeholder:!text-xs placeholder:!text-[#7b8388] focus:!border-[#80939c] focus:!ring-2 focus:!ring-[#1b426c]/10 motion-reduce:!transition-none md:!text-sm @error('email') !border-red-600 @else !border-[#d6dee7] @enderror"
                         @error('email') aria-invalid="true" aria-describedby="email-error" @enderror
                     >
