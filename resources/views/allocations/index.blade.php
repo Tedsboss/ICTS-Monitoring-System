@@ -1,5 +1,4 @@
 @extends('layouts.app')
-
 @section('content')
 @php
     $allocationDark = session('user_settings.class_theme', '') === 'dark';
@@ -41,17 +40,17 @@
     $filtersActive = request()->filled('year_id') || request()->filled('level_id') || request()->filled('program_id') || (auth()->user()->isAdministrator() && request()->filled('staff_id'));
 @endphp
 <nav class="navbar navbar-main navbar-expand-lg px-0 mx-4 shadow-none border-radius-xl z-index-sticky" id="navbarBlur" data-scroll="false"><div class="container-fluid py-1 px-3">@include('layouts.navbars.auth.topnav', ['title' => 'Allocation Management']) @include('layouts.navbars.auth.topnav-withdatetime')</div></nav>
-<div id="direk-allocations" data-theme="{{ $allocationDark ? 'dark' : 'light' }}">
+<div id="direk-allocations" class="allocation-directory-page" data-theme="{{ $allocationDark ? 'dark' : 'light' }}">
     <header class="allocation-heading"><div><span class="allocation-eyebrow">Financial workspace / Allocations</span><h2>Funding with a clear view.</h2><p>Manage program budgets and see how Financial Plans use each allocation.</p></div>@if ($canAddAllocations ?? false)<a href="{{ route('allocations.create') }}" class="allocation-button allocation-primary"><i class="fa fa-plus" aria-hidden="true"></i> New allocation</a>@endif</header>
     <div id="pageMessage"></div>
     @if (session('success') || session('succes'))<div class="allocation-notice allocation-success" role="status">{{ session('success') ?: session('succes') }}</div>@endif
     @if (session('error'))<div class="allocation-notice allocation-danger" role="alert">{{ session('error') }}</div>@endif
     @if ($errors->any())<div class="allocation-notice allocation-danger" role="alert"><strong>Please correct the following:</strong><ul>@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>@endif
     <section class="allocation-metrics" aria-label="Summary of the allocations matching the selected filters">
-        <article class="allocation-panel"><span class="allocation-summary-label">Allocations</span><strong>{{ number_format($allocationCount) }}</strong><p>{{ number_format($expenseCount) }} expense lines · {{ $filtersActive ? 'filtered records' : 'accessible records' }}</p></article>
-        <article class="allocation-panel"><span class="allocation-summary-label">Overall budget</span><strong>₱{{ number_format($totalBudget, 2) }}</strong><p>MOOE ₱{{ number_format($allocationStats->sum('mooe_budget'), 2) }}<br>CO ₱{{ number_format($allocationStats->sum('co_budget'), 2) }}</p></article>
-        <article class="allocation-panel"><span class="allocation-summary-label">Programmed</span><strong class="allocation-accent">₱{{ number_format($totalProgrammed, 2) }}</strong><p>{{ number_format($overallUtilization, 1) }}% of overall budget<br>Effective Financial Plan amounts</p></article>
-        <article class="allocation-panel"><span class="allocation-summary-label">Remaining</span><strong class="{{ $totalRemaining < -0.005 ? 'allocation-negative' : 'allocation-positive' }}">₱{{ number_format($totalRemaining, 2) }}</strong><p>Overall budget less programmed usage<br>Category balances appear below</p></article>
+        <article class="allocation-panel"><i class="fa fa-th-large allocation-metric-symbol" aria-hidden="true"></i><span class="allocation-summary-label">Allocations</span><strong>{{ number_format($allocationCount) }}</strong><p>{{ number_format($expenseCount) }} expense lines · {{ $filtersActive ? 'filtered records' : 'accessible records' }}</p></article>
+        <article class="allocation-panel"><i class="fa fa-money allocation-metric-symbol" aria-hidden="true"></i><span class="allocation-summary-label">Overall budget</span><strong>₱{{ number_format($totalBudget, 2) }}</strong><p>MOOE ₱{{ number_format($allocationStats->sum('mooe_budget'), 2) }}<br>CO ₱{{ number_format($allocationStats->sum('co_budget'), 2) }}</p></article>
+        <article class="allocation-panel"><i class="fa fa-pie-chart allocation-metric-symbol" aria-hidden="true"></i><span class="allocation-summary-label">Programmed</span><strong class="allocation-accent">₱{{ number_format($totalProgrammed, 2) }}</strong><p>{{ number_format($overallUtilization, 1) }}% of overall budget<br>Effective Financial Plan amounts</p></article>
+        <article class="allocation-panel"><i class="fa fa-bank allocation-metric-symbol" aria-hidden="true"></i><span class="allocation-summary-label">Remaining</span><strong class="{{ $totalRemaining < -0.005 ? 'allocation-negative' : 'allocation-positive' }}">₱{{ number_format($totalRemaining, 2) }}</strong><p>Overall budget less programmed usage<br>Category balances appear below</p></article>
     </section>
     <section class="allocation-panel">
         <div class="allocation-panel-heading"><div><h3>Find an allocation</h3><p>Summary amounts reflect the selected filters.</p></div>@if ($filtersActive)<span class="allocation-badge">Filters active</span>@endif</div>
@@ -79,7 +78,7 @@
                     @foreach (['budget', 'programmed', 'remaining'] as $category)
                         <td class="allocation-money-cell"><strong class="{{ $category === 'remaining' ? ($stats['remaining'] < -0.005 ? 'allocation-negative' : 'allocation-positive') : ($category === 'programmed' ? 'allocation-accent' : '') }}">₱{{ number_format($stats[$category], 2) }}</strong>@foreach (['mooe' => 'MOOE', 'co' => 'CO'] as $key => $label)@php $value = $category === 'budget' ? $stats[$key . '_budget'] : $stats[$category . '_' . $key]; @endphp<small class="{{ $category === 'remaining' && $value < -0.005 ? 'allocation-negative' : '' }}">{{ $label }} ₱{{ number_format($value, 2) }}</small>@endforeach</td>
                     @endforeach
-                    <td><div class="allocation-utilization"><strong class="{{ $over ? 'allocation-negative' : '' }}">{{ number_format($stats['utilization'], 1) }}%</strong><span class="allocation-badge {{ $over ? 'allocation-badge-danger' : '' }}">{{ $over ? 'Over budget' : ($nearFull ? 'Near full' : 'Within budget') }}</span><div class="allocation-progress" aria-hidden="true"><span style="width:{{ min(100, max(0, $stats['utilization'])) }}%"></span></div><small>{{ number_format($stats['financial_plan_count']) }} Financial Plan {{ $stats['financial_plan_count'] === 1 ? 'row' : 'rows' }}</small></div></td>
+                    <td><div class="allocation-utilization" data-state="{{ $over ? 'over' : ($nearFull ? 'near' : 'normal') }}"><strong class="{{ $over ? 'allocation-negative' : '' }}">{{ number_format($stats['utilization'], 1) }}%</strong><span class="allocation-badge {{ $over ? 'allocation-badge-danger' : '' }}">{{ $over ? 'Over budget' : ($nearFull ? 'Near full' : 'Within budget') }}</span><div class="allocation-progress" aria-hidden="true"><span style="width:{{ min(100, max(0, $stats['utilization'])) }}%"></span></div><small>{{ number_format($stats['financial_plan_count']) }} Financial Plan {{ $stats['financial_plan_count'] === 1 ? 'row' : 'rows' }}</small></div></td>
                     <td><div class="allocation-row-actions">@if ($canEditAllocations ?? false)<a href="{{ route('allocations.edit', $allocation) }}" class="allocation-button">Edit</a>@endif @if ($canDeleteAllocations ?? false) @if ($stats['financial_plan_count'] > 0)<span class="allocation-locked" title="Financial Plan rows use this allocation."><i class="fa fa-lock" aria-hidden="true"></i> In use</span>@else<form action="{{ route('allocations.destroy', $allocation) }}" method="POST" class="delete-allocation-form" data-financial-plan-count="{{ $stats['financial_plan_count'] }}">@csrf @method('DELETE')<button type="submit" class="allocation-button allocation-remove delete-allocation-button">Delete</button></form>@endif @endif @if (!($canEditAllocations ?? false) && !($canDeleteAllocations ?? false))<span class="allocation-locked">—</span>@endif</div></td>
                 </tr>
             @endforeach
@@ -93,7 +92,6 @@
 @include('layouts.footers.auth.footer')
 @include('allocations.styles')
 @endsection
-
 @push('js')
 <script>
 document.addEventListener('DOMContentLoaded', function () {

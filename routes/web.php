@@ -12,7 +12,7 @@ use App\Http\Controllers\FinancialPlanAllocationTypeController;
 use App\Http\Controllers\AllocationController;
 use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\HolidayController;
-use App\Http\Controllers\HomeController;
+use App\Http\Controllers\PageController;
 use App\Http\Controllers\FormController;
 use App\Http\Controllers\FormSubmissionController;
 use App\Http\Controllers\SubmissionNotificationController;
@@ -104,7 +104,7 @@ Route::group(['middleware' => 'check.restricted.ips'], function () {
                 ->middleware('message.ip.throttle')
                 ->name('auth.contactus.store');
             Route::group(['middleware' => 'first.login'], function () {
-                Route::get('home', [HomeController::class, 'index'])
+                Route::get('home', [PageController::class, 'home'])
                     ->name('home');
                 Route::get('saeb-summary', [SaebSummaryController::class, 'index'])
                     ->name('saeb.index');

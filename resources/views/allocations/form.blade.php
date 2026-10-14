@@ -18,7 +18,7 @@
         @include('layouts.navbars.auth.topnav-withdatetime')
     </div>
 </nav>
-<div id="direk-allocations" data-theme="{{ $allocationDark ? 'dark' : 'light' }}">
+<div id="direk-allocations" class="allocation-editor-page" data-theme="{{ $allocationDark ? 'dark' : 'light' }}">
     <header class="allocation-heading"><div><span class="allocation-eyebrow">Financial workspace / Budget setup</span><h2>{{ $editing ? 'Refine your allocation.' : 'Give your plan a budget.' }}</h2><p>Set the funding ceiling and distribute it across the expenses your office needs.</p></div><a href="{{ route('allocations.index') }}" class="allocation-button"><i class="fa fa-arrow-left" aria-hidden="true"></i> Back to allocations</a></header>
     @if ($errors->any())
         <div class="allocation-notice allocation-danger" role="alert"><strong>Please correct the following:</strong><ul>@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>
@@ -33,6 +33,7 @@
         @if ($contextLocked)
             @foreach (['staff_id', 'year_id', 'level_id', 'program_id'] as $field)<input type="hidden" name="{{ $field }}" value="{{ $allocation->{$field} }}">@endforeach
         @endif
+        <div class="allocation-workflow" aria-label="Allocation setup sections"><span><b>01</b> Context</span><i class="fa fa-angle-right" aria-hidden="true"></i><span><b>02</b> Funding</span><i class="fa fa-angle-right" aria-hidden="true"></i><span><b>03</b> Expense distribution</span></div>
         <div class="allocation-editor-grid">
             <div class="allocation-main">
                 <section class="allocation-panel">
@@ -60,14 +61,13 @@
                 <div class="allocation-form-actions"><a href="{{ route('allocations.index') }}" class="allocation-button">Cancel</a><button type="submit" id="saveAllocation" class="allocation-button allocation-primary"><i class="fa fa-save" aria-hidden="true"></i><span id="saveAllocationText">{{ $editing ? 'Update allocation' : 'Save allocation' }}</span></button></div>
             </div>
             <aside class="allocation-summary allocation-panel" aria-labelledby="allocationSummaryTitle">
-                <div class="allocation-panel-body"><span class="allocation-step">Live summary</span><h3 id="allocationSummaryTitle">Your funding picture</h3><p class="allocation-help">Unassigned funding may remain within each overall budget.</p><span class="allocation-summary-label">Total overall budget</span><strong id="overallBudgetTotal" class="allocation-summary-total">₱0.00</strong><div class="allocation-summary-line"><span>MOOE expenses</span><strong id="mooeExpensesTotal">₱0.00</strong></div><div class="allocation-summary-line"><span>CO expenses</span><strong id="coExpensesTotal">₱0.00</strong></div><div class="allocation-summary-line"><span>MOOE unassigned</span><strong id="mooeUnassigned">₱0.00</strong></div><div class="allocation-summary-line"><span>CO unassigned</span><strong id="coUnassigned">₱0.00</strong></div><div id="budgetStatus" class="allocation-status" role="status" aria-live="polite"></div><p class="allocation-help allocation-summary-note">Expense allocations cannot exceed their MOOE or CO budget. Financial Plans use these expense amounts as their planning limits.</p></div>
+                <div class="allocation-panel-body"><span class="allocation-summary-symbol" aria-hidden="true"><i class="fa fa-pie-chart"></i></span><span class="allocation-step">Live summary</span><h3 id="allocationSummaryTitle">Your funding picture</h3><p class="allocation-help">Unassigned funding may remain within each overall budget.</p><span class="allocation-summary-label">Total overall budget</span><strong id="overallBudgetTotal" class="allocation-summary-total">₱0.00</strong><div class="allocation-summary-line"><span>MOOE expenses</span><strong id="mooeExpensesTotal">₱0.00</strong></div><div class="allocation-summary-line"><span>CO expenses</span><strong id="coExpensesTotal">₱0.00</strong></div><div class="allocation-summary-line"><span>MOOE unassigned</span><strong id="mooeUnassigned">₱0.00</strong></div><div class="allocation-summary-line"><span>CO unassigned</span><strong id="coUnassigned">₱0.00</strong></div><div id="budgetStatus" class="allocation-status" role="status" aria-live="polite"></div><p class="allocation-help allocation-summary-note">Expense allocations cannot exceed their MOOE or CO budget. Financial Plans use these expense amounts as their planning limits.</p></div>
             </aside>
         </div>
     </form>
 </div>
 @include('layouts.footers.auth.footer')
 @include('allocations.styles')
-
 @push('js')
 <script>
 document.addEventListener('DOMContentLoaded', function () {

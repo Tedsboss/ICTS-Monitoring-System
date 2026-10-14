@@ -6,6 +6,11 @@
         && !request()->routeIs('blocked', '2fa.challenge.show')
         && !in_array($direkLayoutStatus, [401, 402, 403, 404, 419, 429, 500, 503]);
     $direkDark = session('user_settings.class_theme', $class_theme ?? '') === 'dark';
+
+    // Render once here so sidenav CSS is registered before the head's CSS stack.
+    $direkSidenavHtml = $direkHasShell
+        ? view('layouts.navbars.auth.sidenav', ['bg' => 'bg-white', 'logo' => $logo ?? null])->render()
+        : '';
 @endphp
 <!DOCTYPE html>
 <html lang="en">
@@ -34,7 +39,7 @@
         <meta property="fb:app_id" content="655968634437471" />
         <meta property="og:title" content="Argon Dashboard 2 PRO Laravel by Creative Tim & UPDIVISION" />
         <meta property="og:type" content="article" />
-        <meta property="og:url" content="https://www.creative-tim.com/live/argon-dashboard-pro-laravel" />
+        <meta property="og:url" content="https://www\.creative-tim.com/live/argon-dashboard-pro-laravel" />
         <meta property="og:image"
             content="https://s3.amazonaws.com/creativetim_bucket/products/146/original/argon-dashboard-pro-laravel.jpg" />
         <meta property="og:description" content="Premium Admin Dashboard for Laravel with Ready to Use CRUDs" />
@@ -77,6 +82,17 @@
     </style>
     @stack('css')
     <style>
+        /* Floating feedback must remain above the sticky toolbar and its dropdowns. */
+        body.direk-workspace [data-notify="container"],
+        body.direk-workspace .toast-container,
+        body.direk-workspace #toast-container {
+            z-index:1090!important;
+        }
+        body.direk-workspace .navbar-main {
+            z-index:1020!important;
+        }
+    </style>
+    <style>
         html.direk-loading body{visibility:hidden}
         html.direk-loading #loader{visibility:visible!important;display:flex!important;opacity:1!important}
     </style>
@@ -100,7 +116,7 @@
             @include('components.loader')
             @yield('content')
         @else
-            @include('layouts.navbars.auth.sidenav', ['bg' => 'bg-white'])
+            {!! $direkSidenavHtml !!}
             <main class="main-content direk-main position-relative border-radius-lg">
                 @include('components.notifications.toast')
                 @include('components.loader')

@@ -2,15 +2,92 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\FinancialPlan;
 use App\Models\Parameter;
+use App\Models\WorkPlan;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
 
 class PageController extends Controller
 {
   public function home()
   {
-    $homeannouncement = Parameter::findorFail(2);
-    return view("home", compact('homeannouncement'));
+    $homeNow = now();
+    $homeUser = auth()->user();
+    $birthday = $homeUser?->birthday;
+    $birthdate = $birthday ? \Carbon\Carbon::parse($birthday) : null;
+    $firstName = trim((string) ($homeUser?->firstname ?? '')) ?: 'there';
+    $greeting = $homeNow->hour < 12
+      ? 'Good morning'
+      : ($homeNow->hour < 18 ? 'Good afternoon' : 'Good evening');
+    $canViewFinancialPlan = $homeUser && $homeUser->can('viewAny', FinancialPlan::class);
+    $canViewWorkPlan = $homeUser && $homeUser->can('viewAny', WorkPlan::class);
+    $modules = [];
+
+    if ($canViewFinancialPlan && Route::has('financial-plans.plans')) {
+      $modules[] = [
+        'title' => 'Financial plans',
+        'description' => 'Build budgets, schedule targets, and review allocation availability.',
+        'route' => 'financial-plans.plans',
+        'icon' => 'fa-money',
+        'category' => 'Budget',
+        'tone' => 'blue',
+        'index' => '01',
+      ];
+    }
+
+    if ($canViewWorkPlan && Route::has('work-plans.plans')) {
+      $modules[] = [
+        'title' => 'Work plans',
+        'description' => 'Turn planned activities into measurable outputs and delivery months.',
+        'route' => 'work-plans.plans',
+        'icon' => 'fa-tasks',
+        'category' => 'Delivery',
+        'tone' => 'emerald',
+        'index' => '02',
+      ];
+    }
+
+    if ($canViewFinancialPlan && $canViewWorkPlan && Route::has('mdp.index')) {
+      $modules[] = [
+        'title' => 'Monthly disbursement',
+        'description' => 'Review monthly cash requirements and export your MDP schedule.',
+        'route' => 'mdp.index',
+        'icon' => 'fa-calendar',
+        'category' => 'Cash flow',
+        'tone' => 'violet',
+        'index' => '03',
+      ];
+    }
+
+    if (Route::has('user-profile')) {
+      $modules[] = [
+        'title' => 'My profile',
+        'description' => 'Manage account details, security preferences, and trusted devices.',
+        'route' => 'user-profile',
+        'icon' => 'fa-user',
+        'category' => 'Account',
+        'tone' => 'amber',
+        'index' => '04',
+      ];
+    }
+
+    return view('home', [
+      'homeNow' => $homeNow,
+      'isDark' => session('user_settings.class_theme', '') === 'dark',
+      'homeannouncement' => Parameter::find(2),
+      'birthdate' => $birthdate,
+      'firstName' => $firstName,
+      'greeting' => $greeting,
+      'modules' => $modules,
+      'primaryModule' => $modules[0] ?? null,
+      'steps' => [
+        ['label' => 'Set foundations', 'detail' => 'Fiscal year and allocation level'],
+        ['label' => 'Prepare resources', 'detail' => 'Expense types and allocations'],
+        ['label' => 'Build the plan', 'detail' => 'Financial and work plans'],
+        ['label' => 'Review delivery', 'detail' => 'Monthly disbursement program'],
+      ],
+    ]);
   }
 
   public function dashboards(string $page)

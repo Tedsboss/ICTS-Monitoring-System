@@ -93,6 +93,29 @@
 @media(max-width:760px){#navbar.direk-auth-actions .direk-clock{display:none}#navbar.direk-auth-actions{gap:8px}#navbar.direk-auth-actions .direk-toolbar-actions{gap:5px}}
 @media(max-width:480px){#navbar.direk-auth-actions{width:100%;justify-content:flex-end;border-top:1px solid var(--actions-border);padding-top:9px}#navbar.direk-auth-actions .direk-mobile-toggle{margin-right:auto}#navbar.direk-auth-actions .direk-toolbar-actions{width:100%}}
 @media(prefers-reduced-motion:reduce){#navbar.direk-auth-actions button{transition:none!important}}
+
+/* Share the same surface, accent and edge palette as the title partial. */
+#navbar.direk-auth-actions{--actions-bg:#f8f6fd;--actions-border:#ddd7ec;--actions-heading:#302842;--actions-copy:#706482;--actions-subtle:#ece7f5;--actions-accent:#7160ca;--actions-edge:#d9d0e8;--actions-highlight:rgba(255,255,255,.9)}
+#navbar.direk-auth-actions[data-theme="dark"]{--actions-bg:#26213b;--actions-border:#514465;--actions-heading:#f4f0ff;--actions-copy:#c1b6d7;--actions-subtle:#39314f;--actions-accent:#c2acff;--actions-edge:#161126;--actions-highlight:rgba(239,221,255,.1)}
+#navbar.direk-auth-actions .direk-clock{padding:9px 13px;border:1px solid var(--actions-border);border-radius:12px;background:linear-gradient(145deg,var(--actions-bg),var(--actions-subtle));box-shadow:inset 0 1px 0 var(--actions-highlight),0 3px 0 var(--actions-edge);gap:10px}
+#navbar.direk-auth-actions .direk-clock-icon{color:var(--actions-accent);background:transparent;box-shadow:none;border:0}
+#navbar.direk-auth-actions #direk-date{font-size:10px;line-height:1.5}
+#navbar.direk-auth-actions #pst-time{font-size:13px;letter-spacing:.03em}
+#navbar.direk-auth-actions .direk-action-button{color:var(--actions-accent)!important;background:linear-gradient(145deg,var(--actions-bg),var(--actions-subtle))!important;box-shadow:inset 0 1px 0 var(--actions-highlight),0 3px 0 var(--actions-edge)!important}
+#navbar.direk-auth-actions .direk-action-button:hover{background:var(--actions-subtle)!important;box-shadow:inset 0 1px 0 var(--actions-highlight),0 3px 0 var(--actions-edge),0 7px 15px rgba(106,80,168,.12)!important}
+#navbar.direk-auth-actions .direk-mobile-lines i{background:var(--actions-accent)!important}
+#navbar.direk-auth-actions .direk-account-button{padding:6px 9px!important;border:1px solid var(--actions-border)!important;background:linear-gradient(145deg,var(--actions-bg),var(--actions-subtle))!important;box-shadow:inset 0 1px 0 var(--actions-highlight),0 3px 0 var(--actions-edge)!important}
+#navbar.direk-auth-actions .direk-account-button:hover{background:var(--actions-subtle)!important}
+#navbar.direk-auth-actions .direk-account-button>img{border-radius:10px;border-color:var(--actions-border)}
+#navbar.direk-auth-actions .dropdown-menu{box-shadow:inset 0 1px 0 var(--actions-highlight),0 4px 0 var(--actions-edge),0 18px 45px rgba(24,16,46,.22)!important}
+#navbar.direk-auth-actions .direk-account-summary,#navbar.direk-auth-actions .direk-dropdown-heading{background:linear-gradient(145deg,var(--actions-bg),var(--actions-subtle))}
+#navbar.direk-auth-actions .direk-account-item-icon,#navbar.direk-auth-actions .direk-dropdown-heading>span,#navbar.direk-auth-actions .direk-notification-empty>span{background:transparent!important;border:0!important;box-shadow:none!important;color:var(--actions-accent)}
+#navbar.direk-auth-actions .direk-logout-button .direk-account-item-icon{color:#e84e69!important}
+#navbar.direk-auth-actions .submission-notification-item .bg-sky-50{background:transparent!important;border:0!important;box-shadow:none!important}
+#navbar.direk-auth-actions .direk-account-label strong{max-width:140px}
+@media(max-width:760px){#navbar.direk-auth-actions .direk-clock{display:none}}
+@media(max-width:480px){#navbar.direk-auth-actions .direk-account-button{padding:4px 6px!important}#navbar.direk-auth-actions .dropdown-menu{max-width:calc(100vw - 24px)}}
+
 </style>
 @endpush
 @push('js')
@@ -161,7 +184,7 @@
                 );
             })
             .fail(function () {
-                // Keep navbar usable if notification loading fails.
+    // Keep navbar usable if notification loading fails.
                 $('#spanAlertCounter').text('');
             });
     }
@@ -224,7 +247,7 @@
         return $('<div/>')
             .text(value == null ? '' : String(value))
             .html();
-    }
+}
     // Mark notification as read before navigation.
     $(document).on(
         'click',
