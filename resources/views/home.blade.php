@@ -7,6 +7,11 @@
     </div>
 </nav>
 <div id="direk-home" class="hc-workspace" data-theme="{{ $isDark ? 'dark' : 'light' }}">
+    <div class="hc-moving-background" aria-hidden="true">
+        <span class="hc-ambient-orb hc-ambient-violet"></span>
+        <span class="hc-ambient-orb hc-ambient-blue"></span>
+        <span class="hc-ambient-orb hc-ambient-lilac"></span>
+    </div>
     <header class="hc-welcome">
         <div>
             <span class="hc-eyebrow">DIREK / YOUR DAILY WORKSPACE</span>
@@ -19,6 +24,8 @@
         </div>
     </header>
     <section class="sc-hero" data-light aria-labelledby="sc-hero-title">
+        <img class="sc-banner-photo" src="{{ asset('assets/img/neda/14624.jpg') }}" alt="" aria-hidden="true" decoding="async">
+        <div class="sc-banner-photo-overlay" aria-hidden="true"></div>
         <div class="sc-copy">
             <span class="sc-badge"><i aria-hidden="true"></i> YOUR CONNECTED WORKSPACE</span>
             <h2 id="sc-hero-title">Bring your <br> plans <em> to life. </em></h2>
@@ -250,6 +257,39 @@
 @media(max-width:760px){#direk-home .hc-journey{padding:24px}#direk-home .hc-journey .hc-section-title{gap:13px}#direk-home .hc-journey .hc-section-title h2{font-size:22px}#direk-home .hc-route-step{padding:18px}}
 @media(max-width:520px){#direk-home .hc-journey{padding:22px 19px}#direk-home .hc-journey ol{grid-template-columns:1fr;gap:18px}#direk-home .hc-journey .hc-route-step{min-height:0;padding:18px 18px 18px 70px}#direk-home .hc-route-top{position:absolute;left:17px;top:17px;display:flex;flex-direction:column;gap:5px;margin:0}#direk-home .hc-route-symbol{width:34px;height:28px;font-size:21px}#direk-home .hc-route-number{font-size:9px}#direk-home .hc-route-step:not(:last-child)::before{display:block;content:"\2193";left:32px;right:auto;top:auto;bottom:-16px;font-size:13px}#direk-home .hc-route-insight{align-items:flex-start}}
 @media(prefers-reduced-motion:reduce){#direk-home .hc-route-step:hover{transform:none!important;transition:none!important}}
+
+/* Slow ambient movement behind the homepage content. */
+#direk-home.hc-workspace{position:relative;isolation:isolate}
+#direk-home .hc-moving-background{position:absolute;inset:0;overflow:hidden;border-radius:inherit;pointer-events:none;z-index:0;opacity:.6}
+#direk-home[data-theme="dark"] .hc-moving-background{opacity:.75}
+#direk-home>.hc-moving-background~*{position:relative;z-index:1}
+#direk-home .hc-ambient-orb{position:absolute;display:block;width:clamp(280px,48vw,650px);aspect-ratio:1;border-radius:50%;pointer-events:none;background:radial-gradient(circle,rgba(164,131,226,.26),rgba(164,131,226,.08) 42%,transparent 70%);animation:dh-ambient-drift 32s ease-in-out infinite alternate}
+#direk-home .hc-ambient-violet{left:-15%;top:1%}
+#direk-home .hc-ambient-blue{right:-18%;top:35%;background:radial-gradient(circle,rgba(113,190,221,.24),rgba(113,190,221,.06) 42%,transparent 70%);animation-name:dh-ambient-drift-reverse;animation-duration:39s;animation-delay:-14s}
+#direk-home .hc-ambient-lilac{left:12%;bottom:-8%;background:radial-gradient(circle,rgba(182,155,233,.22),rgba(182,155,233,.06) 42%,transparent 70%);animation-duration:45s;animation-delay:-22s}
+#direk-home[data-theme="dark"] .hc-ambient-violet{background:radial-gradient(circle,rgba(153,99,236,.23),rgba(153,99,236,.07) 42%,transparent 70%)}
+#direk-home .sc-hero::before{animation:dh-banner-grid-drift 40s linear infinite}
+@keyframes dh-ambient-drift{0%{transform:translate3d(0,0,0) scale(.95)}50%{transform:translate3d(70px,35px,0) scale(1.08)}100%{transform:translate3d(25px,110px,0) scale(1)}}
+@keyframes dh-ambient-drift-reverse{0%{transform:translate3d(0,0,0) scale(1)}50%{transform:translate3d(-65px,-30px,0) scale(1.08)}100%{transform:translate3d(-25px,80px,0) scale(.96)}}
+@keyframes dh-banner-grid-drift{from{background-position:0 0}to{background-position:70px 35px}}
+#direk-home[data-background-paused="true"] .hc-ambient-orb,#direk-home[data-background-paused="true"] .sc-hero::before{animation-play-state:paused!important}
+#direk-home[data-motion="off"] .hc-ambient-orb,#direk-home[data-motion="off"] .sc-hero::before{animation:none!important}
+@media(max-width:760px){#direk-home .hc-moving-background{opacity:.4}#direk-home .hc-ambient-orb{width:340px;animation-duration:45s}#direk-home .hc-ambient-lilac{display:none}}
+@media(prefers-reduced-motion:reduce){#direk-home .hc-ambient-orb,#direk-home .sc-hero::before{animation:none!important;transform:none!important}}
+
+
+/* Agency photo stays inside the banner; the existing gradient is the fallback. */
+#direk-home .sc-hero{isolation:isolate;overflow:hidden}
+#direk-home .sc-banner-photo{position:absolute;inset:0;width:100%;height:100%;display:block;object-fit:cover;object-position:center;z-index:0;pointer-events:none;transform-origin:center;animation:dh-banner-photo-zoom 28s ease-in-out infinite alternate}
+#direk-home .sc-banner-photo-overlay{position:absolute;inset:0;z-index:1;pointer-events:none;background:linear-gradient(105deg,rgba(23,21,43,.91),rgba(36,25,60,.77) 48%,rgba(40,28,65,.54)),linear-gradient(0deg,rgba(17,14,34,.25),transparent 65%)}
+#direk-home .sc-hero::before{z-index:1;opacity:.4}
+#direk-home .sc-copy,#direk-home .sc-scene{position:relative;z-index:2}
+@keyframes dh-banner-photo-zoom{from{transform:scale(1.02)}to{transform:scale(1.10)}}
+#direk-home[data-background-paused="true"] .sc-banner-photo{animation-play-state:paused!important}
+#direk-home[data-motion="off"] .sc-banner-photo{animation:none!important;transform:none!important}
+@media(max-width:760px){#direk-home .sc-banner-photo-overlay{background:linear-gradient(180deg,rgba(23,21,43,.90),rgba(36,25,60,.75) 48%,rgba(40,28,65,.60))}}
+@media(prefers-reduced-motion:reduce){#direk-home .sc-banner-photo{animation:none!important;transform:none!important}}
+
 </style>
 @endpush
 @push('js')
@@ -362,4 +402,17 @@
     window.setInterval(updateClock, 60000);
 })();
 </script>
+
+<script>
+(function () {
+    const root = document.getElementById('direk-home');
+    if (!root) return;
+    function syncBackgroundVisibility() {
+        root.dataset.backgroundPaused = String(document.hidden);
+    }
+    document.addEventListener('visibilitychange', syncBackgroundVisibility);
+    syncBackgroundVisibility();
+})();
+</script>
+
 @endpush
