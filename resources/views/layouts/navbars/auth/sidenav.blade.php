@@ -90,7 +90,7 @@
 <aside class="direk-sidebar direk-sidebar-3d sidenav navbar navbar-vertical navbar-expand-xs fixed-start !my-3 !ms-2 !flex !h-[calc(100vh-2rem)] !max-h-[calc(100vh-2rem)] !flex-col !items-stretch !overflow-hidden !rounded-2xl !border !border-solid !p-0 !shadow-sm {{ $sidebarSurface }}" id="sidenav-main" data-design="immersive-3d" data-theme="{{ $sidebarDark ? 'dark' : 'light' }}" aria-label="Main navigation">
     <div class="sidenav-header !relative !h-auto !min-h-0 !shrink-0 !bg-transparent !px-4 !py-5">
         <button type="button" id="iconSidenav" aria-label="Close navigation" class="!absolute !right-1 !top-1 !grid !h-9 !w-9 !place-items-center !rounded !border-0 !bg-transparent !p-0 {{ $sidebarMuted }} hover:!bg-violet-500/10 focus-visible:!outline-none focus-visible:!ring-2 focus-visible:!ring-[#8276ef] min-[1200px]:!hidden"><i class="fa fa-times" aria-hidden="true"></i></button>
-        <a class="navbar-brand !m-0 !flex !min-w-0 !items-center !gap-3 !rounded-lg !p-0 !no-underline focus-visible:!outline-none focus-visible:!ring-2 focus-visible:!ring-[#8276ef]" href="{{ route('home') }}" aria-label="DIREK Home">
+        <a data-direk-route-family="home" class="navbar-brand !m-0 !flex !min-w-0 !items-center !gap-3 !rounded-lg !p-0 !no-underline focus-visible:!outline-none focus-visible:!ring-2 focus-visible:!ring-[#8276ef]" href="{{ route('home') }}" aria-label="DIREK Home">
             <img src="{{ $logo ?? asset('assets/img/neda/logo.png') }}" class="navbar-brand-img !h-10 !w-10 !max-h-10 !shrink-0 !object-contain" width="40" height="40" alt="DEPDev logo">
             <span class="nav-link-text !min-w-0 !leading-tight">
                 <strong class="!block !text-base !font-semibold !tracking-[0.05em] direk-brand-title">D.I.R.E.K.</strong>
@@ -108,7 +108,7 @@
                 </button>
                 <div id="profile-menu" data-direk-menu @if (!$isProfileRoute) hidden @endif>
                     <ul class="nav !my-1 !ml-4 !flex !list-none !flex-col !gap-1 !border-0 !border-l !border-solid !pl-3 {{ $sidebarDivider }}">
-                        <li class="nav-item !w-full"><a class="nav-link {{ $sidebarSubLink }} {{ $isProfileRoute ? $sidebarActive : $sidebarInactive }}" href="{{ route('user-profile') }}" @if ($isProfileRoute) aria-current="page" @endif><span class="sidenav-mini-icon !inline-flex !w-4 !shrink-0 !justify-center"><i class="fa fa-user !text-inherit" aria-hidden="true"></i></span><span class="sidenav-normal">My Profile</span></a></li>
+                        <li class="nav-item !w-full"><a data-direk-route-family="user-profile" class="nav-link {{ $sidebarSubLink }} {{ $isProfileRoute ? $sidebarActive : $sidebarInactive }}" href="{{ route('user-profile') }}" @if ($isProfileRoute) aria-current="page" @endif><span class="sidenav-mini-icon !inline-flex !w-4 !shrink-0 !justify-center"><i class="fa fa-user !text-inherit" aria-hidden="true"></i></span><span class="sidenav-normal">My Profile</span></a></li>
                         <li class="nav-item !w-full">
                             <form method="POST" action="{{ route('logout') }}" id="logout-form-sidenav" class="!m-0">
                                 @csrf
@@ -196,7 +196,7 @@
                                     <button type="button" id="expense-management-menu-toggle" class="nav-link {{ $sidebarSubLink }} {{ $isExpenseManagementRoute ? $sidebarActive : $sidebarInactive }}" aria-expanded="{{ $isExpenseManagementRoute ? 'true' : 'false' }}" aria-controls="expense-management-menu"><span class="sidenav-mini-icon !inline-flex !w-4 !shrink-0 !justify-center"><i class="fa fa-tags !text-inherit" aria-hidden="true"></i></span><span class="sidenav-normal !min-w-0 !flex-1">Expense Management</span><i class="fa fa-angle-down !ml-auto !shrink-0 !text-xs !transition-transform motion-reduce:!transition-none {{ $sidebarMuted }}" id="expense-management-menu-icon" aria-hidden="true"></i></button>
                                     <div id="expense-management-menu" data-direk-menu @if (!$isExpenseManagementRoute) hidden @endif>
                                         <ul class="nav !my-1 !ml-3 !flex !list-none !flex-col !border-0 !border-l !border-solid !pl-2 {{ $sidebarDivider }}">
-                                            <li class="nav-item !w-full"><a class="nav-link {{ $sidebarSubLink }} {{ $isExpenseManagementRoute ? $sidebarActive : $sidebarInactive }}" href="{{ route('expense-types.index') }}" @if ($isExpenseManagementRoute) aria-current="page" @endif><span class="sidenav-mini-icon !inline-flex !w-4 !shrink-0 !justify-center"><i class="fa fa-tags !text-inherit" aria-hidden="true"></i></span><span class="sidenav-normal">Expense Types</span></a></li>
+                                            <li class="nav-item !w-full"><a data-direk-route-family="expense-types" class="nav-link {{ $sidebarSubLink }} {{ $isExpenseManagementRoute ? $sidebarActive : $sidebarInactive }}" href="{{ route('expense-types.index') }}" @if ($isExpenseManagementRoute) aria-current="page" @endif><span class="sidenav-mini-icon !inline-flex !w-4 !shrink-0 !justify-center"><i class="fa fa-tags !text-inherit" aria-hidden="true"></i></span><span class="sidenav-normal">Expense Types</span></a></li>
                                         </ul>
                                     </div>
                                 </li>
@@ -214,7 +214,7 @@
 </aside>
 @once
 <style>
-/* Scoped sidebar layout. */
+/*Scoped sidebar layout. */
 #sidenav-main.direk-sidebar-3d {
     --side-text:#24304b; --side-copy:#5b6680; --side-muted:#748099;
     --side-border:#dce1ee; --side-accent:#6555dc; --side-ring:#8276ef;
@@ -313,8 +313,7 @@
 @media(max-width:1199px){#sidenav-main.direk-sidebar-3d{box-shadow:inset 1px 1px 0 var(--side-highlight),3px 0 0 var(--side-edge),8px 12px 24px var(--side-shadow)!important}}
 @media(prefers-reduced-motion:reduce){#sidenav-main.direk-sidebar-3d .nav-link,#sidenav-main.direk-sidebar-3d .nav-link .icon,#sidenav-main.direk-sidebar-3d .fa-angle-down{transition:none!important}#sidenav-main.direk-sidebar-3d .nav-link:hover,#sidenav-main.direk-sidebar-3d .nav-link:active,#sidenav-main.direk-sidebar-3d .nav-link .icon{transform:none!important}}
 @media(forced-colors:active){#sidenav-main.direk-sidebar-3d .nav-link[aria-current="page"]{outline:2px solid Highlight!important}#sidenav-main.direk-sidebar-3d .nav-link{box-shadow:none!important;border:1px solid ButtonText!important}}
-
-/* Variant colors are independent of the application palette. Plain icons are retained. */
+/*Variant colors are independent of the application palette. Plain icons are retained. */
 #sidenav-main.direk-sidebar-3d[data-design="immersive-3d"] {
  --side-text:#f4f0ff;--side-copy:#d3cce8;--side-muted:#b4a9cf;--side-border:#4b4268;
  --side-accent:#c2acff;--side-ring:#c2acff;--side-tile-top:#39334f;--side-tile-bottom:#29253e;
@@ -333,15 +332,14 @@
 #sidenav-main.direk-sidebar-3d[data-design="immersive-3d"] .nav-link:active{transform:translateY(1px);box-shadow:inset 0 1px 0 rgba(239,221,255,.13),0 3px 0 #141125,0 8px 14px rgba(0,0,0,.25)!important}
 @media(prefers-reduced-motion:reduce){#sidenav-main.direk-sidebar-3d[data-design="immersive-3d"] .nav-link:hover,#sidenav-main.direk-sidebar-3d[data-design="immersive-3d"] .nav-link:active{transform:none!important;transition:none!important}}
 @media(forced-colors:active){#sidenav-main.direk-sidebar-3d[data-design="immersive-3d"] .nav-link{color:ButtonText!important;background:Canvas!important;border:1px solid ButtonText!important;box-shadow:none!important}#sidenav-main.direk-sidebar-3d[data-design="immersive-3d"] .nav-link[aria-current="page"]{outline:2px solid Highlight!important}}
-
 </style>
 @endonce
-@push('js')
 <script>
 (function () {
     'use strict';
     const root = document.getElementById('sidenav-main');
-    if (!root) return;
+    if (!root || root.dataset.direkBound === 'true') return;
+    root.dataset.direkBound = 'true';
     // Keep icon-only navigation named for both assistive technology and hover.
     root.querySelectorAll('a.nav-link, button.nav-link').forEach(function (link) {
         const label = link.querySelector('.nav-link-text, .sidenav-normal');
@@ -368,6 +366,10 @@
     }
     function expandSidebarIfNeeded() {
         if (root.getAttribute('data-direk-collapsed') !== 'true') return false;
+        if (window.DirekWorkspace) {
+            window.DirekWorkspace.toggleSidebar(true);
+            return true;
+        }
         const trigger = document.querySelector('.sidenav-toggler button')
             || document.querySelector('.sidenav-toggler');
         if (!trigger) return false;
@@ -420,4 +422,3 @@
     if (activeLink) activeLink.classList.add('active');
 })();
 </script>
-@endpush

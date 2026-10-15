@@ -38,14 +38,12 @@ use App\Http\Controllers\LevelController;
 use App\Http\Controllers\ExpenseTypeController;
 use App\Http\Controllers\ProgramClassificationController;
 use Illuminate\Support\Facades\Route;
-
 // --------------------------------------------------------------------------
 // Web Routes
 // --------------------------------------------------------------------------
 Route::get('/', function () {
     return redirect()->route('saebs.index');
 });
-
 Route::get('/login', [LoginController::class, 'show'])
     ->middleware(['guest', 'check.restricted.ips'])
     ->name('login');
@@ -253,7 +251,7 @@ Route::group(['middleware' => 'check.restricted.ips'], function () {
                     ->name('inquiries.submit');
                 Route::post('administrator/inquiries/updatestatus', [InquiryController::class, 'updatestatus'])
                     ->name('inquiries.updatestatus');
-                Route::prefix('administrator')->group(function () {
+                Route::group([], function () {
                     // Financial Plan Allocation Types
                     Route::resource(
                         'financial-plan-allocation-types',
